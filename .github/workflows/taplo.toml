@@ -1,0 +1,8 @@
+# Formats TOML files using Taplo.
+
+[formatting]
+align_entries       = true
+allowed_blank_lines = 1
+compact_arrays      = false
+indent_string       = "    "
+reorder_keys        = true

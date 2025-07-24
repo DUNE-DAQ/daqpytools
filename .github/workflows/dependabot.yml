@@ -1,0 +1,15 @@
+# Dependabot identifies outdated dependencies in your project and opens pull requests 
+# to update them. This file configures Dependabot for your repository.
+# It integrates with GitHub Security Advisory Database to ensure that the dependencies 
+# are secure.
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

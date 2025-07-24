@@ -1,0 +1,16 @@
+__pycache__
+.vscode
+*~
+*.egg-info
+*.#*
+venv/
+.venv/
+build
+.DS_Store
+log*
+.nfs*
+info.*.json
+.python-version
+.coverage
+.*_cache
+htmlcov

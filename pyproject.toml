@@ -75,6 +75,7 @@ force-exclude = '''
 
 [mypy]
 ignore_missing_imports = true
+mypy_path = "src"
 
 [tool.pytest.ini_options]
 # addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=manage.py --ignore=drunc_ui/settings/ --ignore=docs/ --ignore=example_deployment/ --ignore=ers/"

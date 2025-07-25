@@ -18,7 +18,8 @@ dev = [
     "black",
     "pytest-cov",
     "pytest-mypy",
-    "taplo"
+    "taplo",
+    "types-setuptools"
 ]
 
 [project.scripts]

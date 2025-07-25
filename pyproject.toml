@@ -9,6 +9,9 @@ readme = "docs/README.md"
 version = "0.1.0"
 description = "Description left as an exercise for the developer."
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [project.optional-dependencies]
 dev = [
     "ruff",
@@ -18,8 +21,7 @@ dev = [
     "black",
     "pytest-cov",
     "pytest-mypy",
-    "taplo",
-    "types-setuptools"
+    "taplo"
 ]
 
 [project.scripts]

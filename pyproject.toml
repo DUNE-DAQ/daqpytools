@@ -1,12 +1,12 @@
 [build-system]
-build-backend = "hatchling.build"
-requires = ["hatchling"]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "daqpytools"
 requires-python = ">=3.10"
 readme = "docs/README.md"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Description left as an exercise for the developer."
 
 [project.optional-dependencies]
@@ -17,15 +17,12 @@ dev = [
     "isort",
     "black",
     "pytest-cov",
-    "pytest-mypy", # TODO
+    "pytest-mypy",
     "taplo"
 ]
 
-[tool.hatch.version]
-path = "version.py"
-
-[tool.hatch.packages.find]
-where = ["src"]
+[project.scripts]
+daqpytools-logging-demonstrator = "daqpytools.apps.__main_logging_demonstrator__:main"
 
 [tool.ruff]
 line-length = 88

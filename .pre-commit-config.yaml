@@ -25,3 +25,9 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+      - id: pytest-mypy
+        name: Type check with pytest-mypy
+        entry: pytest --mypy
+        language: system
+        types: [python]

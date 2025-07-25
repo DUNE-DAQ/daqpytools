@@ -31,3 +31,9 @@ repos:
         entry: pytest --mypy
         language: system
         types: [python]
+
+      - id: pytest-doctest
+        name: Run doctests with pytest
+        entry: pytest --doctest-modules --ignore=docs/
+        language: system
+        types: [python]

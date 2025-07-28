@@ -16,7 +16,7 @@ jobs:
       - name: Install itself
         run:  |
           pip cache purge
-          pip install -e .[dev]
+          pip install -e daqpytools[dev]
 
       - name: Run tests and generate coverage
         run: pytest --cov=daqpytools --cov-report=xml

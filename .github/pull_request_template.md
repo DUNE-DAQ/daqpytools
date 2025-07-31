@@ -17,9 +17,6 @@ Fixes # (issue)
 ## Key checklist
 
 - [ ] All tests pass (eg. `python -m pytest`)
-{%- if cookiecutter.mkdocs %}
-- [ ] The documentation builds and looks OK (eg. `mkdocs serve`)
-{%- endif %}
 - [ ] Pre-commit hooks run successfully (eg. `pre-commit run --all-files`)
 
 ## Further checks

@@ -62,7 +62,7 @@ ignore_missing_imports = true
 mypy_path              = "src"
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/"
+addopts = "-v --mypy -p no:warnings --cov=daqpython --cov-report=html --doctest-modules --ignore=docs/"
 testpaths = ["tests"]
 norecursedirs = [".git", ".github", "venv", "src"]
 

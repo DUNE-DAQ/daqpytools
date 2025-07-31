@@ -9,5 +9,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
-      - run: ruff check --fix --exit-non-zero-on-fix
+      - run: ruff check --exit-non-zero-on-fix
       - run: ruff format

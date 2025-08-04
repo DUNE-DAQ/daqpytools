@@ -1,14 +1,14 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires      = [ "setuptools >= 61.0" ]
+requires = ["setuptools >= 61.0"]
 
 [project]
 dependencies = [
-    "click==8.1.7",
-    "kafka-python==2.0.2",
-    "pytz==2024.2",
-    "rich==13.9.4",
-    "sh==2.1.0",
+  "click==8.1.7",
+  "kafka-python==2.0.2",
+  "pytz==2024.2",
+  "rich==13.9.4",
+  "sh==2.1.0",
 ]
 description = "Python utils to simplify DAQ development."
 name = "daqpytools"
@@ -21,14 +21,13 @@ package-dir = { "" = "src" }
 
 [project.optional-dependencies]
 dev = [
-    "ruff",
-    "pre-commit",
-    "pytest",
-    "isort",
-    "black",
-    "pytest-cov",
-    "pytest-mypy",
-    "taplo",
+  "ruff",
+  "pre-commit",
+  "pytest",
+  "black",
+  "pytest-cov",
+  "pytest-mypy",
+  "taplo",
 ]
 
 [project.scripts]
@@ -38,32 +37,32 @@ daqpytools-logging-demonstrator = "daqpytools.apps.__main_logging_demonstrator__
 line-length = 88
 
 [tool.ruff.lint]
-ignore = [ "D205", "D100", "D104" ]
+ignore = ["D205", "D100", "D104"]
 pydocstyle.convention = "google"
 select = [
-    "D",
-    "E",
-    "F",
-    "I",
-    "UP",
-    "RUF",
-    "S",
-    "N",
-    "ERA",
-    "B",
-    "C4",
-    "A",
-    "RET",
-    "T20",
-    "ISC",
-    "G",
-    "TRY",
-    "T",
-    "ANN",
+  "D",
+  "E",
+  "F",
+  "I",
+  "UP",
+  "RUF",
+  "S",
+  "N",
+  "ERA",
+  "B",
+  "C4",
+  "A",
+  "RET",
+  "T20",
+  "ISC",
+  "G",
+  "TRY",
+  "T",
+  "ANN",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [ "D100", "D103", "D104", "S101", "ANN201" ]
+"tests/*" = ["D100", "D103", "D104", "S101", "ANN201"]
 
 [tool.black]
 force-exclude = '''
@@ -75,23 +74,23 @@ force-exclude = '''
 '''
 line-length = 88
 skip-magic-trailing-comma = true
-target-version = [ "py310", "py311", "py312", "py313" ]
+target-version = ["py310", "py311", "py312", "py313"]
 
 [tool.mypy]
 ignore_missing_imports = true
-mypy_path              = "src"
+mypy_path = "src"
 
 [tool.pytest.ini_options]
-addopts       = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
-norecursedirs = [ ".git", ".github", "venv" ]
-testpaths     = [ "tests" ]
+addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
+norecursedirs = [".git", ".github", "venv"]
+testpaths = ["tests"]
 
 [tool.coverage.run]
-omit = [ "tests/*" ]
+omit = ["tests/*"]
 
 [tool.taplo.formatting]
-align_entries       = true
+align_entries = true
 allowed_blank_lines = 1
-compact_arrays      = false
-indent_string       = "    "
-reorder_keys        = true
+compact_arrays = false
+indent_string = "    "
+reorder_keys = true

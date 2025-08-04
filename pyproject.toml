@@ -62,9 +62,16 @@ ignore_missing_imports = true
 mypy_path              = "src"
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
-testpaths = ["tests"]
-norecursedirs = [".git", ".github", "venv"]
+addopts       = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
+norecursedirs = [ ".git", ".github", "venv" ]
+testpaths     = [ "tests" ]
 
 [tool.coverage.run]
 omit = [ "tests/*", "scripts/*" ]
+
+[tool.taplo.formatting]
+align_entries       = true
+allowed_blank_lines = 1
+compact_arrays      = false
+indent_string       = "    "
+reorder_keys        = true

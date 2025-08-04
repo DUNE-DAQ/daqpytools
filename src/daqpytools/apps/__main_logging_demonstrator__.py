@@ -78,7 +78,7 @@ def main(
     child_logger: bool,
     disable_logger_inheritance: bool,
 ) -> None:
-    """Demonstrate use of the daq_logging class."""
+    """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator."""
     logger_name = "daqpytools_logging_demonstrator"
 
     validate_test_configuration(

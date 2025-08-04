@@ -38,9 +38,29 @@ daqpytools-logging-demonstrator = "daqpytools.apps.__main_logging_demonstrator__
 line-length = 88
 
 [tool.ruff.lint]
-ignore                = [ "D205", "D100", "D104" ]
+ignore = [ "D205", "D100", "D104" ]
 pydocstyle.convention = "google"
-select                = [ "D", "E", "F", "I", "UP", "RUF", "ANN" ]
+select = [
+    "D",
+    "E",
+    "F",
+    "I",
+    "UP",
+    "RUF",
+    "S",
+    "N",
+    "ERA",
+    "B",
+    "C4",
+    "A",
+    "RET",
+    "T20",
+    "ISC",
+    "G",
+    "TRY",
+    "T",
+    "ANN",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [ "D100", "D103", "D104", "S101", "ANN201" ]
@@ -67,7 +87,7 @@ norecursedirs = [ ".git", ".github", "venv" ]
 testpaths     = [ "tests" ]
 
 [tool.coverage.run]
-omit = [ "tests/*", "scripts/*" ]
+omit = [ "tests/*" ]
 
 [tool.taplo.formatting]
 align_entries       = true

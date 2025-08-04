@@ -37,3 +37,10 @@ repos:
         entry: pytest --doctest-modules --ignore=docs/
         language: system
         types: [python]
+
+      - id: taplo-fmt
+        name: Format TOML files with Taplo
+        entry: taplo fmt
+        language: system
+        types: [toml]
+        pass_filenames: true

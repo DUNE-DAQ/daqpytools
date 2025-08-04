@@ -1,3 +1,5 @@
+# Run pytests with mypy, doctests, and coverage
+
 name: Test, Type Check, and Coverage
 
 on: [push]

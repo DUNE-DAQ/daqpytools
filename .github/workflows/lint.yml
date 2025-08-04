@@ -1,3 +1,5 @@
+# Check compliance with defined linting rules using ruff.
+
 name: Lint with ruff
 
 on:

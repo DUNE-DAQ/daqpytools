@@ -21,4 +21,4 @@ jobs:
           curl -sSf https://taplo.tamasfe.dev/install.sh | sh
           echo "$HOME/.taplo/bin" >> $GITHUB_PATH
       - name: Check TOML formatting with Taplo
-        run: taplo fmt --check --config pyproject.toml
+        run: taplo fmt --check

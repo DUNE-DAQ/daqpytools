@@ -28,6 +28,7 @@ dev = [
     "black",
     "pytest-cov",
     "pytest-mypy",
+    "pytest-doctest",
     "taplo",
 ]
 

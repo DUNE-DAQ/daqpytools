@@ -34,7 +34,7 @@ repos:
 
       - id: taplo-fmt
         name: Format TOML files with Taplo
-        entry: taplo fmt --check --config pyproject.toml
+        entry: taplo fmt --check
         language: system
         types: [toml]
         pass_filenames: true

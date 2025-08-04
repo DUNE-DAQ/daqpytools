@@ -87,10 +87,3 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 omit = ["tests/*"]
-
-[tool.taplo.formatting]
-align_entries = true
-allowed_blank_lines = 1
-compact_arrays = false
-indent_string = "    "
-reorder_keys = true

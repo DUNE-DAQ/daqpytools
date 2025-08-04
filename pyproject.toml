@@ -31,7 +31,9 @@ dev = [
   "pytest-cov",
   "pytest-mypy",
   "taplo",
+  "types-pytz",
 ]
+test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 
 [project.scripts]
 daqpytools-logging-demonstrator = "daqpytools.apps.__main_logging_demonstrator__:main"

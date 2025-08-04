@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -e .[dev]
+          pip install .
 
       - name: Run tests, mypy, and generate coverage
         run: |

@@ -13,12 +13,6 @@ repos:
         language: system
         types: [python]
 
-      - id: isort
-        name: isort Import Sorter
-        entry: isort
-        language: system
-        types: [python]
-
       - id: pytest
         name: Run tests with pytest
         entry: pytest -v tests/ --tb=short --disable-warnings

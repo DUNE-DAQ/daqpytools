@@ -16,15 +16,11 @@ readme = "docs/README.md"
 requires-python = ">=3.10"
 version = "0.1.0"
 
-[tool.setuptools]
-package-dir = { "" = "src" }
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 "daqpytools.logging" = ["log_format.ini"]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["src"]
 
 [project.optional-dependencies]
 dev = [

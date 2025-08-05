@@ -1,5 +1,3 @@
-# From SWIT
-
 name: Add pull request to project
 on:
   pull_request:
@@ -12,7 +10,6 @@ jobs:
       - name: Get project data
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_CI_ISSUES }}
-          GH_TOKEN: ${{ secrets.BOT_CI_ISSUES }}
           ORGANIZATION: DUNE-DAQ
           PROJECT_NUMBER: 5
         run: |

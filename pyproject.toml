@@ -21,6 +21,10 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.package-data]
 "daqpytools.logging" = ["log_format.ini"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [project.optional-dependencies]
 dev = [

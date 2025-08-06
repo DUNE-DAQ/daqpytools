@@ -2,13 +2,13 @@ repos:
   - repo: local
     hooks:
       - id: ruff
-        name: Ruff Linter
+        name: Check linting with Ruff
         entry: ruff check --fix --exit-non-zero-on-fix
         language: system
         types: [python]
 
       - id: black
-        name: Black Formatter
+        name: Check formatting with Black
         entry: black --check
         language: system
         types: [python]
@@ -33,7 +33,7 @@ repos:
         types: [python]
 
       - id: taplo-fmt
-        name: Format TOML files with Taplo
+        name: Check TOML formatting with Taplo
         entry: taplo fmt --check
         language: system
         types: [toml]

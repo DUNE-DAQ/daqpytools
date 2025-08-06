@@ -24,14 +24,14 @@ where = ["src"]
 
 [project.optional-dependencies]
 dev = [
-  "ruff",
-  "pre-commit",
-  "pytest",
-  "black",
-  "pytest-cov",
-  "pytest-mypy",
-  "taplo",
-  "types-pytz",
+  "ruff==0.12.3",
+  "pre-commit==4.2.0",
+  "pytest==8.3.3",
+  "black==25.1.0",
+  "pytest-cov==6.2.1",
+  "pytest-mypy==1.0.1",
+  "taplo==0.9.3",
+  "types-pytz==2025.2.0.20250516",
 ]
 test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 

@@ -1,9 +1,18 @@
 # daqpytools
-Description left as an exercise for the developer.
-## TODO - provide a more detailed description
+Set of importable tools used to simplify DAQ development in python.
 
-## TODO - Indended use case
 
-## TODO - Setup instructions
+## Scope
+This provides a set of tools that are used in python applications, along with their unit tests. Currently, the following tools are defined
+ - logging - [code](https://github.com/PawelPlesniak/daqpytools/tree/develop/src/daqpytools/logging), [wiki](https://github.com/PawelPlesniak/daqpytools/wiki/Logging)
 
-## TODO - Release notes
+## Indended use case
+This repo will serve as the indended source of distribution standard tooling. Any python tool that is used by multiple repositories should be defined here.
+
+## Setup instructions
+For general users, no setup is required - when developing your python applications, it is sufficient to include e.g.
+```python
+from daqpytools.logging.logger import get_daq_logger
+log = get_daq_logger(...)
+```
+For developers, see the developer wiki.

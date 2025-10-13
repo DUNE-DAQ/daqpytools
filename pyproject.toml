@@ -7,7 +7,7 @@ dependencies = [
   "click==8.1.7",
   "kafka-python==2.0.2",
   "pytz==2024.2",
-  "rich==13.9.4",
+  "rich==14.2.0",
   "sh==2.1.0",
 ]
 description = "Python utils to simplify DAQ development."

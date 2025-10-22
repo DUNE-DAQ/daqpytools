@@ -4,11 +4,11 @@ requires = ["setuptools >= 61.0"]
 
 [project]
 dependencies = [
-  "click==8.1.7",
-  "kafka-python==2.0.2",
-  "pytz==2024.2",
-  "rich==13.9.4",
-  "sh==2.1.0",
+  "click",
+  "kafka-python",
+  "pytz",
+  "rich",
+  "sh",
 ]
 description = "Python utils to simplify DAQ development."
 name = "daqpytools"
@@ -86,9 +86,7 @@ ignore_missing_imports = true
 mypy_path = "src"
 
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
-norecursedirs = [".git", ".github", "venv"]
-testpaths = ["tests"]
+addopts = "-v -p no:warnings --cov=daqpytools --cov=src/daqpytools --mypy --doctest-modules tests/"
 
 [tool.coverage.run]
 omit = ["tests/*"]

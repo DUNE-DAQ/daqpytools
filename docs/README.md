@@ -4,7 +4,7 @@ Set of importable tools used to simplify DAQ development in python.
 
 ## Scope
 This provides a set of tools that are used in python applications, along with their unit tests. Currently, the following tools are defined
- - logging - [code](https://github.com/PawelPlesniak/daqpytools/tree/develop/src/daqpytools/logging), [wiki](https://github.com/PawelPlesniak/daqpytools/wiki/Logging)
+ - logging - [code](https://github.com/DUNE-DAQ/daqpytools/tree/develop/src/daqpytools/logging), [wiki](https://github.com/DUNE-DAQ/daqpytools/wiki/Logging)
 
 ## Indended use case
 This repo will serve as the indended source of distribution standard tooling. Any python tool that is used by multiple repositories should be defined here.

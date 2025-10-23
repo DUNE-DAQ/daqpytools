@@ -4,11 +4,11 @@ requires = ["setuptools >= 61.0"]
 
 [project]
 dependencies = [
-  "click==8.1.7",
-  "kafka-python==2.0.2",
-  "pytz==2024.2",
-  "rich==13.9.4",
-  "sh==2.1.0",
+  "click",
+  "kafka-python",
+  "pytz",
+  "rich",
+  "sh",
 ]
 description = "Python utils to simplify DAQ development."
 name = "daqpytools"
@@ -25,18 +25,16 @@ where = ["src"]
 [project.optional-dependencies]
 dev = [
   "ruff",
-  "pre-commit",
   "pytest",
-  "black",
   "pytest-cov",
-  "pytest-mypy",
-  "taplo",
-  "types-pytz",
 ]
 test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 
 [project.scripts]
-daqpytools-logging-demonstrator = "daqpytools.apps.__main_logging_demonstrator__:main"
+daqpytools-logging-demonstrator = "daqpytools.apps.logging_demonstrator:main"
+
+
+# Stricter linting rules than the standard (daq-deliverables #196); this is fine
 
 [tool.ruff]
 line-length = 88
@@ -69,26 +67,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D100", "D103", "D104", "S101", "ANN201"]
 
-[tool.black]
-force-exclude = '''
-/(
-    \.git
-  | \.github
-  | \.ruff_cache
-)/
-'''
-line-length = 88
-skip-magic-trailing-comma = true
-target-version = ["py310", "py311", "py312", "py313"]
-
-[tool.mypy]
-ignore_missing_imports = true
-mypy_path = "src"
-
 [tool.pytest.ini_options]
-addopts = "-v --mypy -p no:warnings --cov=. --cov-report=html --doctest-modules --ignore=docs/ --ignore=src/daqpytools/apps/"
-norecursedirs = [".git", ".github", "venv"]
-testpaths = ["tests"]
+addopts = "-v -p no:warnings --cov=daqpytools --cov=src/daqpytools tests/"
 
 [tool.coverage.run]
 omit = ["tests/*"]

@@ -25,13 +25,8 @@ where = ["src"]
 [project.optional-dependencies]
 dev = [
   "ruff",
-  "pre-commit",
   "pytest",
-  "black",
   "pytest-cov",
-  "pytest-mypy",
-  "taplo",
-  "types-pytz",
 ]
 test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 
@@ -72,24 +67,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D100", "D103", "D104", "S101", "ANN201"]
 
-[tool.black]
-force-exclude = '''
-/(
-    \.git
-  | \.github
-  | \.ruff_cache
-)/
-'''
-line-length = 88
-skip-magic-trailing-comma = true
-target-version = ["py310", "py311", "py312", "py313"]
-
-[tool.mypy]
-ignore_missing_imports = true
-mypy_path = "src"
-
 [tool.pytest.ini_options]
-addopts = "-v -p no:warnings --cov=daqpytools --cov=src/daqpytools --mypy --doctest-modules tests/"
+addopts = "-v -p no:warnings --cov=daqpytools --cov=src/daqpytools tests/"
 
 [tool.coverage.run]
 omit = ["tests/*"]

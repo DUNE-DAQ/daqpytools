@@ -10,6 +10,7 @@ from daqpytools.logging.handlers import (
     add_rich_handler,
     add_stderr_handler,
     add_stdout_handler,
+    add_ers_handler,
 )
 from daqpytools.logging.utils import get_width, log_level_to_int
 
@@ -17,6 +18,7 @@ from daqpytools.logging.utils import get_width, log_level_to_int
 def validate_setup_configuration(
     logger_name: str, rich_handler: bool, stdout_handler: bool, stderr_handler: bool
 ) -> None:
+    #! Does this need to be modified?
     """Checks for one or less stream-type handler associated with the logger."""
     if sum([rich_handler, stdout_handler, stderr_handler]) > 1:
         err_msg = (
@@ -55,6 +57,7 @@ def get_daq_logger(
     file_handler_path: str | None = None,
     stream_stdout_handler: bool = False,
     stream_stderr_handler: bool = False,
+    ers_handler: bool = False,
 ) -> logging.Logger:
     """C'tor."""
     rich_traceback_install(show_locals=True, width=get_width())
@@ -76,4 +79,6 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
     if stream_stderr_handler:
         add_stderr_handler(logger, use_parent_handlers)
+    if ers_handler: 
+        add_ers_handler(logger, use_parent_handlers)
     return logger

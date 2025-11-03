@@ -8,6 +8,8 @@ from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
 
+from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
+
 from daqpytools.logging.exceptions import LoggerHandlerError
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
@@ -19,6 +21,11 @@ from daqpytools.logging.formatter import (
 from daqpytools.logging.levels import log_level_to_str
 from daqpytools.logging.utils import get_width
 
+
+#! Consider moving this to a separate filters.py
+class UseERSFilter(logging.Filter):
+    def filter(self, record):
+        return getattr(record, "use_ers", False)
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -52,6 +59,15 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     handler: RichHandler = FormattedRichHandler(width=width)
     log.addHandler(handler)
     return
+
+def add_ers_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    """Add an ers handler to the root logger."""
+    check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
+    temporary_session_name = "CHANGEME" #TODO: Make this a proper arg input
+    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=temporary_session_name)
+    handler.addFilter(UseERSFilter())
+    log.addHandler(handler)
+
 
 
 def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:

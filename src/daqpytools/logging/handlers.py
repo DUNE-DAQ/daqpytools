@@ -23,7 +23,7 @@ from daqpytools.logging.utils import get_width
 
 
 #! Consider moving this to a separate filters.py
-class UseERSFilter(logging.Filter):
+class UseERSProtobufFilter(logging.Filter):
     def filter(self, record):
         return getattr(record, "use_ers", False)
 
@@ -60,11 +60,11 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     log.addHandler(handler)
     return
 
-def add_ers_handler(log: logging.Logger, use_parent_handlers: bool, session_name:str) -> None:
-    """Add an ers handler to the root logger."""
+def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool, session_name:str) -> None:
+    """Add an ers protobuf handler to the root logger."""
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name)
-    handler.addFilter(UseERSFilter())
+    handler.addFilter(UseERSProtobufFilter())
     log.addHandler(handler)
 
 

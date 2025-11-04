@@ -99,7 +99,7 @@ def main(
         file_handler_path=file_handler_path,
         stream_stdout_handler=stdout_handler,
         stream_stderr_handler=stderr_handler,
-        ers_handler=True
+        ers_protobuf_handler=True
     )
     main_logger.debug("example debug message")
     main_logger.info("example info message")

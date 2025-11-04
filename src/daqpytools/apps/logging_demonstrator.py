@@ -51,6 +51,7 @@ def validate_test_configuration(
 )
 @click.option("-o", "--stdout_handler", is_flag=True, help=("Set up a stdout handler"))
 @click.option("-e", "--stderr_handler", is_flag=True, help=("Set up a stdout handler"))
+@click.option("--ers", is_flag=True, help=("An ERS handler is always added in this demonstration. If set to true, publish to ERS"))
 @click.option(
     "-c",
     "--child-logger",
@@ -77,6 +78,7 @@ def main(
     stderr_handler: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
+    ers: bool
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator."""
     logger_name = "daqpytools_logging_demonstrator"
@@ -97,6 +99,7 @@ def main(
         file_handler_path=file_handler_path,
         stream_stdout_handler=stdout_handler,
         stream_stderr_handler=stderr_handler,
+        ers_handler=True
     )
     main_logger.debug("example debug message")
     main_logger.info("example info message")
@@ -121,6 +124,7 @@ def main(
         "Note: [red] the daqpytools.logging.formatter removes markdown-style "
         "comments from the log record message [/red]."
     )
+    main_logger.debug("This should also appear in ERS if set", extra={"use_ers": ers})
 
     if child_logger:
         nested_logger: logging.Logger = get_daq_logger(

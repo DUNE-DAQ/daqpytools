@@ -60,11 +60,10 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     log.addHandler(handler)
     return
 
-def add_ers_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+def add_ers_handler(log: logging.Logger, use_parent_handlers: bool, session_name:str) -> None:
     """Add an ers handler to the root logger."""
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
-    temporary_session_name = "CHANGEME" #TODO: Make this a proper arg input
-    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=temporary_session_name)
+    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name)
     handler.addFilter(UseERSFilter())
     log.addHandler(handler)
 

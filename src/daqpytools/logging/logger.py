@@ -80,5 +80,5 @@ def get_daq_logger(
     if stream_stderr_handler:
         add_stderr_handler(logger, use_parent_handlers)
     if ers_handler: 
-        add_ers_handler(logger, use_parent_handlers)
+        add_ers_handler(logger, use_parent_handlers, "session_temporary") #! Change name
     return logger

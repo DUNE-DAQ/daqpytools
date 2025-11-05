@@ -4,11 +4,10 @@ import sys
 from datetime import datetime
 from typing import cast
 
+from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
-
-from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 
 from daqpytools.logging.exceptions import LoggerHandlerError
 from daqpytools.logging.formatter import (
@@ -24,7 +23,9 @@ from daqpytools.logging.utils import get_width
 
 #! Consider moving this to a separate filters.py
 class UseERSProtobufFilter(logging.Filter):
-    def filter(self, record):
+    """Class containing ERS filter."""
+    def filter(self, record: logging.LogRecord,) -> bool:
+        """Checks if use_ers is set to only send ERS messages when specified."""
         return getattr(record, "use_ers", False)
 
 def check_parent_handlers(
@@ -60,10 +61,16 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     log.addHandler(handler)
     return
 
-def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool, session_name:str) -> None:
+def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
+                                 session_name:str, topic: str = "ers_stream", 
+                                 address: str ="monkafka.cern.ch:30092") -> None:
+    # TODO: topic and address are new, propagate to all the relevant implementation
     """Add an ers protobuf handler to the root logger."""
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
-    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name)
+    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
+                                                     kafka_address = address, 
+                                                     kafka_topic = topic
+                                                     )
     handler.addFilter(UseERSProtobufFilter())
     log.addHandler(handler)
 

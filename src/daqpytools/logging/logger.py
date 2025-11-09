@@ -18,7 +18,7 @@ def validate_setup_configuration(
     logger_name: str, rich_handler: bool, stdout_handler: bool, stderr_handler: bool
 ) -> None:
     """Checks for one or less stream-type handler associated with the logger."""
-    if sum([rich_handler, stdout_handler, stderr_handler]) > 1:
+    if rich_handler and any([stdout_handler, stderr_handler]):
         err_msg = (
             "All instances of rich_handler, stdout_handler, and std_err will log "
             "to the tty, choose one!"
@@ -27,8 +27,12 @@ def validate_setup_configuration(
     return
 
 
-def setup_root_logger(name: str, level: int) -> logging.Logger:
+def setup_root_logger(name: str, level: int | str) -> logging.Logger:
     """Set up the base logger from which all other loggers inherit."""
+
+    if isinstance(level, str):
+        level = log_level_to_int(level)
+
     root_logger = logging.getLogger(name)
     root_logger.setLevel(level)
 
@@ -64,8 +68,7 @@ def get_daq_logger(
     )
     log_level = log_level_to_int(log_level)
 
-    root_logger_name: str = logger_name
-    logger: logging.Logger = setup_root_logger(name=root_logger_name, level=log_level)
+    logger: logging.Logger = setup_root_logger(name=logger_name, level=log_level)
     logger.propagate = use_parent_handlers
 
     if rich_handler:
@@ -76,4 +79,8 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
     if stream_stderr_handler:
         add_stderr_handler(logger, use_parent_handlers)
+
+    for handler in logger.handlers:
+        handler.setLevel(log_level)
+
     return logger

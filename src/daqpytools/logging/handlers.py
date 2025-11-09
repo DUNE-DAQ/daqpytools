@@ -129,7 +129,7 @@ class FormattedRichHandler(RichHandler):
 
         padding = LOG_RECORD_PADDING.get("logger_name", 45)
         logger_name_text: Text = Text(
-            f"{record.name}:".ljust(padding)[:padding], style="logging.logger_name"
+            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
         )
 
         # Convert message_renderable to Text for type consistency

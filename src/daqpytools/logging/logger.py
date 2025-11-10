@@ -15,27 +15,6 @@ from daqpytools.logging.utils import get_width
 from daqpytools.logging.levels import logging_log_level_to_int
 
 
-def validate_setup_configuration(
-    logger_name: str, rich_handler: bool, stream_handlers: bool
-) -> None:
-    """Checks for one or less stream-type handler associated with the logger."""
-    err_msg = ""
-    match sum([rich_handler, stream_handlers]):
-        case 2:
-            err_msg = (
-                "All instances of rich_handler and stream_handlers (stdout_handler and "
-                "std_err) will log to the tty, choose one!"
-            )
-        case 0:
-            err_msg = (
-                "At least one of rich_handler or stream_handlers (stdout_handler and "
-                "std_err) must be True!"
-            )
-    if err_msg:
-        raise LoggerSetupError(logger_name, err_msg)
-    return
-
-
 def setup_root_logger(name: str, level: int | str) -> logging.Logger:
     """Set up the base logger from which all other loggers inherit.
     The remaining sh* and kafka* loggers are set to a higher log level to avoid
@@ -48,11 +27,22 @@ def setup_root_logger(name: str, level: int | str) -> logging.Logger:
     Returns:
         logging.Logger: Configured root logger instance.
     """
+    # Convert level to int if it's a string
     if isinstance(level, str):
-        level = log_level_to_int(level)
+        level = logging_log_level_to_int(level)
 
+    # Set up the root logger
     root_logger = logging.getLogger(name)
     root_logger.setLevel(level)
+
+    # Validate the root logger has zero handlers
+    if len(root_logger.handlers) != 0:
+        err_msg = (
+            f"Root logger '{name}' already has handlers configured. "
+            "Please use a different logger name."
+        )
+        raise LoggerSetupError(name, err_msg)
+
 
     sh_command_level = level if level > logging.INFO else (level + 10)
     sh_command_logger = logging.getLogger(sh.__name__)
@@ -111,21 +101,17 @@ def get_daq_logger(
         file_handler_valid = (
             ("FileHandler" in existing_logger_handlers) == (file_handler_path is not None)
         )
-        stream_stdout_handler = (
+        stream_handler_valid = (
             ("StreamHandler" in existing_logger_handlers) == stream_handlers
         )
-        if not all([rich_handler_valid, file_handler_valid, stream_stdout_handler]):
+        if not all([rich_handler_valid, file_handler_valid, stream_handler_valid]):
             err_msg = (
                 f"Logger '{logger_name}' already exists with different handler "
                 "configuration. Please use a different logger name or adjust the "
                 "handler configuration."
             )
             raise LoggerSetupError(logger_name, err_msg)
-
-    # The new logger is now being created. Validate the configuration.
-    validate_setup_configuration(
-        logger_name, rich_handler, stream_stdout_handler, stream_stderr_handler
-    )
+        return existing_logger
 
     # Set up the logger
     log_level = logging_log_level_to_int(log_level)
@@ -138,9 +124,8 @@ def get_daq_logger(
         add_rich_handler(logger, use_parent_handlers)
     if file_handler_path:
         add_file_handler(logger, use_parent_handlers, file_handler_path)
-    if stream_stdout_handler:
+    if stream_handlers:
         add_stdout_handler(logger, use_parent_handlers)
-    if stream_stderr_handler:
         add_stderr_handler(logger, use_parent_handlers)
 
     # Set log level for all handlers

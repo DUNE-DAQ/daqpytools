@@ -1,29 +1,6 @@
 import logging
 from pathlib import Path
 
-from daqpytools.logging.levels import log_level_keys, log_level_values
-
-
-class LogLevelError(Exception):
-    """Custom error for unrecognised log level."""
-
-    def __init__(self, level: str | int) -> None:
-        """C'tor."""
-        if isinstance(level, str):
-            err_msg = (
-                f"Level '{level}' is not from the recognised levels "
-                f"({log_level_keys})."
-            )
-
-        elif isinstance(level, int):
-            err_msg = (
-                f"Level '{level}' is not one of the recognised values "
-                f"({log_level_values})."
-            )
-        else:
-            err_msg = f"Level '{level}' is not of any supported type."
-        super().__init__(err_msg)
-
 
 class LoggerHandlerError(Exception):
     """Custom error for attempted duplicate of handler type."""

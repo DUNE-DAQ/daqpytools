@@ -16,7 +16,7 @@ from daqpytools.logging.formatter import (
     TIME_ZONE,
     LoggingFormatter,
 )
-from daqpytools.logging.levels import log_level_to_str
+from daqpytools.logging.levels import logging_log_level_to_str
 from daqpytools.logging.utils import get_width
 
 
@@ -153,6 +153,6 @@ class FormattedRichHandler(RichHandler):
         """Get the style string for the given log level number from the theme."""
         return str(
             CONSOLE_THEME.styles.get(
-                f"logging.level.{log_level_to_str(level_no).lower()}", ""
+                f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
             )
         )

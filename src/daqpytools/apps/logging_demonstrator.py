@@ -49,8 +49,7 @@ def validate_test_configuration(
         "treated as absolute, otherwise as relative."
     ),
 )
-@click.option("-o", "--stdout_handler", is_flag=True, help=("Set up a stdout handler"))
-@click.option("-e", "--stderr_handler", is_flag=True, help=("Set up a stdout handler"))
+@click.option("-s", "--stream_handlers", is_flag=True, help=("Set up stdout and stderr stream handlers"))
 @click.option(
     "-c",
     "--child-logger",
@@ -73,21 +72,12 @@ def main(
     log_level: str,
     rich_handler: bool,
     file_handler_path: str,
-    stdout_handler: bool,
-    stderr_handler: bool,
+    stream_handlers: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator."""
     logger_name = "daqpytools_logging_demonstrator"
-
-    validate_test_configuration(
-        logger_name=logger_name,
-        rich_handler=rich_handler,
-        stdout_handler=stdout_handler,
-        stderr_handler=stderr_handler,
-        file_handler_path=file_handler_path,
-    )
 
     main_logger: logging.Logger = get_daq_logger(
         logger_name="daqpytools_logging_demonstrator",
@@ -95,8 +85,7 @@ def main(
         use_parent_handlers=not disable_logger_inheritance,
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
-        stream_stdout_handler=stdout_handler,
-        stream_stderr_handler=stderr_handler,
+        stream_handlers=stream_handlers,
     )
     main_logger.debug("example debug message")
     main_logger.info("example info message")
@@ -129,8 +118,7 @@ def main(
             use_parent_handlers=not disable_logger_inheritance,
             rich_handler=rich_handler,
             file_handler_path=file_handler_path,
-            stream_stdout_handler=stdout_handler,
-            stream_stderr_handler=stderr_handler,
+            stream_handlers=stream_handlers,
         )
         nested_logger.debug("example debug message")
         nested_logger.info("example info message")

@@ -95,9 +95,18 @@ def test_get_daq_logger(caplog):
     temp_file = tempfile.NamedTemporaryFile()
     log_path = temp_file.name
     
-    # Setup root logger
-    test_logger: logging.Logger = get_daq_logger(
+    # Setup testing root logger
+    test_root_logger: logging.Logger = setup_root_logger(
         logger_name=test_logger_name,
+        log_level= "DEBUG",
+    )
+    assert isinstance(test_root_logger, logging.Logger)
+    assert test_root_logger.name == test_logger_name
+    assert test_root_logger.level == logging.DEBUG
+
+    # Setup testing daq logger
+    test_logger: logging.Logger = get_daq_logger(
+        logger_name=test_logger_child_name + "0",
         log_level= "DEBUG",
         use_parent_handlers=True,
         rich_handler=False,
@@ -138,7 +147,7 @@ def test_get_daq_logger(caplog):
     assert get_daq_logger(test_logger_child_name + "4").getEffectiveLevel() == logging.INFO
 
     # Test logging to a file
-    logger = get_daq_logger(test_logger_child_name + "5", "CRITICAL")
+    logger = get_daq_logger(test_logger_child_name + "0.0", "CRITICAL")
     logger.debug("invisible")
     logger.info("invisible")
     logger.warning("invisible")
@@ -150,7 +159,7 @@ def test_get_daq_logger(caplog):
         if (
             "VISIBLE" in record.getMessage()
             and record.levelno == logging.CRITICAL
-            and f"{test_logger_child_name}5" in record.name
+            and f"{test_logger_child_name}0.0" in record.name
         ):
             good_record += 1
         else:

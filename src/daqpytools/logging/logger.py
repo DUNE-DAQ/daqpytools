@@ -15,42 +15,42 @@ from daqpytools.logging.utils import get_width
 from daqpytools.logging.levels import logging_log_level_to_int
 
 
-def setup_root_logger(name: str, level: int | str) -> logging.Logger:
+def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
     """Set up the base logger from which all other loggers inherit.
     The remaining sh* and kafka* loggers are set to a higher log level to avoid
     excessive logging output.
 
     Args:
-        name (str): Name of the root logger.
-        level (int | str): Log level for the root logger.
+        logger_name (str): Name of the root logger.
+        log_level (int | str): Log level for the root logger.
 
     Returns:
         logging.Logger: Configured root logger instance.
     """
     # Convert level to int if it's a string
-    if isinstance(level, str):
-        level = logging_log_level_to_int(level)
+    if isinstance(log_level, str):
+        log_level = logging_log_level_to_int(log_level)
 
     # Set up the root logger
-    root_logger = logging.getLogger(name)
-    root_logger.setLevel(level)
+    root_logger = logging.getLogger(logger_name)
+    root_logger.setLevel(log_level)
 
     # Validate the root logger has zero handlers
     if len(root_logger.handlers) != 0:
         err_msg = (
-            f"Root logger '{name}' already has handlers configured. "
+            f"Root logger '{logger_name}' already has handlers configured. "
             "Please use a different logger name."
         )
-        raise LoggerSetupError(name, err_msg)
+        raise LoggerSetupError(logger_name, err_msg)
 
 
-    sh_command_level = level if level > logging.INFO else (level + 10)
+    sh_command_level = log_level if log_level > logging.INFO else (log_level + 10)
     sh_command_logger = logging.getLogger(sh.__name__)
     sh_command_logger.setLevel(sh_command_level)
     for handler in sh_command_logger.handlers:
         handler.setLevel(sh_command_level)
 
-    kafka_command_level = level if level > logging.INFO else (level + 10)
+    kafka_command_level = log_level if log_level > logging.INFO else (log_level + 10)
     kafka_command_logger = logging.getLogger(kafka.__name__)
     kafka_command_logger.setLevel(kafka_command_level)
     for handler in kafka_command_logger.handlers:

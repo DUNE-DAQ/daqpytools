@@ -118,15 +118,16 @@ def get_daq_logger(
                 err_msg = (
                     f"Logger '{logger_name}' already exists with different handler "
                     "configuration. Please use a different logger name or adjust the "
-                    "handler configuration."
+                    f"handler configuration. Handlers are: {rich_handler_valid} : {file_handler_valid} : {stream_handler_valid}"
                 )
                 print(err_msg)
                 #! Should mentoin which handlers already exist to help
-                # raise LoggerSetupError(logger_name, err_msg)
+                raise LoggerSetupError(logger_name, err_msg)
             # print("Returning existing logger")
             return existing_logger
         else: 
             print(f"{logger_name} is a placeholder. Continuing with setup")
+            #TODO: Do we need a way to reattach things?
 
     # Set up the logger
     log_level = logging_log_level_to_int(log_level)

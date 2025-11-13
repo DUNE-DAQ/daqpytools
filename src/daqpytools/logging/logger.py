@@ -63,7 +63,7 @@ def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
 
 def get_daq_logger(
     logger_name: str,
-    log_level: int | str = logging.INFO,
+    log_level: int | str = logging.NOTSET, #TODO: check how the tests run with this
     use_parent_handlers: bool = True,
     rich_handler: bool = False,
     file_handler_path: str | None = None,
@@ -131,7 +131,11 @@ def get_daq_logger(
     # Set up the logger
     log_level = logging_log_level_to_int(log_level)
     logger: logging.Logger = logging.getLogger(logger_name)
-    logger.setLevel(log_level)
+
+    # Set log level only if specifically required
+    # If not, rely on inheritance 
+    if log_level is not logging.NOTSET:
+        logger.setLevel(log_level)
     logger.propagate = use_parent_handlers
 
     # Add requested handlers
@@ -143,8 +147,9 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
 
-    # Set log level for all handlers
-    for handler in logger.handlers:
-        handler.setLevel(log_level)
+    # Set log level for all handlers if requested
+    if log_level is not logging.NOTSET:
+        for handler in logger.handlers:
+            handler.setLevel(log_level)
 
     return logger

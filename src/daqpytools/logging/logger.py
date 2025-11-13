@@ -13,6 +13,7 @@ from daqpytools.logging.handlers import (
 )
 from daqpytools.logging.utils import get_width
 from daqpytools.logging.levels import logging_log_level_to_int
+from logging import PlaceHolder
 
 
 def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
@@ -27,6 +28,7 @@ def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
     Returns:
         logging.Logger: Configured root logger instance.
     """
+    # print("Setting up root logger")
     # Convert level to int if it's a string
     if isinstance(log_level, str):
         log_level = logging_log_level_to_int(log_level)
@@ -86,32 +88,45 @@ def get_daq_logger(
     
     """
     rich_traceback_install(show_locals=True, width=get_width())
+    # print(f"Getting {logger_name}")
 
     # Check if the logger exists with the requested handlers. If different handlers are
     # requested, an exception is raised.
     existing_loggers = logging.root.manager.loggerDict
     if logger_name in existing_loggers:
         existing_logger = existing_loggers[logger_name]
-        existing_logger_handlers = [
-            type(handler).__name__ for handler in existing_logger.handlers
-        ]
-        rich_handler_valid = (
-            ("FormattedRichHandler" in existing_logger_handlers) == rich_handler
-        )
-        file_handler_valid = (
-            ("FileHandler" in existing_logger_handlers) == (file_handler_path is not None)
-        )
-        stream_handler_valid = (
-            ("StreamHandler" in existing_logger_handlers) == stream_handlers
-        )
-        if not all([rich_handler_valid, file_handler_valid, stream_handler_valid]):
-            err_msg = (
-                f"Logger '{logger_name}' already exists with different handler "
-                "configuration. Please use a different logger name or adjust the "
-                "handler configuration."
+        #! Check if existing logger is an instance of placeholder
+        # if so, then exit out of the if statement
+
+        is_placeholder = isinstance(existing_logger, PlaceHolder)
+        
+        if not is_placeholder:
+            # existing_logger = logging.getLogger(logger_name)
+            existing_logger_handlers = [
+                type(handler).__name__ for handler in existing_logger.handlers
+            ]
+            rich_handler_valid = (
+                ("FormattedRichHandler" in existing_logger_handlers) == rich_handler
             )
-            raise LoggerSetupError(logger_name, err_msg)
-        return existing_logger
+            file_handler_valid = (
+                ("FileHandler" in existing_logger_handlers) == (file_handler_path is not None)
+            )
+            stream_handler_valid = (
+                ("StreamHandler" in existing_logger_handlers) == stream_handlers
+            )
+            if not all([rich_handler_valid, file_handler_valid, stream_handler_valid]):
+                err_msg = (
+                    f"Logger '{logger_name}' already exists with different handler "
+                    "configuration. Please use a different logger name or adjust the "
+                    "handler configuration."
+                )
+                print(err_msg)
+                #! Should mentoin which handlers already exist to help
+                # raise LoggerSetupError(logger_name, err_msg)
+            # print("Returning existing logger")
+            return existing_logger
+        else: 
+            print(f"{logger_name} is a placeholder. Continuing with setup")
 
     # Set up the logger
     log_level = logging_log_level_to_int(log_level)

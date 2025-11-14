@@ -36,8 +36,11 @@ jobs:
           source env.sh
           python -m pip install --upgrade pip
           cd sourcecode
+          echo "Cloning daqpytools"
           git clone https://github.com/${{ github.event.pull_request.head.repo.owner.login }}/daqpytools.git -b ${{ github.head_ref }} ||  git clone https://github.com/DUNE-DAQ/daqpytools.git
+          echo "Entering daqpytools"
           cd daqpytools
+          echo "Installing"
           pip install .[test]
           echo "DAQPYTOOLS_DIR=$(pwd)" >> $GITHUB_ENV
 

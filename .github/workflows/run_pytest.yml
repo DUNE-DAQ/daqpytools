@@ -3,6 +3,10 @@ name: Run pytest
 on:
   pull_request:
 
+permissions:
+  checks: write
+  pull-requests: write
+
 jobs:
   install_and_test:
 

@@ -51,8 +51,6 @@ def check_parent_handlers(
     python_root_logger_name = logging.getLogger().name
     if log.name == python_root_logger_name:
         raise ValueError("You should not be interfacing with the root logger")
-    this_is_root_logger = log.name == python_root_logger_name
-
     # Validate the stream handler has a target stream
     if handler_type.__name__ == "StreamHandler" and target_stream is None:
         raise ValueError(
@@ -67,7 +65,6 @@ def check_parent_handlers(
 
     logger_parent = log.parent
     this_is_root_logger = logger_parent.name == python_root_logger_name
-
     while not this_is_root_logger:
         handler_checking = [
             isinstance(handler, handler_type) for handler in logger_parent.handlers

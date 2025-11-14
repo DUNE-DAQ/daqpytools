@@ -1,4 +1,5 @@
 import logging
+from logging import PlaceHolder
 
 import kafka
 import sh
@@ -11,9 +12,8 @@ from daqpytools.logging.handlers import (
     add_stderr_handler,
     add_stdout_handler,
 )
-from daqpytools.logging.utils import get_width
 from daqpytools.logging.levels import logging_log_level_to_int
-from logging import PlaceHolder
+from daqpytools.logging.utils import get_width
 
 
 def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
@@ -28,7 +28,6 @@ def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
     Returns:
         logging.Logger: Configured root logger instance.
     """
-    # print("Setting up root logger")
     # Convert level to int if it's a string
     if isinstance(log_level, str):
         log_level = logging_log_level_to_int(log_level)
@@ -88,20 +87,18 @@ def get_daq_logger(
     
     """
     rich_traceback_install(show_locals=True, width=get_width())
-    # print(f"Getting {logger_name}")
 
     # Check if the logger exists with the requested handlers. If different handlers are
     # requested, an exception is raised.
     existing_loggers = logging.root.manager.loggerDict
     if logger_name in existing_loggers:
         existing_logger = existing_loggers[logger_name]
-        #! Check if existing logger is an instance of placeholder
-        # if so, then exit out of the if statement
 
-        is_placeholder = isinstance(existing_logger, PlaceHolder)
-        
-        if not is_placeholder:
-            # existing_logger = logging.getLogger(logger_name)
+        # If the logger is a placeholder, then a child was initialised before the 
+        # current parent. Eg. root.parent.child was called before root.parent,
+        # and now root.parent is being initialised. If this is the case, 
+        # then root.parent is a placeholder, and should be initialised as normal
+        if not isinstance(existing_logger, PlaceHolder):
             existing_logger_handlers = [
                 type(handler).__name__ for handler in existing_logger.handlers
             ]
@@ -109,7 +106,8 @@ def get_daq_logger(
                 ("FormattedRichHandler" in existing_logger_handlers) == rich_handler
             )
             file_handler_valid = (
-                ("FileHandler" in existing_logger_handlers) == (file_handler_path is not None)
+                ("FileHandler" in existing_logger_handlers) 
+                == (file_handler_path is not None)
             )
             stream_handler_valid = (
                 ("StreamHandler" in existing_logger_handlers) == stream_handlers
@@ -118,16 +116,12 @@ def get_daq_logger(
                 err_msg = (
                     f"Logger '{logger_name}' already exists with different handler "
                     "configuration. Please use a different logger name or adjust the "
-                    f"handler configuration. Handlers are: {rich_handler_valid} : {file_handler_valid} : {stream_handler_valid}"
+                    "handler configuration. Valid checks are: "
+                    f"Rich : {rich_handler_valid}, file: {file_handler_valid}, "
+                    f"stream: {stream_handler_valid}" 
                 )
-                print(err_msg)
-                #! Should mentoin which handlers already exist to help
                 raise LoggerSetupError(logger_name, err_msg)
-            # print("Returning existing logger")
             return existing_logger
-        else: 
-            print(f"{logger_name} is a placeholder. Continuing with setup")
-            #TODO: Do we need a way to reattach things?
 
     # Set up the logger
     log_level = logging_log_level_to_int(log_level)

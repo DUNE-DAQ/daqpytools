@@ -19,7 +19,7 @@ jobs:
       - name: Test with pytest/pytest-cov
         if: success()
         run: |
-          pip install .[test]
+          pip install daqpytools[test]
           pytest 
         #--junitxml=junit/test-results.xml --cov=drunc --cov-report=html TODO: chat with SWIT to get the cov reports in
 

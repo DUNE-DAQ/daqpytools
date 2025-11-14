@@ -1,0 +1,30 @@
+name: Run pytest
+
+on:
+  pull_request:
+
+jobs:
+  install_and_test:
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    container:
+      image: ghcr.io/dune-daq/nightly-release-alma9:development_v5
+
+    steps:
+      - name: Test with pytest/pytest-cov
+        if: success()
+        run: |
+          pip install .[test]
+          pytest 
+        #--junitxml=junit/test-results.xml --cov=drunc --cov-report=html TODO: chat with SWIT to get the cov reports in
+
+      # - name: Publish JUnit test report
+      #   uses: mikepenz/action-junit-report@v5
+      #   if: ${{ !cancelled() }}
+      #   with:
+      #     report_paths: '${{ env.DRUNC_DIR }}/junit/test-results.xml'

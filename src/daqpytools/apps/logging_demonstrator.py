@@ -76,7 +76,28 @@ def main(
     child_logger: bool,
     disable_logger_inheritance: bool,
 ) -> None:
-    """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator."""
+    """
+    Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
+    Note - if you are seeing output logs without any explicit handlers assigned, this is
+    expected - python loggers propagate to the root logger by default, which has a
+    default stderr stream handler assigned if a record ever reaches it.
+
+    Args:
+        log_level (str): Log level to set for the logger.
+        rich_handler (bool): If true, set up a rich handler.
+        file_handler_path (str): If provided, set up a file handler with the given path.
+        stream_handlers (bool): If true, set up stdout and stderr stream handlers.
+        child_logger (bool): If true, sets up a child logger to the demonstrator logger.
+        disable_logger_inheritance (bool): If true, disable logger inheritance so each
+            logger instance only uses the logger handlers assigned to the given logger
+            instance.
+
+    Returns:
+        None
+
+    Raises:
+        LoggerSetupError: If no handlers are set up for the logger.
+    """
     logger_name = "daqpytools_logging_demonstrator"
 
     main_logger: logging.Logger = get_daq_logger(

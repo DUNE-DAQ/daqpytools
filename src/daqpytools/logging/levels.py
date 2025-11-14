@@ -14,9 +14,21 @@ logging_log_level_keys = list(logging_log_levels.keys())
 logging_log_level_values = list(logging_log_levels.values())
 logging_methods = Literal["debug", "info", "warning", "error", "critical", "exception"]
 
+
 # Convert logging log levels to the declared types
 def logging_log_level_to_int(log_level: str | int) -> int:
-    """Set up the logging level based on the provided string or integer."""
+    """Set up the logging level based on the provided string or integer.
+    
+    Args:
+        log_level (str | int): The log level as a string or integer.
+    
+    Returns:
+        int: The log level as an integer.
+
+    Raises:
+        ValueError: If the provided log level is not recognized.
+        TypeError: If the provided log level is neither a string nor an integer.
+    """
     if isinstance(log_level, str):
         log_level = log_level.upper()
         if log_level not in logging_log_level_keys:
@@ -42,7 +54,18 @@ def logging_log_level_to_int(log_level: str | int) -> int:
 
 
 def logging_log_level_to_str(log_level: str | int) -> str:
-    """Convert a logging level to its string representation."""
+    """Convert a logging level to its string representation.
+    
+    Args:
+        log_level (str | int): The log level as a string or integer.
+
+    Returns:
+        str: The log level as a string.
+
+    Raises:
+        ValueError: If the provided log level is not recognized.
+        TypeError: If the provided log level is neither a string nor an integer.
+    """
     if isinstance(log_level, str):
         log_level = log_level.upper()
         if log_level not in logging_log_level_keys:
@@ -85,19 +108,20 @@ oks_to_logging_map = {
     "kLowestPriority": "DEBUG",
 }
 
+
 def oks_log_level_to_int(log_level: str | int) -> int:
     """Convert the log level to the equivalent level in python logging as an int.
     Requires discussion about the mapping of OKS log levels to python logging levels.
 
     Args:
-        level (str | int): The log level in OKS format (string or int).
+        log_level (str | int): The log level in OKS format (string or int).
 
     Returns:
         int: The equivalent log level in python logging format.
 
     Raises:
         ValueError: If the provided log level is not recognized.
-        TypeError: If the provided log level is neither a string nor an integer.    
+        TypeError: If the provided log level is neither a string nor an integer.
     """
     if isinstance(log_level, str):
         if log_level not in oks_log_level_keys:
@@ -130,14 +154,14 @@ def oks_log_level_to_str(log_level: str | int) -> str:
     Requires discussion about the mapping of OKS log levels to python logging levels.
 
     Args:
-        level (str | int): The log level in OKS format (string or int).
+        log_level (str | int): The log level in OKS format (string or int).
 
     Returns:
         str: The equivalent log level in python logging format.
 
     Raises:
         ValueError: If the provided log level is not recognized.
-        TypeError: If the provided log level is neither a string nor an integer.    
+        TypeError: If the provided log level is neither a string nor an integer.
     """
     if isinstance(log_level, str):
         if log_level not in oks_log_level_keys:

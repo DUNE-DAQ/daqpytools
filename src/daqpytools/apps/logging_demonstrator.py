@@ -49,7 +49,12 @@ def validate_test_configuration(
         "treated as absolute, otherwise as relative."
     ),
 )
-@click.option("-s", "--stream_handlers", is_flag=True, help=("Set up stdout and stderr stream handlers"))
+@click.option(
+    "-s",
+    "--stream_handlers",
+    is_flag=True,
+    help=("Set up stdout and stderr stream handlers"),
+)
 @click.option(
     "-c",
     "--child-logger",
@@ -76,8 +81,7 @@ def main(
     child_logger: bool,
     disable_logger_inheritance: bool,
 ) -> None:
-    """
-    Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
+    """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
     expected - python loggers propagate to the root logger by default, which has a
     default stderr stream handler assigned if a record ever reaches it.
@@ -101,7 +105,7 @@ def main(
     logger_name = "daqpytools_logging_demonstrator"
 
     main_logger: logging.Logger = get_daq_logger(
-        logger_name="daqpytools_logging_demonstrator",
+        logger_name=logger_name,
         log_level=log_level,
         use_parent_handlers=not disable_logger_inheritance,
         rich_handler=rich_handler,
@@ -134,7 +138,7 @@ def main(
 
     if child_logger:
         nested_logger: logging.Logger = get_daq_logger(
-            logger_name="daqpytools_logging_demonstrator.child",
+            logger_name=f"{logger_name}.child",
             log_level=log_level,
             use_parent_handlers=not disable_logger_inheritance,
             rich_handler=rich_handler,

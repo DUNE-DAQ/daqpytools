@@ -11,9 +11,9 @@ invalid_log_level_str = "INVALID_LEVEL"
 invalid_log_level_int = 15
 invalid_log_level_type = None
 
+
 def test_logging_log_level_to_str() -> None:
-    """Check function logging_log_level_to_str works as intended.
-    """
+    """Check function logging_log_level_to_str works as intended."""
     # Correct cases
     assert logging_log_level_to_str("DEBUG") == "DEBUG"
     assert logging_log_level_to_str("INFO") == "INFO"
@@ -28,17 +28,33 @@ def test_logging_log_level_to_str() -> None:
     assert logging_log_level_to_str(50) == "CRITICAL"
 
     # Exception raising cases
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_str}' is not from the recognized logging levels"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"Level '{invalid_log_level_str}' is not from the recognized logging levels"
+        ),
+    ):
         logging_log_level_to_str(invalid_log_level_str)
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_int}' is not from the recognized logging level values"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"Level '{invalid_log_level_int}' is not from the recognized logging level "
+            "values"
+        ),
+    ):
         logging_log_level_to_str(invalid_log_level_int)
-    with pytest.raises(TypeError, match=f"Log level must be a string or an integer. Received type {type(invalid_log_level_type).__name__}."):
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Log level must be a string or an integer. Received type "
+            f"{type(invalid_log_level_type).__name__}."
+        ),
+    ):
         logging_log_level_to_str(invalid_log_level_type)
 
 
 def test_logging_log_level_to_int() -> None:
-    """Check function logging_log_level_to_int works as intended.
-    """
+    """Check function logging_log_level_to_int works as intended."""
     # Correct cases
     assert logging_log_level_to_int("NOTSET") == 0
     assert logging_log_level_to_int("DEBUG") == 10
@@ -53,17 +69,34 @@ def test_logging_log_level_to_int() -> None:
     assert logging_log_level_to_int(50) == 50
 
     # Exception raising cases
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_str}' is not from the recognized logging levels"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"Level '{invalid_log_level_str}' is not from the recognized logging "
+            "levels"
+        ),
+    ):
         logging_log_level_to_int(invalid_log_level_str)
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_int}' is not from the recognized logging level values"):
+    with pytest.raises(
+        ValueError,
+        match=(
+            f"Level '{invalid_log_level_int}' is not from the recognized logging level "
+            "values"
+        ),
+    ):
         logging_log_level_to_int(invalid_log_level_int)
-    with pytest.raises(TypeError, match=f"Log level must be a string or an integer. Received type {type(invalid_log_level_type).__name__}."):
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Log level must be a string or an integer. Received type "
+            f"{type(invalid_log_level_type).__name__}."
+        ),
+    ):
         logging_log_level_to_int(invalid_log_level_type)
 
 
 def test_oks_log_level_to_str() -> None:
-    """Check function oks_log_level_to_str works as intended.
-    """
+    """Check function oks_log_level_to_str works as intended."""
     # Correct cases
     assert oks_log_level_to_str("kLowestPriority") == "DEBUG"
     assert oks_log_level_to_str("kDefault") == "INFO"
@@ -75,17 +108,28 @@ def test_oks_log_level_to_str() -> None:
     assert oks_log_level_to_str(0) == "ERROR"
 
     # Exception raising cases
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_str}' is not from the recognized OKS levels"):
+    with pytest.raises(
+        ValueError,
+        match=f"Level '{invalid_log_level_str}' is not from the recognized OKS levels",
+    ):
         oks_log_level_to_str(invalid_log_level_str)
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_int}' is not from the recognized OKS values"):
+    with pytest.raises(
+        ValueError,
+        match=f"Level '{invalid_log_level_int}' is not from the recognized OKS values",
+    ):
         oks_log_level_to_str(invalid_log_level_int)
-    with pytest.raises(TypeError, match=f"Log level must be a string or an integer. Received type {type(invalid_log_level_type).__name__}."):
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Log level must be a string or an integer. Received type "
+            f"{type(invalid_log_level_type).__name__}."
+        ),
+    ):
         oks_log_level_to_str(invalid_log_level_type)
 
 
 def test_oks_log_level_to_int() -> None:
-    """Check function oks_log_level_to_int works as intended.
-    """
+    """Check function oks_log_level_to_int works as intended."""
     # Correct cases
     assert oks_log_level_to_int("kLowestPriority") == 10
     assert oks_log_level_to_int("kDefault") == 20
@@ -97,9 +141,21 @@ def test_oks_log_level_to_int() -> None:
     assert oks_log_level_to_int(0) == 40
 
     # Exception raising cases
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_str}' is not from the recognized OKS levels"):
+    with pytest.raises(
+        ValueError,
+        match=f"Level '{invalid_log_level_str}' is not from the recognized OKS levels",
+    ):
         oks_log_level_to_int(invalid_log_level_str)
-    with pytest.raises(ValueError, match=f"Level '{invalid_log_level_int}' is not from the recognized OKS values"):
+    with pytest.raises(
+        ValueError,
+        match=f"Level '{invalid_log_level_int}' is not from the recognized OKS values",
+    ):
         oks_log_level_to_int(invalid_log_level_int)
-    with pytest.raises(TypeError, match=f"Log level must be a string or an integer. Received type {type(invalid_log_level_type).__name__}."):
+    with pytest.raises(
+        TypeError,
+        match=(
+            "Log level must be a string or an integer. Received type "
+            f"{type(invalid_log_level_type).__name__}."
+        ),
+    ):
         oks_log_level_to_int(invalid_log_level_type)

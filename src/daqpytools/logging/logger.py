@@ -44,7 +44,6 @@ def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
         )
         raise LoggerSetupError(logger_name, err_msg)
 
-
     sh_command_level = log_level if log_level > logging.INFO else (log_level + 10)
     sh_command_logger = logging.getLogger(sh.__name__)
     sh_command_logger.setLevel(sh_command_level)
@@ -84,7 +83,7 @@ def get_daq_logger(
 
     Raises:
         LoggerSetupError: If the configuration is invalid.
-    
+
     """
     rich_traceback_install(show_locals=True, width=get_width())
 
@@ -94,31 +93,30 @@ def get_daq_logger(
     if logger_name in existing_loggers:
         existing_logger = existing_loggers[logger_name]
 
-        # If the logger is a placeholder, then a child was initialised before the 
+        # If the logger is a placeholder, then a child was initialised before the
         # current parent. Eg. root.parent.child was called before root.parent,
-        # and now root.parent is being initialised. If this is the case, 
+        # and now root.parent is being initialised. If this is the case,
         # then root.parent is a placeholder, and should be initialised as normal
         if not isinstance(existing_logger, PlaceHolder):
             existing_logger_handlers = [
                 type(handler).__name__ for handler in existing_logger.handlers
             ]
             rich_handler_valid = (
-                ("FormattedRichHandler" in existing_logger_handlers) == rich_handler
-            )
-            file_handler_valid = (
-                ("FileHandler" in existing_logger_handlers) 
-                == (file_handler_path is not None)
+                "FormattedRichHandler" in existing_logger_handlers
+            ) == rich_handler
+            file_handler_valid = ("FileHandler" in existing_logger_handlers) == (
+                file_handler_path is not None
             )
             stream_handler_valid = (
-                ("StreamHandler" in existing_logger_handlers) == stream_handlers
-            )
+                "StreamHandler" in existing_logger_handlers
+            ) == stream_handlers
             if not all([rich_handler_valid, file_handler_valid, stream_handler_valid]):
                 err_msg = (
                     f"Logger '{logger_name}' already exists with different handler "
                     "configuration. Please use a different logger name or adjust the "
                     "handler configuration. Valid checks are: "
                     f"Rich : {rich_handler_valid}, file: {file_handler_valid}, "
-                    f"stream: {stream_handler_valid}" 
+                    f"stream: {stream_handler_valid}"
                 )
                 raise LoggerSetupError(logger_name, err_msg)
             return existing_logger
@@ -128,7 +126,7 @@ def get_daq_logger(
     logger: logging.Logger = logging.getLogger(logger_name)
 
     # Set log level only if specifically required
-    # If not, rely on inheritance 
+    # If not, rely on inheritance
     if log_level is not logging.NOTSET:
         logger.setLevel(log_level)
     logger.propagate = use_parent_handlers

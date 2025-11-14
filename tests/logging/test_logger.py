@@ -4,19 +4,14 @@ import tempfile
 import pytest
 
 from daqpytools.logging.exceptions import LoggerSetupError
-from daqpytools.logging.logger import (
-    setup_root_logger,
-    get_daq_logger
-)
+from daqpytools.logging.logger import get_daq_logger, setup_root_logger
 
 test_logger_name = "test_logger"
 test_logger_child_name = f"{test_logger_name}.child"
 
 
 def test_setup_root_logger():
-    """
-    Test the setup_root_logger function.
-    """
+    """Test the setup_root_logger function."""
     # Set up the root logger
     root_logger = setup_root_logger(test_logger_name, "INFO")
     assert isinstance(root_logger, logging.Logger)
@@ -45,9 +40,10 @@ def test_setup_root_logger():
     for kafka_logger_handler in kafka_logger.handlers:
         assert kafka_logger_handler.level == logging.ERROR
 
-    # Test that adding a handler to the root logger and setting it up again raises an error
+    # Test that adding a handler to the root logger and setting it up again raises an
+    # error
     root_logger.addHandler(logging.NullHandler())
-    with pytest.raises(LoggerSetupError, match="already has handlers configured."):
+    with pytest.raises(LoggerSetupError, match="already has handlers configured"):
         setup_root_logger(test_logger_name, "DEBUG")
 
     # Cleanup handlers
@@ -58,17 +54,16 @@ def test_setup_root_logger():
     # Remove loggers
     for name in [test_logger_name, "sh", "kafka"]:
         logging.root.manager.loggerDict.pop(name, None)
-    
+
     # Shutdown logging to reset any internal state
     logging.shutdown()
 
+
 def test_rich_daq_logger():
-    """
-    Test the get_daq_logger function with rich handler.
-    """
+    """Test the get_daq_logger function with rich handler."""
     test_logger: logging.Logger = get_daq_logger(
         logger_name=test_logger_name,
-        log_level= "DEBUG",
+        log_level="DEBUG",
         use_parent_handlers=True,
         rich_handler=True,
     )
@@ -85,20 +80,19 @@ def test_rich_daq_logger():
 
     # Remove logger
     logging.root.manager.loggerDict.pop(test_logger_name, None)
-    
+
     # Shutdown logging to reset any internal state
     logging.shutdown()
 
 
-
-def test_get_daq_logger(caplog):
+def test_get_daq_logger(caplog: pytest.LogCaptureFixture):
     temp_file = tempfile.NamedTemporaryFile()
     log_path = temp_file.name
-    
+
     # Setup testing root logger
     test_root_logger: logging.Logger = setup_root_logger(
         logger_name=test_logger_name,
-        log_level= "DEBUG",
+        log_level="DEBUG",
     )
     assert isinstance(test_root_logger, logging.Logger)
     assert test_root_logger.name == test_logger_name
@@ -107,7 +101,7 @@ def test_get_daq_logger(caplog):
     # Setup testing daq logger
     test_logger: logging.Logger = get_daq_logger(
         logger_name=test_logger_child_name + "0",
-        log_level= "DEBUG",
+        log_level="DEBUG",
         use_parent_handlers=True,
         rich_handler=False,
         file_handler_path=log_path,
@@ -128,7 +122,7 @@ def test_get_daq_logger(caplog):
 
     test_logger.setLevel("WARNING")
     assert test_logger.getEffectiveLevel() == logging.WARNING
-    
+
     test_logger.setLevel("ERROR")
     assert test_logger.getEffectiveLevel() == logging.ERROR
 
@@ -136,14 +130,22 @@ def test_get_daq_logger(caplog):
     assert test_logger.getEffectiveLevel() == logging.CRITICAL
 
     # Generate a child logger. Test that by default this inherets the parent logger
-    assert get_daq_logger(test_logger.name + ".child").getEffectiveLevel() == logging.CRITICAL
+    assert (
+        get_daq_logger(test_logger.name + ".child").getEffectiveLevel()
+        == logging.CRITICAL
+    )
 
     # Test if a new child logger can be initialised with a different log level
-    assert get_daq_logger(test_logger_child_name + "2", "WARNING").getEffectiveLevel() == logging.WARNING
+    assert (
+        get_daq_logger(test_logger_child_name + "2", "WARNING").getEffectiveLevel()
+        == logging.WARNING
+    )
 
     # Test if the child logger can be changed
     get_daq_logger(test_logger_child_name + "3").setLevel("INFO")
-    assert get_daq_logger(test_logger_child_name + "3").getEffectiveLevel() == logging.INFO
+    assert (
+        get_daq_logger(test_logger_child_name + "3").getEffectiveLevel() == logging.INFO
+    )
 
     # Test logging to a file
     logger = get_daq_logger(test_logger_child_name + "0.0", "CRITICAL")
@@ -151,7 +153,7 @@ def test_get_daq_logger(caplog):
     logger.info("invisible")
     logger.warning("invisible")
     logger.error("invisible")
-    logger.critical("VISIBLE") # Caps to avoid false positives
+    logger.critical("VISIBLE")  # Caps to avoid false positives
     good_record = 0
     bad_record = 0
     for record in caplog.records:
@@ -173,15 +175,15 @@ def test_get_daq_logger(caplog):
         assert "invisible" not in temp_file_data
 
     temp_file.close()
-    
+
     # Validate that you cannot set up the same logger with different handlers
     with pytest.raises(
         LoggerSetupError,
-        match="already exists with different handler configuration.",
+        match="already exists with different handler configuration",
     ):
         get_daq_logger(
             logger_name=test_logger_name,
-            log_level= "DEBUG",
+            log_level="DEBUG",
             use_parent_handlers=True,
             rich_handler=True,  # Different from initial setup
             file_handler_path=log_path,
@@ -204,7 +206,6 @@ def test_get_daq_logger(caplog):
     # Remove loggers
     for name in loggers:
         logging.root.manager.loggerDict.pop(name, None)
-    
+
     # Shutdown logging to reset any internal state
     logging.shutdown()
-

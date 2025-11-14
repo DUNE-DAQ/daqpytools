@@ -62,7 +62,7 @@ def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
 
 def get_daq_logger(
     logger_name: str,
-    log_level: int | str = logging.NOTSET, #TODO: check how the tests run with this
+    log_level: int | str = logging.NOTSET,
     use_parent_handlers: bool = True,
     rich_handler: bool = False,
     file_handler_path: str | None = None,

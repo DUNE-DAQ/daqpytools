@@ -135,16 +135,15 @@ def test_get_daq_logger(caplog):
     test_logger.setLevel("CRITICAL")
     assert test_logger.getEffectiveLevel() == logging.CRITICAL
 
-    # Generate a child logger. Test that by default this is initialised with log level INFO    
-    # This is the case even if the parent logger has a different log level
-    assert get_daq_logger(test_logger_child_name + "1").getEffectiveLevel() == logging.INFO
+    # Generate a child logger. Test that by default this inherets the parent logger
+    assert get_daq_logger(test_logger.name + ".child").getEffectiveLevel() == logging.CRITICAL
 
     # Test if a new child logger can be initialised with a different log level
     assert get_daq_logger(test_logger_child_name + "2", "WARNING").getEffectiveLevel() == logging.WARNING
 
     # Test if the child logger can be changed
     get_daq_logger(test_logger_child_name + "3").setLevel("INFO")
-    assert get_daq_logger(test_logger_child_name + "4").getEffectiveLevel() == logging.INFO
+    assert get_daq_logger(test_logger_child_name + "3").getEffectiveLevel() == logging.INFO
 
     # Test logging to a file
     logger = get_daq_logger(test_logger_child_name + "0.0", "CRITICAL")

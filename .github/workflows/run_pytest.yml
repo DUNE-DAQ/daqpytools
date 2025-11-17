@@ -86,7 +86,7 @@ jobs:
 
       # - name: Upload JUnit test report
       #   if: ${{ !cancelled() }}
-      #   uses: actions/upload-artifact@v4
+      #   uses: actions/upload-artifact@v5
       #   with:
       #     name: junit-report
       #     path: ${{ env.DAQPYTOOLS_DIR }}/junit/test-results.xml
@@ -95,7 +95,7 @@ jobs:
 
       - name: Upload coverage report (HTML)
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: html-coverage-report
           path: ${{ env.DAQPYTOOLS_DIR }}/htmlcov/

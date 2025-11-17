@@ -1,4 +1,7 @@
 # daqpytools
+[![Lint](https://github.com/DUNE-DAQ/daqpytools/actions/workflows/lint.yml/badge.svg)](https://github.com/DUNE-DAQ/daqpytools/actions/workflows/lint.yml)
+[![pytest](https://github.com/DUNE-DAQ/daqpytools/actions/workflows/run_pytest.yml/badge.svg)](https://github.com/DUNE-DAQ/daqpytools/actions/workflows/run_pytest.yml)
+
 Set of importable tools used to simplify DAQ development in python.
 
 

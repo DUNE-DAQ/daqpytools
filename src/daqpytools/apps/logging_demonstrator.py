@@ -49,9 +49,13 @@ def validate_test_configuration(
         "treated as absolute, otherwise as relative."
     ),
 )
-@click.option("-o", "--stdout_handler", is_flag=True, help=("Set up a stdout handler"))
-@click.option("-e", "--stderr_handler", is_flag=True, help=("Set up a stdout handler"))
 @click.option("--ers", is_flag=True, help=("An ERS handler is always added in this demonstration. If set to true, publish to ERS"))
+@click.option(
+    "-s",
+    "--stream_handlers",
+    is_flag=True,
+    help=("Set up stdout and stderr stream handlers"),
+)
 @click.option(
     "-c",
     "--child-logger",
@@ -74,31 +78,41 @@ def main(
     log_level: str,
     rich_handler: bool,
     file_handler_path: str,
-    stdout_handler: bool,
-    stderr_handler: bool,
+    stream_handlers: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
     ers: bool
 ) -> None:
-    """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator."""
+    """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
+    Note - if you are seeing output logs without any explicit handlers assigned, this is
+    expected - python loggers propagate to the root logger by default, which has a
+    default stderr stream handler assigned if a record ever reaches it.
+
+    Args:
+        log_level (str): Log level to set for the logger.
+        rich_handler (bool): If true, set up a rich handler.
+        file_handler_path (str): If provided, set up a file handler with the given path.
+        stream_handlers (bool): If true, set up stdout and stderr stream handlers.
+        child_logger (bool): If true, sets up a child logger to the demonstrator logger.
+        disable_logger_inheritance (bool): If true, disable logger inheritance so each
+            logger instance only uses the logger handlers assigned to the given logger
+            instance.
+
+    Returns:
+        None
+
+    Raises:
+        LoggerSetupError: If no handlers are set up for the logger.
+    """
     logger_name = "daqpytools_logging_demonstrator"
 
-    validate_test_configuration(
-        logger_name=logger_name,
-        rich_handler=rich_handler,
-        stdout_handler=stdout_handler,
-        stderr_handler=stderr_handler,
-        file_handler_path=file_handler_path,
-    )
-
     main_logger: logging.Logger = get_daq_logger(
-        logger_name="daqpytools_logging_demonstrator",
+        logger_name=logger_name,
         log_level=log_level,
         use_parent_handlers=not disable_logger_inheritance,
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
-        stream_stdout_handler=stdout_handler,
-        stream_stderr_handler=stderr_handler,
+        stream_handlers=stream_handlers,
         ers_protobuf_handler=True
     )
     main_logger.debug("example debug message")
@@ -128,13 +142,12 @@ def main(
 
     if child_logger:
         nested_logger: logging.Logger = get_daq_logger(
-            logger_name="daqpytools_logging_demonstrator.child",
+            logger_name=f"{logger_name}.child",
             log_level=log_level,
             use_parent_handlers=not disable_logger_inheritance,
             rich_handler=rich_handler,
             file_handler_path=file_handler_path,
-            stream_stdout_handler=stdout_handler,
-            stream_stderr_handler=stderr_handler,
+            stream_handlers=stream_handlers,
         )
         nested_logger.debug("example debug message")
         nested_logger.info("example info message")

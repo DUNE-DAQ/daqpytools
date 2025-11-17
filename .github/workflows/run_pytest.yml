@@ -58,7 +58,7 @@ jobs:
           pytest --junitxml=junit/test-results.xml --cov=daqpytools --cov-report=html
 
       - name: Publish JUnit test report
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@v6
         if: ${{ !cancelled() }}
         with:
           report_paths: '${{ env.DAQPYTOOLS_DIR }}/junit/test-results.xml'

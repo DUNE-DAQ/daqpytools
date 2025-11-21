@@ -145,7 +145,7 @@ def get_daq_logger(
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:
         for handler in logger.handlers:
-            # Ignore stderr handler resets
+            # Ignore stderr handler resets, needs to be fixed at the error level
             if type(handler).__name__ == "StderrHandler":
                 continue
             handler.setLevel(log_level)

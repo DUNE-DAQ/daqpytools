@@ -7,11 +7,11 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
+    add_ers_protobuf_handler,
     add_file_handler,
     add_rich_handler,
     add_stderr_handler,
     add_stdout_handler,
-    add_ers_protobuf_handler,
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
@@ -79,6 +79,7 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
+        ers_protobuf_handler (bool): Whether to add an ERS protobuf handler.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -142,7 +143,8 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
     if ers_protobuf_handler: 
-        add_ers_protobuf_handler(logger, use_parent_handlers, "session_temporary") #! Change name
+        #! Change name
+        add_ers_protobuf_handler(logger, use_parent_handlers, "session_temporary")
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:

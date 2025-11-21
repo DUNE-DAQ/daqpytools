@@ -49,7 +49,13 @@ def validate_test_configuration(
         "treated as absolute, otherwise as relative."
     ),
 )
-@click.option("--ers", is_flag=True, help=("An ERS handler is always added in this demonstration. If set to true, publish to ERS"))
+@click.option(
+    "--ers", 
+    is_flag=True, 
+    help=(
+        "Set up an ERS handler, and publish to ERS"
+        )
+    )
 @click.option(
     "-s",
     "--stream_handlers",
@@ -97,6 +103,9 @@ def main(
         disable_logger_inheritance (bool): If true, disable logger inheritance so each
             logger instance only uses the logger handlers assigned to the given logger
             instance.
+        ers (bool): If true, sets up an ERS protobuf handler. A log message will always 
+            be printed to stdout to demonstrate an ERS message; if true, this log 
+            message will also be published to ers. 
 
     Returns:
         None

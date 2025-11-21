@@ -16,7 +16,9 @@ from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
 
 
-def setup_root_logger(logger_name: str, log_level: int | str) -> logging.Logger:
+def setup_root_logger(
+    logger_name: str, log_level: int | str = logging.INFO
+) -> logging.Logger:
     """Set up the base logger from which all other loggers inherit.
     The remaining sh* and kafka* loggers are set to a higher log level to avoid
     excessive logging output.
@@ -143,6 +145,9 @@ def get_daq_logger(
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:
         for handler in logger.handlers:
+            # Ignore stderr handler resets
+            if type(handler).__name__ == "StderrHandler":
+                continue
             handler.setLevel(log_level)
 
     return logger

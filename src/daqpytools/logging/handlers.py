@@ -146,9 +146,10 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
         logging.StreamHandler,
         target_stream=cast(io.IOBase, sys.stderr),
     )
-    stdout_handler = logging.StreamHandler(sys.stderr)
-    stdout_handler.setFormatter(LoggingFormatter())
-    log.addHandler(stdout_handler)
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(LoggingFormatter())
+    stderr_handler.setLevel(logging.ERROR)
+    log.addHandler(stderr_handler)
     return
 
 

@@ -184,7 +184,7 @@ class FormattedRichHandler(RichHandler):
     def __init__(self, width: int = 100) -> None:
         """Initialize with custom console and style settings."""
         console: Console = Console(
-            force_terminal=True, width=width, theme=CONSOLE_THEME
+            force_terminal=sys.stdout.isatty(), width=width, theme=CONSOLE_THEME
         )
         super().__init__(
             console=console,

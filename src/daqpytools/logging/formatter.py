@@ -107,10 +107,10 @@ class LoggingFormatter(logging.Formatter):
         padding = LOG_RECORD_PADDING.get("level", 10)
         record.levelname = record.levelname.ljust(padding)[:padding]
 
-        padding = LOG_RECORD_PADDING.get("logger_name", 40)
-        record.name = f"{record.name}:".ljust(padding)[:padding]
-
         padding = LOG_RECORD_PADDING.get("file_and_line", 40)
         record.filename = f"{record.filename}:{record.lineno}".ljust(padding)[:padding]
+
+        padding = LOG_RECORD_PADDING.get("logger_name", 40)
+        record.name = f"{record.name}".ljust(padding)[:padding]
 
         return super().format(record)

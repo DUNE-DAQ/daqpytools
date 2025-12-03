@@ -130,6 +130,10 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
 def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     """Add a stderr handler to the logger.
 
+    The error is set to the ERROR level, and will only log messages at that level
+    or higher. This is to avoid duplicate logging of error messages when both stdout
+    and stderr handlers are used.
+
     Args:
         log (logging.Logger): Logger to add the stderr handler to.
         use_parent_handlers (bool): Whether to check parent handlers.
@@ -146,9 +150,10 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
         logging.StreamHandler,
         target_stream=cast(io.IOBase, sys.stderr),
     )
-    stdout_handler = logging.StreamHandler(sys.stderr)
-    stdout_handler.setFormatter(LoggingFormatter())
-    log.addHandler(stdout_handler)
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(LoggingFormatter())
+    stderr_handler.setLevel(logging.ERROR)
+    log.addHandler(stderr_handler)
     return
 
 

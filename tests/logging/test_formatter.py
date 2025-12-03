@@ -47,7 +47,7 @@ def test_formatter_file_lineno():
 def test_formatter_name_level_message():
     """Validate the correct format and spacing is generated."""
     padding = LOG_RECORD_PADDING.get("logger_name")
-    expected_name = (test_logger_name + ":").ljust(padding)[:padding]
+    expected_name = (test_logger_name).ljust(padding)[:padding]
     assert expected_name in formatted_message
 
 

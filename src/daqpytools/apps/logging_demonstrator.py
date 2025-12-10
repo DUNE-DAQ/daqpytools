@@ -7,6 +7,10 @@ from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger
 from daqpytools.logging.utils import get_width
+from daqpytools.logging.handlers import HandlerType, HandlerConf
+from dataclasses import asdict
+
+from daqpytools.logging.handlers import dummy_add_Lstdout_handler, dummy_add_ERSTrace_handler, dummy_add_Throttle_handler
 
 
 def validate_test_configuration(
@@ -115,6 +119,7 @@ def main(
     """
     logger_name = "daqpytools_logging_demonstrator"
 
+    #! Initialise the main logger and all the relevant handlers
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,
         log_level=log_level,
@@ -124,63 +129,173 @@ def main(
         stream_handlers=stream_handlers,
         ers_protobuf_handler=True
     )
-    main_logger.debug("example debug message")
-    main_logger.info("example info message")
-    main_logger.warning("example warning message")
-    main_logger.error("example error message")
-    main_logger.critical("example critical message")
-    main_logger.info(
-        "[dim cyan]You[/dim cyan] "
-        "[bold green]can[/bold green] "
-        "[bold yellow]also[/bold yellow] "
-        "[bold red]add[/bold red] "
-        "[bold white on red]colours[/bold white on red] "
-        "[bold red]to[/bold red] "
-        "[bold yellow]your[/bold yellow] "
-        "[bold green]log[/bold green] "
-        "[dim cyan]record[/dim cyan] "
-        "[bold green]text[/bold green] "
-        "[bold yellow]with[/bold yellow] "
-        "[bold green]markdown[/bold green]!"
-    )
-    main_logger.warning(
-        "Note: [red] the daqpytools.logging.formatter removes markdown-style "
-        "comments from the log record message [/red]."
-    )
-    main_logger.debug("This should also appear in ERS if set", extra={"use_ers": ers})
+    dummy_add_Lstdout_handler(main_logger, True)
+    dummy_add_ERSTrace_handler(main_logger, True)
+    dummy_add_Throttle_handler(main_logger, True)
+    
 
-    if child_logger:
-        nested_logger: logging.Logger = get_daq_logger(
-            logger_name=f"{logger_name}.child",
-            log_level=log_level,
-            use_parent_handlers=not disable_logger_inheritance,
-            rich_handler=rich_handler,
-            file_handler_path=file_handler_path,
-            stream_handlers=stream_handlers,
-        )
-        nested_logger.debug("example debug message")
-        nested_logger.info("example info message")
-        nested_logger.warning("example warning message")
-        nested_logger.error("example error message")
-        nested_logger.critical("example critical message")
-        nested_logger.info(
-            "[dim cyan]You[/dim cyan] "
-            "[bold green]can[/bold green] "
-            "[bold yellow]also[/bold yellow] "
-            "[bold red]add[/bold red] "
-            "[bold white on red]colours[/bold white on red] "
-            "[bold red]to[/bold red] "
-            "[bold yellow]your[/bold yellow] "
-            "[bold green]log[/bold green] "
-            "[dim cyan]record[/dim cyan] "
-            "[bold green]text[/bold green] "
-            "[bold yellow]with[/bold yellow] "
-            "[bold green]markdown[/bold green]!"
-        )
-        nested_logger.warning(
-            "Note: [red] the daqpytools.logging.formatter removes markdown-style "
-            "comments from the log record message [/red]."
-        )
+    #* Test choosing which handler to use individually
+    main_logger.critical("Default go to tty / rich / file when added")
+    main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})
+    main_logger.critical("Should only go to file", extra={"handlers": [HandlerType.File]})
+    main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
+    main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
+    main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
+    # main_logger.critical("Should go to tty and ERS", extra={"handlers": [HandlerType.Rich, HandlerType.ERS]})
+
+
+
+    #! What about.. 
+    main_logger.critical("Should only go to Throttle", extra={
+        "handlers": [HandlerType.Throttle, HandlerType.Lstdout],
+        "oks" : True 
+    })
+
+    ## and then you wrap the dictionary around it
+    ## OKS = true means use the configuration that exists in the thingy s
+
+
+
+    #* Test the routing to 'Opmon' and base (no ers)
+    # Note that its using a long extra, not an extra=handlerconf.base. That'll need restructuring of the class
+    handlerconf = HandlerConf()
+    main_logger.warning("Handlerconf Base", extra={"handlers": handlerconf.base})
+    main_logger.warning("Handlerconf Opmon", extra={"handlers": handlerconf.Opmon})
+
+    # #* Test ERS routing
+    # main_logger.debug("None", extra={"handlers": handlerconf.ERS})
+    # main_logger.info("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
+    # main_logger.warning("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
+    # main_logger.error("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
+    # main_logger.critical("erstrace,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
+
+    
+    
+    
+
+
+    """
+    So you feed something like main_logger.info in , it passes through the logging level, and then its gonna have to do a few things
+    
+    - First check if it is 'ers' that is specifically called for
+    - Check the log level to see what it can be passed with 
+    - Only apply those that it asks for 
+
+    # Maybe we can have handlerconf.ers resolve to handlers=something, ers=true? 
+    # and have the rest of it resolve to just list of handlers? that could work? its a bit ugly tho
+
+
+    And what do we want? 
+    handlerconf.base  resolves to base
+    handlerconf.opmon resolves to opmon
+    handler.ers _checks_ the log levels and then resolves to ers_{log_level}
+    I think handlerconf needs to be initialised with the full set of filters 
+
+
+    I mean the best thing is if we just have extra=handler.base/opmon/ers and have that resolve into itself
+    we have the handler.obj, and that gets passed into the filter itself
+
+
+
+
+    """
+
+
+    # Okay lets try to explain it to chatgpt
+
+    # I have a question regarding logging in python thats a bit complicated that I want your advice on.
+
+
+    # I have a set of handlers that exists, lets call it RichHandler, FileHandler, Throttle, and StreamHandler. A logging instance would have _all_ of it.
+
+    # I want to organise this into different streams, lets call it Base, Opmon, and the 'ERS' streams. Base and Opmon are simple:
+    # Base: Rich + File
+    # Opmon: Stream + File.
+
+    # We can control this behaviour using filters in each of the handlers
+
+    # The hard part is ERS, because the set of handlers which come out is entirely dependent on the log level that we send it to. Eg. log.info() would have a different set of handlers that we want to use. Eg:
+
+    # ERS_critical: Rich
+    # ERS_info: Rich + Throttle.
+
+    # The basic use case should be something like
+    # log.info("msg", extra=HandlerConf.Opmon) -> goes to stream + file 
+    # log.info("msg", extra=HandlerConf.ERS) -> goes to rich + throttle
+    # log.critical("msg", extra=HandlerConf.ERS) -> goes to Rich
+
+
+    # How can I design a set of python objects that do this? 
+
+
+
+    # Maybe have a 
+    # stream: ERS
+    # Handlers: {set of handlers}? 
+
+
+    # Filter:
+    # - check if stream is ers. 
+    #     If stream is ers, pick up the relevant ers_{log_level}
+    #     else continue with the current set of base Handlers
+
+
+    # basic_streams
+    # {
+    #     Base: [Rich, File]
+    #     Opmon: [Stream, File]
+    # }
+
+    # ers_streams
+    # {
+    #     ers_critical: [rich]
+    #     ers_info: [rich + throttle]
+    # }
+
+
+    # Can you just have it so that if its a normal basic stream, it just gives you the list
+    # but if the stream is ERS, then it returns a dictionary? 
+    # and then let the filter select? Ahh but that suckss
+
+    
+
+
+    
+
+    # main_logger.debug("This should also appear in ERS if set", extra={"use_ers": ers})
+
+    # if child_logger:
+    #     nested_logger: logging.Logger = get_daq_logger(
+    #         logger_name=f"{logger_name}.child",
+    #         log_level=log_level,
+    #         use_parent_handlers=not disable_logger_inheritance,
+    #         rich_handler=rich_handler,
+    #         file_handler_path=file_handler_path,
+    #         stream_handlers=stream_handlers,
+    #     )
+    #     nested_logger.debug("example debug message")
+    #     nested_logger.info("example info message")
+    #     nested_logger.warning("example warning message")
+    #     nested_logger.error("example error message")
+    #     nested_logger.critical("example critical message")
+    #     nested_logger.info(
+    #         "[dim cyan]You[/dim cyan] "
+    #         "[bold green]can[/bold green] "
+    #         "[bold yellow]also[/bold yellow] "
+    #         "[bold red]add[/bold red] "
+    #         "[bold white on red]colours[/bold white on red] "
+    #         "[bold red]to[/bold red] "
+    #         "[bold yellow]your[/bold yellow] "
+    #         "[bold green]log[/bold green] "
+    #         "[dim cyan]record[/dim cyan] "
+    #         "[bold green]text[/bold green] "
+    #         "[bold yellow]with[/bold yellow] "
+    #         "[bold green]markdown[/bold green]!"
+    #     )
+    #     nested_logger.warning(
+    #         "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+    #         "comments from the log record message [/red]."
+    #     )
 
     return
 

@@ -4,6 +4,10 @@ import sys
 from datetime import datetime
 from typing import cast
 
+from enum import Enum
+from dataclasses import dataclass, field
+
+
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
@@ -21,12 +25,107 @@ from daqpytools.logging.levels import logging_log_level_to_str
 from daqpytools.logging.utils import get_width
 
 
+#! Note that this is a temp place holder, it should be ready from the environment variables!!!
+
+# Oks_logging_map = {
+#     #! There is no fatal here
+#     "ERROR": "ERROR",
+#     "WARNING": "WARNING",
+#     "FATAL": "CRITICAL",
+#     "INFO": "INFO",
+# }
+
+# class StreamType(Enum):
+#     BASE="base"
+#     ERS_FATAL="ERS_fatal"
+#     ERS_ERROR="ERS_error"
+
+
+class HandlerType(Enum):
+    Unknown = 0
+    Stream = 1
+    Rich = 2
+    File = 3
+    Kafka = 4 #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
+    Lstdout = 5
+    ERSTrace = 6
+    Throttle = 7
+
+
+
+"""
+If ERS:
+    mapping[ERS_{log_level}]
+else:
+    mapping[thing]
+"""
+
+
+@dataclass
+class HandlerConf:
+    """Add docstring here"""
+    base: set[HandlerType] = field(default_factory=lambda: {HandlerType.Stream, HandlerType.Rich, HandlerType.File})
+    ERS: set[HandlerType] = field(default_factory=lambda: {HandlerType.Kafka, HandlerType.Throttle, HandlerType.ERSTrace, HandlerType.Lstdout})
+    Opmon: set[HandlerType]= field(default_factory=lambda: {HandlerType.Lstdout, HandlerType.Rich})
+
+
+    # ERS_fatal: set[HandlerType] = field(default_factory= lambda:HandlerConf.get_oks_conf("ERS_FATAL"))
+    # ERS_error: set[HandlerType] = field(default_factory= lambda:HandlerConf.get_oks_conf("ERS_ERROR"))
+
+
+    
+
+    # def get_oks_conf(level: str):
+    #     #! the rest needs to be generated. No have this initialised at the handlerconf in the init stage
+    #     Oks_mapping = {
+    #         "ERS_FATAL":   {HandlerType.Rich, HandlerType.Throttle},
+    #         "ERS_ERROR":   {HandlerType.Rich, HandlerType.Throttle},
+    #     }
+    #     return Oks_mapping[level]
+    
+    # def get_handlers(type: StreamType, log):
+    #     if type == StreamType.ERS
+
+
+
+class OnlyLevelFilter(logging.Filter):
+    def __init__(self, level):
+        super().__init__()
+        self.level = level
+
+    def filter(self, record):
+        return record.levelno == self.level
+
+
+#! Current behaviour works if oks = False
+class HandleIDFilter(logging.Filter):
+    def __init__(self, handler_id):
+        super().__init__()
+        self.handler_id = handler_id
+    def filter(self, record):
+        #! Resolve which are the set of handlers the log wants to pass to
+
+        
+        
+        # If 'handlers' set is provided, only allow if this handler is included
+        #TODO: Replace the below with handlerconf.base
+        allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
+        if allowed is None:
+            return True
+        return self.handler_id in allowed
+
+# #! If oks is true, then 
+#     - first map the logging log level to the oks log level (static, can be done here)
+#     - Look up the oks log level to the relevant oks handler (hard, needs to be obtained from the config) This can probably be done at the init stage of something.. 
+#     - Pass the messages to all four filters. Can check if the current filter is allowed or not
+
+
 #! Consider moving this to a separate filters.py
-class UseERSProtobufFilter(logging.Filter):
-    """Class containing ERS filter."""
-    def filter(self, record: logging.LogRecord,) -> bool:
-        """Checks if use_ers is set to only send ERS messages when specified."""
-        return getattr(record, "use_ers", False)
+# class UseERSProtobufFilter(logging.Filter):
+#     """Class containing ERS filter."""
+#     def filter(self, record: logging.LogRecord,) -> bool:
+#         """Checks if use_ers is set to only send ERS messages when specified."""
+#         return getattr(record, "use_ers", False)
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -106,8 +205,28 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
     width: int = get_width()
     handler: RichHandler = FormattedRichHandler(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.Rich))
     log.addHandler(handler)
     return
+
+def dummy_add_Lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = LstdoutDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
+    log.addHandler(handler)
+
+def dummy_add_ERSTrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = ERSTraceDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
+    log.addHandler(handler)
+
+def dummy_add_Throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = ThrottleDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.Throttle))
+    log.addHandler(handler)
+    
 
 def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
@@ -119,7 +238,7 @@ def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                                      kafka_address = address, 
                                                      kafka_topic = topic
                                                      )
-    handler.addFilter(UseERSProtobufFilter())
+    handler.addFilter(HandleIDFilter(HandlerType.Kafka))
     log.addHandler(handler)
 
 
@@ -145,6 +264,7 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(LoggingFormatter())
+    stdout_handler.addFilter(HandleIDFilter(HandlerType.Stream))
     log.addHandler(stdout_handler)
     return
 
@@ -168,9 +288,10 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
         logging.StreamHandler,
         target_stream=cast(io.IOBase, sys.stderr),
     )
-    stdout_handler = logging.StreamHandler(sys.stderr)
-    stdout_handler.setFormatter(LoggingFormatter())
-    log.addHandler(stdout_handler)
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(LoggingFormatter())
+    stderr_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    log.addHandler(stderr_handler)
     return
 
 
@@ -191,6 +312,7 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str) 
     check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
     file_handler = logging.FileHandler(filename=path)
     file_handler.setFormatter(LoggingFormatter())
+    file_handler.addFilter(HandleIDFilter(HandlerType.File))
     log.addHandler(file_handler)
     return
 
@@ -286,3 +408,64 @@ class FormattedRichHandler(RichHandler):
                 f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
             )
         )
+
+
+
+
+class ClassNameRichHandler(FormattedRichHandler):
+    
+    """Handler that displays the class name instead of time."""
+
+    def render(
+        self,
+        *,
+        record: logging.LogRecord,
+        traceback: object,
+        message_renderable: ConsoleRenderable,
+    ) -> Text:
+        # Use class name instead of time
+        class_name: str = self.__class__.__name__
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        class_name_text: Text = Text(class_name.ljust(padding)[:padding], style="logging.time")
+
+        padding = LOG_RECORD_PADDING.get("level", 10)
+        level_text: Text = Text(
+            record.levelname.ljust(padding)[:padding],
+            style=self._get_level_style(record.levelno),
+        )
+
+        file_and_no: str = f"{record.filename}:{record.lineno}"
+        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
+        file_and_no_text: Text = Text(
+            file_and_no.ljust(padding)[:padding], style="logging.location"
+        )
+
+        padding = LOG_RECORD_PADDING.get("logger_name", 45)
+        logger_name_text: Text = Text(
+            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
+        )
+
+        message_text: Text
+        if isinstance(message_renderable, Text):
+            message_text = message_renderable
+        else:
+            message_text = Text.from_markup(str(message_renderable))
+
+        components: list[Text] = [
+            class_name_text,
+            level_text,
+            file_and_no_text,
+            logger_name_text,
+            message_text,
+        ]
+
+        return Text(" ").join(components)
+
+
+class LstdoutDummy(ClassNameRichHandler):
+    pass
+
+class ERSTraceDummy(ClassNameRichHandler):
+    pass
+class ThrottleDummy(ClassNameRichHandler):
+    pass

@@ -10,7 +10,7 @@ from daqpytools.logging.utils import get_width
 from daqpytools.logging.handlers import HandlerType, HandlerConf
 from dataclasses import asdict
 
-from daqpytools.logging.handlers import dummy_add_Lstdout_handler, dummy_add_ERSTrace_handler, dummy_add_Throttle_handler
+from daqpytools.logging.handlers import dummy_add_Lstdout_handler, dummy_add_ERSTrace_handler, dummy_add_Throttle_handler, StreamType
 
 
 def validate_test_configuration(
@@ -145,11 +145,12 @@ def main(
 
 
 
-    #! What about.. 
-    main_logger.critical("Should only go to Throttle", extra={
-        "handlers": [HandlerType.Throttle, HandlerType.Lstdout],
-        "oks" : True 
-    })
+    # #! What about.. 
+    # main_logger.critical("Should only go to Throttle", extra={
+    #     "handlers": [HandlerType.Throttle, HandlerType.Lstdout],
+    #     "stream" : StreamType.BASE
+    # })
+
 
     ## and then you wrap the dictionary around it
     ## OKS = true means use the configuration that exists in the thingy s
@@ -159,19 +160,21 @@ def main(
     #* Test the routing to 'Opmon' and base (no ers)
     # Note that its using a long extra, not an extra=handlerconf.base. That'll need restructuring of the class
     handlerconf = HandlerConf()
-    main_logger.warning("Handlerconf Base", extra={"handlers": handlerconf.base})
-    main_logger.warning("Handlerconf Opmon", extra={"handlers": handlerconf.Opmon})
+    # main_logger.warning("Handlerconf Base", extra={"handlers": handlerconf.base})
+    main_logger.warning("Handlerconf Base", extra=handlerconf.base)
+    main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     # #* Test ERS routing
     # main_logger.debug("None", extra={"handlers": handlerconf.ERS})
     # main_logger.info("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
     # main_logger.warning("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
-    # main_logger.error("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
+    main_logger.error("erstrace,throttle,lstdout,protobufstream", extra=handlerconf.ERS)
     # main_logger.critical("erstrace,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
 
     
     
-    
+    #! So basically
+    # The two ideas I have basically boil down to 'do we want to initialise it in handler conf or in the handlers themself?'
 
 
     """

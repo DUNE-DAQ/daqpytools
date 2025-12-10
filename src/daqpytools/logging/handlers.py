@@ -35,10 +35,10 @@ from daqpytools.logging.utils import get_width
 #     "INFO": "INFO",
 # }
 
-# class StreamType(Enum):
-#     BASE="base"
-#     ERS_FATAL="ERS_fatal"
-#     ERS_ERROR="ERS_error"
+class StreamType(Enum):
+    BASE="base"
+    OPMON="opmon"
+    ERS="ers"
 
 
 class HandlerType(Enum):
@@ -64,24 +64,35 @@ else:
 @dataclass
 class HandlerConf:
     """Add docstring here"""
-    base: set[HandlerType] = field(default_factory=lambda: {HandlerType.Stream, HandlerType.Rich, HandlerType.File})
-    ERS: set[HandlerType] = field(default_factory=lambda: {HandlerType.Kafka, HandlerType.Throttle, HandlerType.ERSTrace, HandlerType.Lstdout})
-    Opmon: set[HandlerType]= field(default_factory=lambda: {HandlerType.Lstdout, HandlerType.Rich})
+    base: dict = field(default_factory = lambda:
+    {
+        "handlers":{HandlerType.Stream, HandlerType.Rich, HandlerType.File},
+        "stream": StreamType.BASE
+    }
+    )
+    
+    Opmon: dict = field(default_factory=lambda:
+    {
+        "handlers":  {HandlerType.Lstdout, HandlerType.Rich},
+        "stream": StreamType.OPMON
+    }
+    )
 
-
-    # ERS_fatal: set[HandlerType] = field(default_factory= lambda:HandlerConf.get_oks_conf("ERS_FATAL"))
-    # ERS_error: set[HandlerType] = field(default_factory= lambda:HandlerConf.get_oks_conf("ERS_ERROR"))
-
-
+    ERS: dict=field(default_factory = lambda:
+    {
+        "ers_handlers":  HandlerConf.get_oks_conf(),
+        "stream": StreamType.ERS
+    }
+    )
     
 
-    # def get_oks_conf(level: str):
-    #     #! the rest needs to be generated. No have this initialised at the handlerconf in the init stage
-    #     Oks_mapping = {
-    #         "ERS_FATAL":   {HandlerType.Rich, HandlerType.Throttle},
-    #         "ERS_ERROR":   {HandlerType.Rich, HandlerType.Throttle},
-    #     }
-    #     return Oks_mapping[level]
+    def get_oks_conf():
+        #! the rest needs to be generated. No have this initialised at the handlerconf in the init stage
+        Oks_mapping = {
+            "ERS_FATAL":   {HandlerType.Rich, HandlerType.Throttle},
+            "ERS_ERROR":   {HandlerType.Rich, HandlerType.Throttle},
+        }
+        return Oks_mapping
     
     # def get_handlers(type: StreamType, log):
     #     if type == StreamType.ERS
@@ -104,12 +115,13 @@ class HandleIDFilter(logging.Filter):
         self.handler_id = handler_id
     def filter(self, record):
         #! Resolve which are the set of handlers the log wants to pass to
-
-        
-        
-        # If 'handlers' set is provided, only allow if this handler is included
-        #TODO: Replace the below with handlerconf.base
-        allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
+        if getattr(record, "stream", None) == StreamType.ERS:
+            #! Do something
+            allowed=getattr(record, "ers_handlers", None)[f"ERS_{record.levelname}"]
+        else:
+            # If 'handlers' set is provided, only allow if this handler is included
+            #TODO: Replace the below with handlerconf.base
+            allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
         if allowed is None:
             return True
         return self.handler_id in allowed

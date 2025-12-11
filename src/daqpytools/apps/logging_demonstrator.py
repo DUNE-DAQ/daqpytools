@@ -1,5 +1,5 @@
 import logging
-
+import os
 import click
 from rich.traceback import install as rich_traceback_install
 
@@ -148,30 +148,32 @@ def main(
 
 
 
-    # #! What about.. 
-    # main_logger.critical("Should only go to Throttle", extra={
-    #     "handlers": [HandlerType.Throttle, HandlerType.Lstdout],
-    #     "stream" : StreamType.BASE
-    # })
+    #* Interlude: Inject environment variables
+    os.environ["DUNEDAQ_ERS_ERROR"] = "erstrace,throttle,lstdout" #,protobufstream(monkafka.cern.ch:30092)
+    os.environ["DUNEDAQ_ERS_CRITICAL"] = "erstrace"
+    main_logger.info(f"{os.getenv('DUNEDAQ_ERS_ERROR')=}")
+    main_logger.info(f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}")
 
 
-    ## and then you wrap the dictionary around it
-    ## OKS = true means use the configuration that exists in the thingy s
+    """
+    DUNEDAQ_ERS_ERROR="erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)"
+    DUNEDAQ_ERS_CRITICAL="erstrace"
 
+    That should be fatal in the next step
+    """
 
-
-    #* Test the routing to 'Opmon' and base (no ers)
-    # Note that its using a long extra, not an extra=handlerconf.base. That'll need restructuring of the class
-    
-    # main_logger.warning("Handlerconf Base", extra={"handlers": handlerconf.base})
-    
+    #* Test the routing to 'Opmon' and base (no ers)    
     handlerconf = HandlerConf()
     main_logger.warning("Handlerconf Base", extra=handlerconf.base)
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     # #* Test ERS routing
-    main_logger.error("Error now goes to rich + throttle", extra=handlerconf.ERS)
-    main_logger.critical("ers critical should just be rich", extra=handlerconf.ERS)
+    main_logger.error("Error now goes to erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.critical("ers critical should just be erstrace", extra=handlerconf.ERS)
+
+
+    
+
 
 
     # #! What about

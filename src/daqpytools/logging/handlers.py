@@ -1,4 +1,5 @@
 import io
+import os
 import logging
 import sys
 from dataclasses import dataclass, field
@@ -38,26 +39,23 @@ class StreamType(Enum):
     ERS="ers"
 
 
+
 class HandlerType(Enum):
     Unknown = 0
     Stream = 1
     Rich = 2
     File = 3
-    Kafka = 4 #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
-    Lstdout = 5
-    ERSTrace = 6
-    Throttle = 7
+    
+    #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
+    #TODO Also, need to develop the proper location parsing
+    Kafka = "protobufstream(monkafka.cern.ch:30092)"
+ 
+    Lstdout = "lstdout"
+    ERSTrace = "erstrace"
+    Throttle = "throttle"
 
 
-
-"""
-If ERS:
-    mapping[ERS_{log_level}]
-else:
-    mapping[thing]
-"""
-
-
+#! Rename to loghandlerconf
 @dataclass
 class HandlerConf:
     """Add docstring here"""
@@ -86,9 +84,14 @@ class HandlerConf:
     
     #! Make pythonic eg use static method dectorator (if its even necessary here)
     def get_oks_conf():
+        
+        str_to_handlers = lambda s: {HandlerType(h.strip()) for h in os.getenv(s).split(",")}
+        
+        #! Need to handle case where it does not exist
         Oks_mapping = {
-            "ERS_CRITICAL":   {HandlerType.Rich},
-            "ERS_ERROR":   {HandlerType.Rich, HandlerType.Throttle},
+            "DUNEDAQ_ERS_ERROR" : str_to_handlers("DUNEDAQ_ERS_ERROR"),
+            "DUNEDAQ_ERS_CRITICAL": str_to_handlers("DUNEDAQ_ERS_CRITICAL"),
+            # "DUNEDAQ_ERS_INFO": str_to_handlers("DUNEDAQ_ERS_INFO"),
         }
 
 
@@ -108,7 +111,7 @@ class HandleIDFilter(logging.Filter):
         self.handler_id = handler_id
     def filter(self, record):
         if getattr(record, "stream", None) == StreamType.ERS:
-            allowed=getattr(record, "ers_handlers", None)[f"ERS_{record.levelname}"]
+            allowed=getattr(record, "ers_handlers", None)[f"DUNEDAQ_ERS_{record.levelname}"]
         else:
             # If 'handlers' set is provided, only allow if this handler is included
             #TODO: Replace the below with handlerconf.base

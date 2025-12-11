@@ -1,12 +1,10 @@
 import io
 import logging
 import sys
-from datetime import datetime
-from typing import cast
-
-from enum import Enum
 from dataclasses import dataclass, field
-
+from datetime import datetime
+from enum import Enum
+from typing import cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
@@ -23,7 +21,6 @@ from daqpytools.logging.formatter import (
 )
 from daqpytools.logging.levels import logging_log_level_to_str
 from daqpytools.logging.utils import get_width
-
 
 #! Note that this is a temp place holder, it should be ready from the environment variables!!!
 
@@ -64,6 +61,8 @@ else:
 @dataclass
 class HandlerConf:
     """Add docstring here"""
+    #! Note at some point this will need to be used to initialise the kafkahandler 
+    # Because the broadcast server is defined here (?!)
     base: dict = field(default_factory = lambda:
     {
         "handlers":{HandlerType.Stream, HandlerType.Rich, HandlerType.File},
@@ -73,7 +72,7 @@ class HandlerConf:
     
     Opmon: dict = field(default_factory=lambda:
     {
-        "handlers":  {HandlerType.Lstdout, HandlerType.Rich},
+        "handlers": {HandlerType.Lstdout, HandlerType.Rich},
         "stream": StreamType.OPMON
     }
     )
@@ -85,17 +84,40 @@ class HandlerConf:
     }
     )
     
-
+    #! Make pythonic eg use static method dectorator (if its even necessary here)
     def get_oks_conf():
-        #! the rest needs to be generated. No have this initialised at the handlerconf in the init stage
         Oks_mapping = {
-            "ERS_FATAL":   {HandlerType.Rich, HandlerType.Throttle},
+            "ERS_CRITICAL":   {HandlerType.Rich},
             "ERS_ERROR":   {HandlerType.Rich, HandlerType.Throttle},
         }
+
+
+        #! This will need to be extracted from variables
+        #* Will also need to figure out what happens if HandlerConf is initialised not inside the controller shell and similar
+        # Eg. no variables exist
+        #! Also writing this function its just an get os.env variable and some code to parse it
+        # test_loggess.critical(f"{os.getenv('DUNEDAQ_ERS_INFO')=}")        
+
         return Oks_mapping
-    
-    # def get_handlers(type: StreamType, log):
-    #     if type == StreamType.ERS
+
+
+
+class HandleIDFilter(logging.Filter):
+    def __init__(self, handler_id):
+        super().__init__()
+        self.handler_id = handler_id
+    def filter(self, record):
+        if getattr(record, "stream", None) == StreamType.ERS:
+            allowed=getattr(record, "ers_handlers", None)[f"ERS_{record.levelname}"]
+        else:
+            # If 'handlers' set is provided, only allow if this handler is included
+            #TODO: Replace the below with handlerconf.base
+            allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
+        if allowed is None:
+            return True
+        return self.handler_id in allowed
+
+
 
 
 
@@ -108,23 +130,6 @@ class OnlyLevelFilter(logging.Filter):
         return record.levelno == self.level
 
 
-#! Current behaviour works if oks = False
-class HandleIDFilter(logging.Filter):
-    def __init__(self, handler_id):
-        super().__init__()
-        self.handler_id = handler_id
-    def filter(self, record):
-        #! Resolve which are the set of handlers the log wants to pass to
-        if getattr(record, "stream", None) == StreamType.ERS:
-            #! Do something
-            allowed=getattr(record, "ers_handlers", None)[f"ERS_{record.levelname}"]
-        else:
-            # If 'handlers' set is provided, only allow if this handler is included
-            #TODO: Replace the below with handlerconf.base
-            allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
-        if allowed is None:
-            return True
-        return self.handler_id in allowed
 
 # #! If oks is true, then 
 #     - first map the logging log level to the oks log level (static, can be done here)
@@ -425,7 +430,6 @@ class FormattedRichHandler(RichHandler):
 
 
 class ClassNameRichHandler(FormattedRichHandler):
-    
     """Handler that displays the class name instead of time."""
 
     def render(

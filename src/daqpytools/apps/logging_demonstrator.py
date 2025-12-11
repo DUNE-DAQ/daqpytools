@@ -4,13 +4,16 @@ import click
 from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.handlers import (
+    HandlerConf,
+    HandlerType,
+    dummy_add_ERSTrace_handler,
+    dummy_add_Lstdout_handler,
+    dummy_add_Throttle_handler,
+)
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger
 from daqpytools.logging.utils import get_width
-from daqpytools.logging.handlers import HandlerType, HandlerConf
-from dataclasses import asdict
-
-from daqpytools.logging.handlers import dummy_add_Lstdout_handler, dummy_add_ERSTrace_handler, dummy_add_Throttle_handler, StreamType
 
 
 def validate_test_configuration(
@@ -159,18 +162,28 @@ def main(
 
     #* Test the routing to 'Opmon' and base (no ers)
     # Note that its using a long extra, not an extra=handlerconf.base. That'll need restructuring of the class
-    handlerconf = HandlerConf()
+    
     # main_logger.warning("Handlerconf Base", extra={"handlers": handlerconf.base})
+    
+    handlerconf = HandlerConf()
     main_logger.warning("Handlerconf Base", extra=handlerconf.base)
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     # #* Test ERS routing
+    main_logger.error("Error now goes to rich + throttle", extra=handlerconf.ERS)
+    main_logger.critical("ers critical should just be rich", extra=handlerconf.ERS)
+
+
+    # #! What about
+    # main_logger.error("msg", extra={"handlerconf": handlerconf, "streamtype": streamtype.ers})
+    
     # main_logger.debug("None", extra={"handlers": handlerconf.ERS})
     # main_logger.info("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
     # main_logger.warning("erstrace,throttle,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
-    main_logger.error("erstrace,throttle,lstdout,protobufstream", extra=handlerconf.ERS)
     # main_logger.critical("erstrace,lstdout,protobufstream", extra={"handlers": handlerconf.ERS})
 
+
+    # main_logger.info(f"{os.getenv('DUNEDAQ_ERS_INFO')=}")
     
     
     #! So basically

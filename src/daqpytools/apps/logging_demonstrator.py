@@ -130,7 +130,7 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_protobuf_handler=True
+        ers_protobuf_handler=False
     )
     dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
@@ -171,7 +171,12 @@ def main(
     main_logger.error("Error now goes to erstrace,throttle,lstdout", extra=handlerconf.ERS)
     main_logger.critical("ers critical should just be erstrace", extra=handlerconf.ERS)
 
-
+    #! Right so whats the next gameplan for you
+    # Simplify the handlertype for kafka, it should just be a number / simple string
+    # Fix up the oks parser, that should get you the usual ers handlertypes, and in the case of kafka it should also generate and return the kafkaconf thing
+    # Think about how it would work if there are many different kafka streams..
+    # Propagate the kafka protobuf thingys
+    # Once that is done, test it out on the logger demonstrator
     
 
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import cast
+import re
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
@@ -38,30 +39,42 @@ class StreamType(Enum):
     OPMON="opmon"
     ERS="ers"
 
-
+@dataclass 
+class ProtobufConf:
+    url = "monkafka.cern.ch"
+    port = 30092
 
 class HandlerType(Enum):
-    Unknown = 0
-    Stream = 1
-    Rich = 2
-    File = 3
+    # Names must exactly match what is given in the ers config
     
-    #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
-    #TODO Also, need to develop the proper location parsing
-    Kafka = "protobufstream(monkafka.cern.ch:30092)"
- 
+    Unknown = "unknown"
+    Stream = "stream"
+    Rich = "rich"
+    File = "file"
+    Protobufstream = "protobufstream"
     Lstdout = "lstdout"
-    ERSTrace = "erstrace"
+    ERStrace = "erstrace"
     Throttle = "throttle"
 
+    #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
+    #TODO Also, need to develop the proper location parsing
+
+    @classmethod
+    def from_string(s: str):
+        return HandlerType[s.lower()]
+
+
+
+@dataclass
+class ERSHandlerConf:
+    handlers: list 
+    protobufconf: ProtobufConf
 
 #! Rename to loghandlerconf
 @dataclass
 class HandlerConf:
     """Add docstring here"""
-    #! Note at some point this will need to be used to initialise the kafkahandler 
-    # Because the broadcast server is defined here (?!)
-    base: dict = field(default_factory = lambda:
+    Base: dict = field(default_factory = lambda:
     {
         "handlers":{HandlerType.Stream, HandlerType.Rich, HandlerType.File},
         "stream": StreamType.BASE
@@ -77,30 +90,60 @@ class HandlerConf:
 
     ERS: dict=field(default_factory = lambda:
     {
+        # this should just be handlers, so handlertype x y z
+        # or at least ers handlers cuz it depends on the string type thing
+        # also have a stream which is ers which is correct
+        # but also have a separate parameter which is the protobuf conf YES thats how it works!
+
         "ers_handlers":  HandlerConf.get_oks_conf(),
         "stream": StreamType.ERS
     }
     )
-    
-    #! Make pythonic eg use static method dectorator (if its even necessary here)
+
+    @staticmethod
     def get_oks_conf():
+
+
+        # Consider moving this to its own functions
+        def convert_string_to_handlertype(stringname: str): # -> Handlertype, ProtobufConf
+            if "protobufstream" not in stringname:
+                return HandlerType.from_string(stringname.strip()), None
+
+            match = re.search(r"\(([^:]+):(\d+)\)", stringname)
+            if not match:
+                raise ValueError("protobufstream must contain url and port in format (url:port)")
+            url, port = match.group(1), int(match.group(2))
+            conf = ProtobufConf(url=url, port=port)
+            return HandlerType.Protobufstream, conf
         
-        str_to_handlers = lambda s: {HandlerType(h.strip()) for h in os.getenv(s).split(",")}
         
+        
+        def make_ers_handler_conf(somestring :str ):
+            ershandlerconf = ERSHandlerConf()
+
+            # Obtain the os.getenv thing, and handle cases when it doesnt work
+
+            envvalue = os.getenv(somestring)
+            if envvalue is None:
+                raise ValueError("No environment detected")
+            
+            for h in envvalue.split(","):
+                handlertype, kafkaconf = convert_string_to_handlertype(h)
+                ershandlerconf.handlers.append(handlertype)
+
+                if kafkaconf:
+                    ershandlerconf.protobufconf = kafkaconf 
+                
+                #There is a bug here where it will only accept the last ever protobuf... i mean there really should only be one right? We should get this checked out.
+            
+            return ershandlerconf
+
+
         #! Need to handle case where it does not exist
         Oks_mapping = {
-            "DUNEDAQ_ERS_ERROR" : str_to_handlers("DUNEDAQ_ERS_ERROR"),
-            "DUNEDAQ_ERS_CRITICAL": str_to_handlers("DUNEDAQ_ERS_CRITICAL"),
-            # "DUNEDAQ_ERS_INFO": str_to_handlers("DUNEDAQ_ERS_INFO"),
+            "DUNEDAQ_ERS_ERROR" : make_ers_handler_conf("DUNEDAQ_ERS_ERROR"),
+            "DUNEDAQ_ERS_CRITICAL": make_ers_handler_conf("DUNEDAQ_ERS_CRITICAL"),
         }
-
-
-        #! This will need to be extracted from variables
-        #* Will also need to figure out what happens if HandlerConf is initialised not inside the controller shell and similar
-        # Eg. no variables exist
-        #! Also writing this function its just an get os.env variable and some code to parse it
-        # test_loggess.critical(f"{os.getenv('DUNEDAQ_ERS_INFO')=}")        
-
         return Oks_mapping
 
 
@@ -110,8 +153,14 @@ class HandleIDFilter(logging.Filter):
         super().__init__()
         self.handler_id = handler_id
     def filter(self, record):
+        
+        # Process more if its an ERS type
         if getattr(record, "stream", None) == StreamType.ERS:
-            allowed=getattr(record, "ers_handlers", None)[f"DUNEDAQ_ERS_{record.levelname}"]
+            ershandlerconf = getattr(record, "ers_handlers", None)[f"DUNEDAQ_ERS_{record.levelname}"]
+            allowed = ershandlerconf.handlers
+            # TODO later: the kafka protobufs should have an additional parameter for 'yes it is kafka protobuf' but also 'yes the url and port number matches, transmit' 
+        
+    
         else:
             # If 'handlers' set is provided, only allow if this handler is included
             #TODO: Replace the below with handlerconf.base
@@ -121,31 +170,12 @@ class HandleIDFilter(logging.Filter):
         return self.handler_id in allowed
 
 
-
-
-
 class OnlyLevelFilter(logging.Filter):
     def __init__(self, level):
         super().__init__()
         self.level = level
-
     def filter(self, record):
         return record.levelno == self.level
-
-
-
-# #! If oks is true, then 
-#     - first map the logging log level to the oks log level (static, can be done here)
-#     - Look up the oks log level to the relevant oks handler (hard, needs to be obtained from the config) This can probably be done at the init stage of something.. 
-#     - Pass the messages to all four filters. Can check if the current filter is allowed or not
-
-
-#! Consider moving this to a separate filters.py
-# class UseERSProtobufFilter(logging.Filter):
-#     """Class containing ERS filter."""
-#     def filter(self, record: logging.LogRecord,) -> bool:
-#         """Checks if use_ers is set to only send ERS messages when specified."""
-#         return getattr(record, "use_ers", False)
 
 def check_parent_handlers(
     log: logging.Logger,

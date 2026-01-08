@@ -130,7 +130,7 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_protobuf_handler=False
+        ers_protobuf_handler=True
     )
     dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
@@ -164,7 +164,7 @@ def main(
 
     #* Test the routing to 'Opmon' and base (no ers)    
     handlerconf = HandlerConf()
-    main_logger.warning("Handlerconf Base", extra=handlerconf.base)
+    main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     # #* Test ERS routing

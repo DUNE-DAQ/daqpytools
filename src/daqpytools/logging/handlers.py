@@ -46,29 +46,26 @@ class ProtobufConf:
 
 class HandlerType(Enum):
     # Names must exactly match what is given in the ers config
-    
     Unknown = "unknown"
     Stream = "stream"
     Rich = "rich"
     File = "file"
     Protobufstream = "protobufstream"
     Lstdout = "lstdout"
-    ERStrace = "erstrace"
+    ERSTrace = "erstrace"
     Throttle = "throttle"
-
     #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
     #TODO Also, need to develop the proper location parsing
-
     @classmethod
-    def from_string(s: str):
-        return HandlerType[s.lower()]
+    def from_string(self, s: str):
+        return HandlerType(s.lower())
 
 
 
 @dataclass
 class ERSHandlerConf:
-    handlers: list 
-    protobufconf: ProtobufConf
+    handlers: list = field(default_factory = lambda: [])
+    protobufconf: ProtobufConf = field(default_factory = lambda: ProtobufConf())
 
 #! Rename to loghandlerconf
 @dataclass
@@ -107,7 +104,7 @@ class HandlerConf:
         # Consider moving this to its own functions
         def convert_string_to_handlertype(stringname: str): # -> Handlertype, ProtobufConf
             if "protobufstream" not in stringname:
-                return HandlerType.from_string(stringname.strip()), None
+                return HandlerType.from_string(stringname), None
 
             match = re.search(r"\(([^:]+):(\d+)\)", stringname)
             if not match:

@@ -138,29 +138,25 @@ def main(
     
 
     #* Test choosing which handler to use individually
-    main_logger.critical("Default go to tty / rich / file when added")
+    main_logger.debug("Default go to tty / rich / file when added")
     main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})
     main_logger.critical("Should only go to file", extra={"handlers": [HandlerType.File]})
     main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
     main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
     main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
-    # main_logger.critical("Should go to tty and ERS", extra={"handlers": [HandlerType.Rich, HandlerType.ERS]})
+    # main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
 
-
-
+    
     #* Interlude: Inject environment variables
-    os.environ["DUNEDAQ_ERS_ERROR"] = "erstrace,throttle,lstdout" #,protobufstream(monkafka.cern.ch:30092)
-    os.environ["DUNEDAQ_ERS_CRITICAL"] = "erstrace"
+    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
+    os.environ["DUNEDAQ_ERS_ERROR"] = "erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)"
+    
     main_logger.info(f"{os.getenv('DUNEDAQ_ERS_ERROR')=}")
     main_logger.info(f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}")
 
 
-    """
-    DUNEDAQ_ERS_ERROR="erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)"
-    DUNEDAQ_ERS_CRITICAL="erstrace"
-
-    That should be fatal in the next step
-    """
 
     #* Test the routing to 'Opmon' and base (no ers)    
     handlerconf = HandlerConf()
@@ -168,9 +164,13 @@ def main(
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     # #* Test ERS routing
-    main_logger.error("Error now goes to erstrace,throttle,lstdout", extra=handlerconf.ERS)
-    main_logger.critical("ers critical should just be erstrace", extra=handlerconf.ERS)
-
+    
+    main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
+    main_logger.debug("ERS Debug none", extra=handlerconf.ERS)
+    main_logger.error("ERS Error erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)", extra=handlerconf.ERS) 
+    
     #! Right so whats the next gameplan for you
     # Simplify the handlertype for kafka, it should just be a number / simple string
     # Fix up the oks parser, that should get you the usual ers handlertypes, and in the case of kafka it should also generate and return the kafkaconf thing

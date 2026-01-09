@@ -26,13 +26,7 @@ from daqpytools.logging.utils import get_width
 
 #! Note that this is a temp place holder, it should be ready from the environment variables!!!
 
-# Oks_logging_map = {
-#     #! There is no fatal here
-#     "ERROR": "ERROR",
-#     "WARNING": "WARNING",
-#     "FATAL": "CRITICAL",
-#     "INFO": "INFO",
-# }
+
 
 class StreamType(Enum):
     BASE="base"
@@ -41,8 +35,8 @@ class StreamType(Enum):
 
 @dataclass 
 class ProtobufConf:
-    url = "monkafka.cern.ch"
-    port = 30092
+    url:str= "monkafka.cern.ch"
+    port:int= 30092
 
 class HandlerType(Enum):
     # Names must exactly match what is given in the ers config
@@ -137,10 +131,15 @@ class HandlerConf:
 
 
         #! Need to handle case where it does not exist
-        Oks_mapping = {
-            "DUNEDAQ_ERS_ERROR" : make_ers_handler_conf("DUNEDAQ_ERS_ERROR"),
-            "DUNEDAQ_ERS_CRITICAL": make_ers_handler_conf("DUNEDAQ_ERS_CRITICAL"),
-        }
+
+        relevant_vars = [
+            "DUNEDAQ_ERS_WARNING",
+            "DUNEDAQ_ERS_INFO",
+            "DUNEDAQ_ERS_FATAL",
+            "DUNEDAQ_ERS_ERROR",
+        ]
+        Oks_mapping = {var: make_ers_handler_conf(var) for var in relevant_vars}
+        
         return Oks_mapping
 
 
@@ -153,8 +152,24 @@ class HandleIDFilter(logging.Filter):
         
         # Process more if its an ERS type
         if getattr(record, "stream", None) == StreamType.ERS:
-            ershandlerconf = getattr(record, "ers_handlers", None)[f"DUNEDAQ_ERS_{record.levelname}"]
-            allowed = ershandlerconf.handlers
+            Oks_logging_map = {
+                #! There is no fatal here
+                "ERROR": "ERROR",
+                "WARNING": "WARNING",
+                "CRITICAL": "FATAL",
+                "INFO": "INFO",
+            }
+
+            #! This is some pretty bad implementation
+
+            transform = Oks_logging_map.get(record.levelname)
+            if transform is None:
+                allowed = {}
+            else:
+                ers_level = f"DUNEDAQ_ERS_{transform}"
+                ershandlerconf = getattr(record, "ers_handlers", None)[ers_level]
+                allowed = ershandlerconf.handlers
+            
             # TODO later: the kafka protobufs should have an additional parameter for 'yes it is kafka protobuf' but also 'yes the url and port number matches, transmit' 
         
     
@@ -285,7 +300,7 @@ def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                                      kafka_address = address, 
                                                      kafka_topic = topic
                                                      )
-    handler.addFilter(HandleIDFilter(HandlerType.Kafka))
+    handler.addFilter(HandleIDFilter(HandlerType.Protobufstream))
     log.addHandler(handler)
 
 

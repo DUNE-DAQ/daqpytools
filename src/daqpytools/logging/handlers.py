@@ -24,9 +24,6 @@ from daqpytools.logging.formatter import (
 from daqpytools.logging.levels import logging_log_level_to_str
 from daqpytools.logging.utils import get_width
 
-#! Note that this is a temp place holder, it should be ready from the environment variables!!!
-
-
 
 class StreamType(Enum):
     BASE="base"
@@ -48,12 +45,10 @@ class HandlerType(Enum):
     Lstdout = "lstdout"
     ERSTrace = "erstrace"
     Throttle = "throttle"
-    #TODO Used to be called ERS, need to go through fine tooth comb to fix all instances
-    #TODO Also, need to develop the proper location parsing
+
     @classmethod
     def from_string(self, s: str):
         return HandlerType(s.lower())
-
 
 
 @dataclass
@@ -61,9 +56,8 @@ class ERSHandlerConf:
     handlers: list = field(default_factory = lambda: [])
     protobufconf: ProtobufConf = field(default_factory = lambda: ProtobufConf())
 
-#! Rename to loghandlerconf
 @dataclass
-class HandlerConf:
+class LogHandlerConf:
     """Add docstring here"""
     Base: dict = field(default_factory = lambda:
     {
@@ -81,67 +75,54 @@ class HandlerConf:
 
     ERS: dict=field(default_factory = lambda:
     {
-        # this should just be handlers, so handlertype x y z
-        # or at least ers handlers cuz it depends on the string type thing
-        # also have a stream which is ers which is correct
-        # but also have a separate parameter which is the protobuf conf YES thats how it works!
-
-        "ers_handlers":  HandlerConf.get_oks_conf(),
+        "ers_handlers":  LogHandlerConf.get_oks_conf(),
         "stream": StreamType.ERS
     }
     )
 
     @staticmethod
+    def convert_string_to_handlertype(stringname: str): # -> Handlertype, ProtobufConf
+        if "protobufstream" not in stringname:
+            return HandlerType.from_string(stringname), None
+
+        match = re.search(r"\(([^:]+):(\d+)\)", stringname)
+        if not match:
+            raise ValueError("protobufstream must contain url and port in format (url:port)")
+        url, port = match.group(1), int(match.group(2))
+        conf = ProtobufConf(url=url, port=port)
+        return HandlerType.Protobufstream, conf
+
+    @staticmethod
+    def make_ers_handler_conf(somestring :str ):
+
+        ershandlerconf = ERSHandlerConf()
+        envvalue = os.getenv(somestring)
+        if envvalue is None:
+            raise ValueError("No environment detected")
+        
+        for h in envvalue.split(","):
+            handlertype, kafkaconf = LogHandlerConf.convert_string_to_handlertype(h)
+            ershandlerconf.handlers.append(handlertype)
+
+            if kafkaconf:
+                ershandlerconf.protobufconf = kafkaconf 
+            
+            #There is a bug here where it will only accept the last ever protobuf... i mean there really should only be one right? We should get this checked out.
+        
+        return ershandlerconf
+
+        
+    @staticmethod
     def get_oks_conf():
-
-
-        # Consider moving this to its own functions
-        def convert_string_to_handlertype(stringname: str): # -> Handlertype, ProtobufConf
-            if "protobufstream" not in stringname:
-                return HandlerType.from_string(stringname), None
-
-            match = re.search(r"\(([^:]+):(\d+)\)", stringname)
-            if not match:
-                raise ValueError("protobufstream must contain url and port in format (url:port)")
-            url, port = match.group(1), int(match.group(2))
-            conf = ProtobufConf(url=url, port=port)
-            return HandlerType.Protobufstream, conf
-        
-        
-        
-        def make_ers_handler_conf(somestring :str ):
-            ershandlerconf = ERSHandlerConf()
-
-            # Obtain the os.getenv thing, and handle cases when it doesnt work
-
-            envvalue = os.getenv(somestring)
-            if envvalue is None:
-                raise ValueError("No environment detected")
-            
-            for h in envvalue.split(","):
-                handlertype, kafkaconf = convert_string_to_handlertype(h)
-                ershandlerconf.handlers.append(handlertype)
-
-                if kafkaconf:
-                    ershandlerconf.protobufconf = kafkaconf 
-                
-                #There is a bug here where it will only accept the last ever protobuf... i mean there really should only be one right? We should get this checked out.
-            
-            return ershandlerconf
-
-
         #! Need to handle case where it does not exist
-
         relevant_vars = [
             "DUNEDAQ_ERS_WARNING",
             "DUNEDAQ_ERS_INFO",
             "DUNEDAQ_ERS_FATAL",
             "DUNEDAQ_ERS_ERROR",
         ]
-        Oks_mapping = {var: make_ers_handler_conf(var) for var in relevant_vars}
-        
+        Oks_mapping = {var: LogHandlerConf.make_ers_handler_conf(var) for var in relevant_vars}
         return Oks_mapping
-
 
 
 class HandleIDFilter(logging.Filter):

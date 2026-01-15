@@ -57,10 +57,17 @@ def validate_test_configuration(
     ),
 )
 @click.option(
-    "--ers", 
+    "--ersprotobufstream", 
     is_flag=True, 
     help=(
         "Set up an ERS handler, and publish to ERS"
+        )
+    )
+@click.option(
+    "--handlertypes", 
+    is_flag=True, 
+    help=(
+        "Demonstrate HandlerTypes functionality"
         )
     )
 @click.option(
@@ -94,7 +101,8 @@ def main(
     stream_handlers: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
-    ers: bool
+    ersprotobufstream: bool,
+    handlertypes:bool,
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
@@ -110,9 +118,11 @@ def main(
         disable_logger_inheritance (bool): If true, disable logger inheritance so each
             logger instance only uses the logger handlers assigned to the given logger
             instance.
-        ers (bool): If true, sets up an ERS protobuf handler. A log message will always 
-            be printed to stdout to demonstrate an ERS message; if true, this log 
-            message will also be published to ers. 
+        ersprotobufstream (bool): If true, sets up an ERS protobuf handler. Error msg
+            are demonstrated in the HandlerType demonstration, requiring handlertypes
+            to be set to true.
+        handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes
+            and streams.
 
     Returns:
         None
@@ -122,7 +132,6 @@ def main(
     """
     logger_name = "daqpytools_logging_demonstrator"
 
-    #! Initialise the main logger and all the relevant handlers
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,
         log_level=log_level,
@@ -130,8 +139,71 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_protobuf_handler=False
+        ers_protobuf_handler=ersprotobufstream,
     )
+    main_logger.debug("example debug message")
+    main_logger.info("example info message")
+    main_logger.warning("example warning message")
+    main_logger.error("example error message")
+    main_logger.critical("example critical message")
+    main_logger.info(
+        "[dim cyan]You[/dim cyan] "
+        "[bold green]can[/bold green] "
+        "[bold yellow]also[/bold yellow] "
+        "[bold red]add[/bold red] "
+        "[bold white on red]colours[/bold white on red] "
+        "[bold red]to[/bold red] "
+        "[bold yellow]your[/bold yellow] "
+        "[bold green]log[/bold green] "
+        "[dim cyan]record[/dim cyan] "
+        "[bold green]text[/bold green] "
+        "[bold yellow]with[/bold yellow] "
+        "[bold green]markdown[/bold green]!"
+    )
+    main_logger.warning(
+        "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+        "comments from the log record message [/red]."
+    )
+
+    if child_logger:
+        nested_logger: logging.Logger = get_daq_logger(
+            logger_name=f"{logger_name}.child",
+            log_level=log_level,
+            use_parent_handlers=not disable_logger_inheritance,
+            rich_handler=rich_handler,
+            file_handler_path=file_handler_path,
+            stream_handlers=stream_handlers,
+        )
+        nested_logger.debug("example debug message")
+        nested_logger.info("example info message")
+        nested_logger.warning("example warning message")
+        nested_logger.error("example error message")
+        nested_logger.critical("example critical message")
+        nested_logger.info(
+            "[dim cyan]You[/dim cyan] "
+            "[bold green]can[/bold green] "
+            "[bold yellow]also[/bold yellow] "
+            "[bold red]add[/bold red] "
+            "[bold white on red]colours[/bold white on red] "
+            "[bold red]to[/bold red] "
+            "[bold yellow]your[/bold yellow] "
+            "[bold green]log[/bold green] "
+            "[dim cyan]record[/dim cyan] "
+            "[bold green]text[/bold green] "
+            "[bold yellow]with[/bold yellow] "
+            "[bold green]markdown[/bold green]!"
+        )
+        nested_logger.warning(
+            "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+            "comments from the log record message [/red]."
+        )
+
+
+    # HandlerTypes demo
+    if not handlertypes:
+        return
+
+    #* Add all dummy handlers which have not been developed yet
     dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
     dummy_add_Throttle_handler(main_logger, True)
@@ -144,10 +216,10 @@ def main(
     main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
     main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
     main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
-    # main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
+    main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
 
     
-    #* Interlude: Inject environment variables
+    #* Interlude: Inject sample environment variables
     os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
     os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
     os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
@@ -156,15 +228,12 @@ def main(
     main_logger.info(f"{os.getenv('DUNEDAQ_ERS_ERROR')=}")
     main_logger.info(f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}")
 
-
-
-    #* Test the routing to 'Opmon' and base (no ers)    
+    #* Test the routing to the Base and Opmon streams
     handlerconf = LogHandlerConf()
     main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
-    # #* Test ERS routing
-    
+    #* Test ERS Streams
     main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
     main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)
     main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
@@ -172,8 +241,6 @@ def main(
     main_logger.error("ERS Error erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)", extra=handlerconf.ERS) 
 
     # TODO
-    # 1. Simplify the comments
-    # 2. Simplify the code
     # 3. Figure out how to change the protobufs based on output
     # 4. Add a prototype in drunc
     # 5. Play with making the new handlers

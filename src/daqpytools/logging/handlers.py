@@ -109,13 +109,13 @@ class LogHandlerConf:
 
     ERS: dict=field(default_factory = lambda:
     {
-        "ers_handlers":  LogHandlerConf.get_oks_conf(),
+        "ers_handlers":  LogHandlerConf._get_oks_conf(),
         "stream": StreamType.ERS
     }
     )
 
     @staticmethod
-    def convert_string_to_handlertype(handler_str: str) -> tuple[HandlerType, ProtobufConf | None]:
+    def _convert_str_to_handlertype(handler_str: str) -> tuple[HandlerType, ProtobufConf | None]:
         """Parses a given environment variable to obtain the
         HandlerType and ProtobufConf as necessary. 
 
@@ -133,7 +133,7 @@ class LogHandlerConf:
         return HandlerType.Protobufstream, ProtobufConf(url=url, port=port)
 
     @staticmethod
-    def make_ers_handler_conf(ers_log_level :str) ->ERSHandlerConf:
+    def _make_ers_handler_conf(ers_log_level :str) ->ERSHandlerConf:
         """Generates the ERSHandlerConf from reading an environment variable"""
         ershandlerconf = ERSHandlerConf()
         envvalue = os.getenv(ers_log_level)
@@ -143,7 +143,7 @@ class LogHandlerConf:
             raise ValueError(f"The environment variable {ers_log_level} is empty")
         
         for h in envvalue.split(","):
-            handlertype, kafkaconf = LogHandlerConf.convert_string_to_handlertype(h)
+            handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
             ershandlerconf.handlers.append(handlertype)
 
             # TODO/ask: Current implementation only supports one protobuf handler
@@ -154,7 +154,7 @@ class LogHandlerConf:
         return ershandlerconf
 
     @staticmethod
-    def get_oks_conf():
+    def _get_oks_conf():
         """From the set of known environment variables, generate the ERS conf dict"""
         ers_env_vars = [
             "DUNEDAQ_ERS_WARNING",
@@ -162,7 +162,7 @@ class LogHandlerConf:
             "DUNEDAQ_ERS_FATAL",
             "DUNEDAQ_ERS_ERROR",
         ]
-        return {var: LogHandlerConf.make_ers_handler_conf(var) for var in ers_env_vars}
+        return {var: LogHandlerConf._make_ers_handler_conf(var) for var in ers_env_vars}
     
     @staticmethod
     def get_base() -> set[HandlerType]:

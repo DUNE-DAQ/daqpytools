@@ -240,12 +240,7 @@ def main(
     main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
     main_logger.debug("ERS Debug none", extra=handlerconf.ERS)
     main_logger.error("ERS Error erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)", extra=handlerconf.ERS) 
-
-    # TODO
-    # 3. Figure out how to change the protobufs based on output
-    # 4. Add a prototype in drunc
-    # 5. Play with making the new handlers
-
+    
     return
 
 

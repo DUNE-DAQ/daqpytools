@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import ClassVar
 import io
 import os
 import logging
@@ -26,17 +28,23 @@ from daqpytools.logging.utils import get_width
 
 
 class StreamType(Enum):
+    #TODO: See if you can get rid of this
+    """Enumtype to classify the set of relevant handlers (i.e streams)"""
     BASE="base"
     OPMON="opmon"
     ERS="ers"
 
 @dataclass 
 class ProtobufConf:
+    """Dataclass to hold Protobut Configuration"""
     url:str= "monkafka.cern.ch"
     port:int= 30092
 
 class HandlerType(Enum):
-    # Names must exactly match what is given in the ers config
+    """Enumtype to classify the existing set of Handlers
+    Values must match exactly what is given in the OKS configuration, if any
+    All are in lowercase
+    """
     Unknown = "unknown"
     Stream = "stream"
     Rich = "rich"
@@ -47,23 +55,60 @@ class HandlerType(Enum):
     Throttle = "throttle"
 
     @classmethod
-    def from_string(self, s: str):
+    def from_string(self, s: str) -> HandlerType:
+        """Converts from a case-independent string to the"""
         return HandlerType(s.lower())
 
 
 @dataclass
 class ERSHandlerConf:
+    """
+    Dataclass that holds the relevant ERS configuration from OKS. 
+
+    As an example, given the following
+    <obj class="Variable" id="ehn1-env-ers-error">
+        <attr name="name" type="string" val="DUNEDAQ_ERS_ERROR"/>
+        <attr name="value" type="string" val="erstrace,throttle,lstdout,
+            protobufstream(monkafka.cern.ch:30092)"/>
+    </obj>
+
+    This dataclass holds the list of relevant Handlers attached to the ERS log level. 
+    In case it also contains a single protobuf handler, the configuration is stored by 
+    the ProtobufConf instance. Multiple protobuf handlers with different url/ports 
+    are not yet supported.
+    """
     handlers: list = field(default_factory = lambda: [])
     protobufconf: ProtobufConf = field(default_factory = lambda: ProtobufConf())
 
 @dataclass
 class LogHandlerConf:
-    """Add docstring here"""
+    """Dataclass that holds the various streams and relevant handlers
+    
+    Attributes:
+
+    handlers: Set of handlers that are allowed to be used
+    stream: StreamType to identify the stream name 
+    ers_handlers: A dictionary with the ERS log level as the key and the relevant
+        ERSHandlerConf as the value. 
+
+
+    TODO: Maybe get rid of StreamType as the relevant info is captured here?
+    TODO: Replace base and opmon with class variables (ClassVar)
+    """
+
+    #! Temporary classvar
+
+    base_handlers : ClassVar[set] = {HandlerType.Stream, HandlerType.Rich, HandlerType.File}
+
+
+
+
+    #! Consider using class variables 
     Base: dict = field(default_factory = lambda:
-    {
-        "handlers":{HandlerType.Stream, HandlerType.Rich, HandlerType.File},
-        "stream": StreamType.BASE
-    }
+        {
+            "handlers":LogHandlerConf.base_handlers,
+            "stream": StreamType.BASE
+        }
     )
     
     Opmon: dict = field(default_factory=lambda:
@@ -81,94 +126,106 @@ class LogHandlerConf:
     )
 
     @staticmethod
-    def convert_string_to_handlertype(stringname: str): # -> Handlertype, ProtobufConf
-        if "protobufstream" not in stringname:
-            return HandlerType.from_string(stringname), None
+    def convert_string_to_handlertype(handler_str: str) -> tuple[HandlerType, ProtobufConf | None]:
+        """Parses a given environment variable to obtain the 
+        HandlerType and ProtobufConf as necessary. 
 
-        match = re.search(r"\(([^:]+):(\d+)\)", stringname)
+        Eg. converts "throttle" to HandlerType.Throttle
+            converts "protobufstream(url:port)" to return both the HandlerType and the 
+            protobuf configuration
+        """
+
+        if "protobufstream" not in handler_str:
+            return HandlerType.from_string(handler_str), None
+
+        match = re.search(r"\(([^:]+):(\d+)\)", handler_str)
         if not match:
             raise ValueError("protobufstream must contain url and port in format (url:port)")
         url, port = match.group(1), int(match.group(2))
-        conf = ProtobufConf(url=url, port=port)
-        return HandlerType.Protobufstream, conf
+        return HandlerType.Protobufstream, ProtobufConf(url=url, port=port)
 
     @staticmethod
-    def make_ers_handler_conf(somestring :str ):
-
+    def make_ers_handler_conf(ers_log_level :str) ->ERSHandlerConf:
+        """Generates the ERSHandlerConf from reading an environment variable"""
         ershandlerconf = ERSHandlerConf()
-        envvalue = os.getenv(somestring)
+        envvalue = os.getenv(ers_log_level)
         if envvalue is None:
-            raise ValueError("No environment detected")
+            #TODO: Need to decide what happens if no environment variable is detected
+            # Do we return None or do we raise an error? 
+            raise ValueError(f"The environment variable {ers_log_level} is empty")
         
         for h in envvalue.split(","):
             handlertype, kafkaconf = LogHandlerConf.convert_string_to_handlertype(h)
             ershandlerconf.handlers.append(handlertype)
 
+            # TODO: Current implementation only supports one protobuf handler
+            # Do we want to support any more? Eg if the environment variable includes
+            # Two "protobufstream(url:port)"
             if kafkaconf:
                 ershandlerconf.protobufconf = kafkaconf 
-            
-            #There is a bug here where it will only accept the last ever protobuf... i mean there really should only be one right? We should get this checked out.
-        
         return ershandlerconf
 
-        
     @staticmethod
     def get_oks_conf():
-        #! Need to handle case where it does not exist
-        relevant_vars = [
+        """From the set of known environment variables, generate the ERS conf dict"""
+        ers_env_vars = [
             "DUNEDAQ_ERS_WARNING",
             "DUNEDAQ_ERS_INFO",
             "DUNEDAQ_ERS_FATAL",
             "DUNEDAQ_ERS_ERROR",
         ]
-        Oks_mapping = {var: LogHandlerConf.make_ers_handler_conf(var) for var in relevant_vars}
-        return Oks_mapping
+        return {var: LogHandlerConf.make_ers_handler_conf(var) for var in ers_env_vars}
+    
+    @staticmethod
+    def get_base() -> set[HandlerType]:
+        """Returns the default list of handlers from LogHandlerConf.base without having
+        to initialise an instance"""
+        return LogHandlerConf.base_handlers
 
 
 class HandleIDFilter(logging.Filter):
-    def __init__(self, handler_id):
+    """Filter class that accepts a list of 'allowed' handlers and will only fire
+    if the current handler (defined by the handler_id) is within the set of 
+    allowed handlers"""
+    
+    def __init__(self, handler_id:HandlerType):
         super().__init__()
         self.handler_id = handler_id
+    
     def filter(self, record):
-        
-        # Process more if its an ERS type
+        # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
-            Oks_logging_map = {
-                #! There is no fatal here
-                "ERROR": "ERROR",
-                "WARNING": "WARNING",
-                "CRITICAL": "FATAL",
-                "INFO": "INFO",
+            
+            #TODO: See if we want to define this mapping elsewhere
+            level_to_ers_var = {
+                "ERROR": "DUNEDAQ_ERS_ERROR",
+                "WARNING": "DUNEDAQ_ERS_WARNING",
+                "CRITICAL": "DUNEDAQ_ERS_FATAL",
+                "INFO": "DUNEDAQ_ERS_INFO",
             }
 
-            #! This is some pretty bad implementation
-
-            transform = Oks_logging_map.get(record.levelname)
-            if transform is None:
-                allowed = {}
-            else:
-                ers_level = f"DUNEDAQ_ERS_{transform}"
-                ershandlerconf = getattr(record, "ers_handlers", None)[ers_level]
-                allowed = ershandlerconf.handlers
+            ers_level_var = level_to_ers_var.get(record.levelname)
+            if ers_level_var is None:
+                return False
             
-            # TODO later: the kafka protobufs should have an additional parameter for 'yes it is kafka protobuf' but also 'yes the url and port number matches, transmit' 
+            ers_handlers = getattr(record, "ers_handlers", None)
+            if ers_handlers is None:
+                return False
+            
+            ershandlerconf = ers_handlers.get(ers_level_var)
+            if ershandlerconf is None:
+                return False
+            
+            allowed = ershandlerconf.handlers
+            # TODO: kafka protobufs should validate url/port match before transmitting
         
-    
+        # Handle the non-ERS case
         else:
-            # If 'handlers' set is provided, only allow if this handler is included
-            #TODO: Replace the below with handlerconf.base
-            allowed = getattr(record, "handlers", {HandlerType.Stream, HandlerType.Rich, HandlerType.File}) 
-        if allowed is None:
-            return True
+            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
+        
+        if not allowed:
+            return False
         return self.handler_id in allowed
-
-
-class OnlyLevelFilter(logging.Filter):
-    def __init__(self, level):
-        super().__init__()
-        self.level = level
-    def filter(self, record):
-        return record.levelno == self.level
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -251,26 +308,7 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     handler.addFilter(HandleIDFilter(HandlerType.Rich))
     log.addHandler(handler)
     return
-
-def dummy_add_Lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
-    width: int = get_width()
-    handler: RichHandler = LstdoutDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
-    log.addHandler(handler)
-
-def dummy_add_ERSTrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    width: int = get_width()
-    handler: RichHandler = ERSTraceDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
-    log.addHandler(handler)
-
-def dummy_add_Throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    width: int = get_width()
-    handler: RichHandler = ThrottleDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Throttle))
-    log.addHandler(handler)
     
-
 def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
                                  address: str ="monkafka.cern.ch:30092") -> None:
@@ -283,8 +321,6 @@ def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                                      )
     handler.addFilter(HandleIDFilter(HandlerType.Protobufstream))
     log.addHandler(handler)
-
-
 
 def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     """Add a stdout handler to the logger.
@@ -454,7 +490,27 @@ class FormattedRichHandler(RichHandler):
 
 
 
+# Placeholder code for currently nonexisting handlers. 
+# These are simply RichHandler instances which replace the utc timing info with their
+# Handler names. Will be removed as soon as real handlers are developed
 
+def dummy_add_Lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = LstdoutDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
+    log.addHandler(handler)
+
+def dummy_add_ERSTrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = ERSTraceDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
+    log.addHandler(handler)
+
+def dummy_add_Throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    width: int = get_width()
+    handler: RichHandler = ThrottleDummy(width=width)
+    handler.addFilter(HandleIDFilter(HandlerType.Throttle))
+    log.addHandler(handler)
 class ClassNameRichHandler(FormattedRichHandler):
     """Handler that displays the class name instead of time."""
 

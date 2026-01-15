@@ -1,14 +1,14 @@
 from __future__ import annotations
-from typing import ClassVar
+
 import io
-import os
 import logging
+import os
+import re
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import cast
-import re
+from typing import ClassVar, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
@@ -65,8 +65,7 @@ class HandlerType(Enum):
 
 @dataclass
 class ERSHandlerConf:
-    """
-    Dataclass that holds the relevant ERS configuration from OKS. 
+    """Dataclass that holds the relevant ERS configuration from OKS.
 
     As an example, given the following
     <obj class="Variable" id="ehn1-env-ers-error">
@@ -117,14 +116,13 @@ class LogHandlerConf:
 
     @staticmethod
     def convert_string_to_handlertype(handler_str: str) -> tuple[HandlerType, ProtobufConf | None]:
-        """Parses a given environment variable to obtain the 
+        """Parses a given environment variable to obtain the
         HandlerType and ProtobufConf as necessary. 
 
         Eg. converts "throttle" to HandlerType.Throttle
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
-
         if "protobufstream" not in handler_str:
             return HandlerType.from_string(handler_str), None
 
@@ -169,14 +167,16 @@ class LogHandlerConf:
     @staticmethod
     def get_base() -> set[HandlerType]:
         """Returns the default list of handlers from LogHandlerConf._BASE_HANDLERS without having
-        to initialise an instance"""
+        to initialise an instance
+        """
         return LogHandlerConf._BASE_HANDLERS
 
 
 class HandleIDFilter(logging.Filter):
     """Filter class that accepts a list of 'allowed' handlers and will only fire
     if the current handler (defined by the handler_id) is within the set of 
-    allowed handlers"""
+    allowed handlers
+    """
     
     def __init__(self, handler_id:HandlerType):
         super().__init__()

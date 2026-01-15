@@ -1,12 +1,13 @@
 import logging
 import os
+
 import click
 from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
-    LogHandlerConf,
     HandlerType,
+    LogHandlerConf,
     dummy_add_ERSTrace_handler,
     dummy_add_Lstdout_handler,
     dummy_add_Throttle_handler,

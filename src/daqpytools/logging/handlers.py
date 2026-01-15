@@ -28,7 +28,6 @@ from daqpytools.logging.utils import get_width
 
 
 class StreamType(Enum):
-    #TODO: See if you can get rid of this
     """Enumtype to classify the set of relevant handlers (i.e streams)"""
     BASE="base"
     OPMON="opmon"
@@ -39,6 +38,10 @@ class ProtobufConf:
     """Dataclass to hold Protobut Configuration"""
     url:str= "monkafka.cern.ch"
     port:int= 30092
+
+    def get_string(self):
+        """Converts back to string version"""
+        return f"{self.url}:{self.port}"
 
 class HandlerType(Enum):
     """Enumtype to classify the existing set of Handlers
@@ -85,38 +88,25 @@ class LogHandlerConf:
     """Dataclass that holds the various streams and relevant handlers
     
     Attributes:
-
-    handlers: Set of handlers that are allowed to be used
-    stream: StreamType to identify the stream name 
-    ers_handlers: A dictionary with the ERS log level as the key and the relevant
-        ERSHandlerConf as the value. 
-
-
-    TODO: Maybe get rid of StreamType as the relevant info is captured here?
-    TODO: Replace base and opmon with class variables (ClassVar)
+        _BASE_HANDLERS: Private class variable for default base handlers
+        _OPMON_HANDLERS: Private class variable for opmon handlers
+        BASE_CONFIG: Class variable for base stream configuration
+        OPMON_CONFIG: Class variable for opmon stream configuration
+        ERS: Instance field for ERS configuration (loaded from environment)
     """
 
-    #! Temporary classvar
-
-    base_handlers : ClassVar[set] = {HandlerType.Stream, HandlerType.Rich, HandlerType.File}
-
-
-
-
-    #! Consider using class variables 
-    Base: dict = field(default_factory = lambda:
-        {
-            "handlers":LogHandlerConf.base_handlers,
-            "stream": StreamType.BASE
-        }
-    )
+    _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich, HandlerType.File}
+    _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Lstdout, HandlerType.Rich}
     
-    Opmon: dict = field(default_factory=lambda:
-    {
-        "handlers": {HandlerType.Lstdout, HandlerType.Rich},
+    Base: ClassVar[dict] = {
+        "handlers": _BASE_HANDLERS,
+        "stream": StreamType.BASE
+    }
+    
+    Opmon: ClassVar[dict] = {
+        "handlers": _OPMON_HANDLERS,
         "stream": StreamType.OPMON
     }
-    )
 
     ERS: dict=field(default_factory = lambda:
     {
@@ -150,7 +140,7 @@ class LogHandlerConf:
         ershandlerconf = ERSHandlerConf()
         envvalue = os.getenv(ers_log_level)
         if envvalue is None:
-            #TODO: Need to decide what happens if no environment variable is detected
+            #TODO/ask: Need to decide what happens if no environment variable is detected
             # Do we return None or do we raise an error? 
             raise ValueError(f"The environment variable {ers_log_level} is empty")
         
@@ -158,7 +148,7 @@ class LogHandlerConf:
             handlertype, kafkaconf = LogHandlerConf.convert_string_to_handlertype(h)
             ershandlerconf.handlers.append(handlertype)
 
-            # TODO: Current implementation only supports one protobuf handler
+            # TODO/ask: Current implementation only supports one protobuf handler
             # Do we want to support any more? Eg if the environment variable includes
             # Two "protobufstream(url:port)"
             if kafkaconf:
@@ -178,9 +168,9 @@ class LogHandlerConf:
     
     @staticmethod
     def get_base() -> set[HandlerType]:
-        """Returns the default list of handlers from LogHandlerConf.base without having
+        """Returns the default list of handlers from LogHandlerConf._BASE_HANDLERS without having
         to initialise an instance"""
-        return LogHandlerConf.base_handlers
+        return LogHandlerConf._BASE_HANDLERS
 
 
 class HandleIDFilter(logging.Filter):
@@ -193,10 +183,11 @@ class HandleIDFilter(logging.Filter):
         self.handler_id = handler_id
     
     def filter(self, record):
+        # TODO/future: kafka protobufs should validate url/port match before transmitting
+        
         # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
-            
-            #TODO: See if we want to define this mapping elsewhere
+            #TODO/ask: See if we want to define this mapping elsewhere
             level_to_ers_var = {
                 "ERROR": "DUNEDAQ_ERS_ERROR",
                 "WARNING": "DUNEDAQ_ERS_WARNING",
@@ -204,25 +195,20 @@ class HandleIDFilter(logging.Filter):
                 "INFO": "DUNEDAQ_ERS_INFO",
             }
 
-            ers_level_var = level_to_ers_var.get(record.levelname)
-            if ers_level_var is None:
-                return False
-            
-            ers_handlers = getattr(record, "ers_handlers", None)
-            if ers_handlers is None:
-                return False
-            
-            ershandlerconf = ers_handlers.get(ers_level_var)
-            if ershandlerconf is None:
+            # Chain None checks using walrus operator
+            if (
+                (ers_level_var := level_to_ers_var.get(record.levelname)) is None
+                or (ers_handlers := getattr(record, "ers_handlers", None)) is None
+                or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
+            ):
                 return False
             
             allowed = ershandlerconf.handlers
-            # TODO: kafka protobufs should validate url/port match before transmitting
+            
         
         # Handle the non-ERS case
         else:
             allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
-        
         if not allowed:
             return False
         return self.handler_id in allowed
@@ -312,7 +298,7 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
 def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
                                  address: str ="monkafka.cern.ch:30092") -> None:
-    # TODO: topic and address are new, propagate to all the relevant implementation
+    # TODO/future: topic and address are new, propagate to all the relevant implementation
     """Add an ers protobuf handler to the root logger."""
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 

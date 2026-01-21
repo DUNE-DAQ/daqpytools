@@ -64,7 +64,6 @@ class HandlerType(Enum):
     Lstdout = "lstdout"
     ERSTrace = "erstrace"
     Throttle = "throttle"
-
     @classmethod
     def from_string(cls, s: str) -> HandlerType:
         """Converts from a case-independent string to HandlerType."""
@@ -220,20 +219,25 @@ class HandleIDFilter(BaseHandlerFilter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers
     """
-    
-    def __init__(self, handler_id:HandlerType):
+
+    def __init__(self, handler_id: Union[HandlerType, List[HandlerType]]):
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
         super().__init__()
-        self.handler_id = handler_id
+        
+        # Normalise handler_id to be a set
+        if isinstance(handler_id, list):
+            self.handler_ids = set(handler_id)
+        else:
+            self.handler_ids = {handler_id}
     
     def filter(self, record):
         """Identifies when a log message should be transmitted or not."""
         allowed = self.get_allowed(record)
         if not allowed:
             return False
-        return self.handler_id in allowed
+        return bool(self.handler_ids & set(allowed))
 
 
 
@@ -522,7 +526,7 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(LoggingFormatter())
-    stdout_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    stdout_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstdout]))
     log.addHandler(stdout_handler)
     return
 
@@ -678,13 +682,6 @@ class FormattedRichHandler(RichHandler):
 # These are simply RichHandler instances which replace the utc timing info with their
 # Handler names. Will be removed as soon as real handlers are developed
 
-def dummy_add_lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = LstdoutDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
-    log.addHandler(handler)
-
 def dummy_add_erstrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     """Adds dummy handler."""
     width: int = get_width()
@@ -743,10 +740,6 @@ class ClassNameRichHandler(FormattedRichHandler):
 
         return Text(" ").join(components)
 
-
-class LstdoutDummy(ClassNameRichHandler):
-    """LstdoutDummy placeholder class."""
-    pass
 
 class ERSTraceDummy(ClassNameRichHandler):
     """ERSTraceDummy placeholder class."""

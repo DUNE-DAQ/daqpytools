@@ -12,6 +12,7 @@ from daqpytools.logging.handlers import (
     add_rich_handler,
     add_stderr_handler,
     add_stdout_handler,
+    ThrottleFilter,
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
@@ -152,7 +153,7 @@ def get_daq_logger(
 
     if throttle:
         # Note: Default parameters used. No functionality on customisability yet
-        main_logger.addFilter(ThrottleFilter())
+        logger.addFilter(ThrottleFilter())
 
 
     # Set log level for all handlers if requested

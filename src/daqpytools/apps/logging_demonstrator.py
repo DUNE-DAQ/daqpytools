@@ -9,8 +9,6 @@ from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
     dummy_add_erstrace_handler,
-    dummy_add_lstdout_handler,
-    dummy_add_throttle_handler,
     ThrottleFilter,
 )
 from daqpytools.logging.levels import logging_log_level_keys
@@ -73,6 +71,13 @@ def validate_test_configuration(
         )
     )
 @click.option(
+    "--throttle", 
+    is_flag=True, 
+    help=(
+        "Demonstrate throttling functionality"
+        )
+    )
+@click.option(
     "-s",
     "--stream_handlers",
     is_flag=True,
@@ -105,6 +110,7 @@ def main(
     disable_logger_inheritance: bool,
     ersprotobufstream: bool,
     handlertypes:bool,
+    throttle: bool,
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
@@ -142,11 +148,11 @@ def main(
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
         ers_kafka_handler=ersprotobufstream,
+        throttle=throttle
     )
 
-    my_throttle = ThrottleFilter(initial_threshold = 10,time_limit = 5)
-    main_logger.addFilter(my_throttle)
 
+    
 
     # main_logger.debug("example debug message")
 
@@ -155,7 +161,6 @@ def main(
         return
 
     # #* Add all dummy handlers which have not been developed yet
-    dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
     
     def emit_err(i):

@@ -205,7 +205,58 @@ class IssueRecord:
         self.last_occurrence_formatted: str = ""
 
 
-class ThrottleFilter(logging. Filter):
+
+
+class BaseHandlerFilter(logging.Filter):
+    def __init__(self):
+        super().__init__()
+    
+    def get_allowed(self, record) -> list | None:
+        # TODO/future: kafka protobufs should validate url/port match before transmitting
+        
+        # Handle the ERS case, requires more processing
+        if getattr(record, "stream", None) == StreamType.ERS:
+            #TODO/ask: See if we want to define this mapping elsewhere
+
+            # Chain None checks using walrus operator
+            if (
+                (ers_level_var := level_to_ers_var.get(record.levelname)) is None
+                or (ers_handlers := getattr(record, "ers_handlers", None)) is None
+                or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
+            ):
+                return None
+            
+            allowed = ershandlerconf.handlers
+            
+        # Handle the non-ERS case
+        else:
+            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
+        
+        return allowed
+        
+class HandleIDFilter(BaseHandlerFilter):
+    """Filter class that accepts a list of 'allowed' handlers and will only fire
+    if the current handler (defined by the handler_id) is within the set of 
+    allowed handlers
+    """
+    
+    def __init__(self, handler_id:HandlerType):
+        """Initialises HandleIDFilter with the handler_id, to identify what
+        kind of handler this filter is.
+        """
+        super().__init__()
+        self.handler_id = handler_id
+    
+    def filter(self, record):
+        """Identifies when a log message should be transmitted or not."""
+        allowed = self.get_allowed(record)
+        if not allowed:
+            return False
+        return self.handler_id in allowed
+
+
+
+class ThrottleFilter(BaseHandlerFilter):
     """
     Advanced logging filter with escalating throttle thresholds.
     
@@ -228,8 +279,8 @@ class ThrottleFilter(logging. Filter):
         ...     logger.error("Repeated error message")
     """
     
-    def __init__(self, initial_threshold: int = 30, time_limit:  int = 30, name: str = ""):
-        super().__init__(name=name)
+    def __init__(self, initial_threshold: int = 30, time_limit:  int = 30):
+        super().__init__()
         self.initial_threshold = initial_threshold
         self.time_limit = time_limit
         self.issue_map: Dict[str, IssueRecord] = defaultdict(IssueRecord)
@@ -245,6 +296,10 @@ class ThrottleFilter(logging. Filter):
         Returns:
             True if the record should be logged, False to suppress it
         """
+        # Check if we want to apply the filter
+        if HandlerType.Throttle not in self.get_allowed(record):
+            return True
+        
         # Create unique issue ID from file path and line number
         issue_id = f"{record.pathname}:{record.lineno}"
     
@@ -340,6 +395,8 @@ class ThrottleFilter(logging. Filter):
         
         # Emit the suppression notice through the logger
         # We need to temporarily remove this filter to avoid recursion
+
+        #! I need to study this
         logger = logging.getLogger(record.name)
         logger.removeFilter(self)
         try:
@@ -364,44 +421,6 @@ class ThrottleFilter(logging. Filter):
         """
         dt = datetime.fromtimestamp(timestamp)
         return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
-
-
-class HandleIDFilter(logging.Filter):
-    """Filter class that accepts a list of 'allowed' handlers and will only fire
-    if the current handler (defined by the handler_id) is within the set of 
-    allowed handlers.
-    """
-    def __init__(self, handler_id:HandlerType) -> None:
-        """Initialises HandleIDFilter with the handler_id, to identify what
-        kind of handler this filter is.
-        """
-        super().__init__()
-        self.handler_id = handler_id
-    
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Identifies when a log message should be transmitted or not."""
-        # TODO/future: kafka protobufs should validate url/port match before trasmit
-        
-        # Handle the ERS case, requires more processing
-        if getattr(record, "stream", None) == StreamType.ERS:
-
-            # Chain None checks using walrus operator
-            if (
-                (ers_level_var := level_to_ers_var.get(record.levelname)) is None
-                or (ers_handlers := getattr(record, "ers_handlers", None)) is None
-                or (erspyloghandlerconf := ers_handlers.get(ers_level_var)) is None
-            ):
-                return False
-            
-            allowed = erspyloghandlerconf.handlers
-            
-        
-        # Handle the non-ERS case
-        else:
-            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
-        if not allowed:
-            return False
-        return self.handler_id in allowed
 
 def check_parent_handlers(
     log: logging.Logger,

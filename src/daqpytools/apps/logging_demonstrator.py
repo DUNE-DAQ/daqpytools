@@ -160,17 +160,33 @@ def main(
     dummy_add_throttle_handler(main_logger, True)
     
     def emit_err(i):
-        main_logger.critical(f"Throttle test {i}")
+        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
 
     #* Test choosing which handler to use individually
-    for i in range(10000):
+    for i in range(50):
         emit_err(i)
     time.sleep(6)
     emit_err(0)
 
-    for i in range(1000):
+    for i in range(50):
         emit_err(i)
 
+    
+    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
+    os.environ["DUNEDAQ_ERS_ERROR"] = (
+        "erstrace,"
+        "throttle,"
+        "lstdout,"
+        "protobufstream(monkafka.cern.ch:30092)"
+    )
+
+
+    
+    handlerconf = LogHandlerConf()
+    main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
+    main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
 
 
     # main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})

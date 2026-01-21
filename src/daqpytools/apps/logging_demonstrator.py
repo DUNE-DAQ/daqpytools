@@ -150,62 +150,118 @@ def main(
         ers_kafka_handler=ersprotobufstream,
         throttle=throttle
     )
+    main_logger.debug("example debug message")
+    main_logger.info("example info message")
+    main_logger.warning("example warning message")
+    main_logger.error("example error message")
+    main_logger.critical("example critical message")
+    main_logger.info(
+        "[dim cyan]You[/dim cyan] "
+        "[bold green]can[/bold green] "
+        "[bold yellow]also[/bold yellow] "
+        "[bold red]add[/bold red] "
+        "[bold white on red]colours[/bold white on red] "
+        "[bold red]to[/bold red] "
+        "[bold yellow]your[/bold yellow] "
+        "[bold green]log[/bold green] "
+        "[dim cyan]record[/dim cyan] "
+        "[bold green]text[/bold green] "
+        "[bold yellow]with[/bold yellow] "
+        "[bold green]markdown[/bold green]!"
+    )
+    main_logger.warning(
+        "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+        "comments from the log record message [/red]."
+    )
+
+    if child_logger:
+        nested_logger: logging.Logger = get_daq_logger(
+            logger_name=f"{logger_name}.child",
+            log_level=log_level,
+            use_parent_handlers=not disable_logger_inheritance,
+            rich_handler=rich_handler,
+            file_handler_path=file_handler_path,
+            stream_handlers=stream_handlers,
+        )
+        nested_logger.debug("example debug message")
+        nested_logger.info("example info message")
+        nested_logger.warning("example warning message")
+        nested_logger.error("example error message")
+        nested_logger.critical("example critical message")
+        nested_logger.info(
+            "[dim cyan]You[/dim cyan] "
+            "[bold green]can[/bold green] "
+            "[bold yellow]also[/bold yellow] "
+            "[bold red]add[/bold red] "
+            "[bold white on red]colours[/bold white on red] "
+            "[bold red]to[/bold red] "
+            "[bold yellow]your[/bold yellow] "
+            "[bold green]log[/bold green] "
+            "[dim cyan]record[/dim cyan] "
+            "[bold green]text[/bold green] "
+            "[bold yellow]with[/bold yellow] "
+            "[bold green]markdown[/bold green]!"
+        )
+        nested_logger.warning(
+            "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+            "comments from the log record message [/red]."
+        )
 
 
-    
+    # Throttle demo
 
-    # main_logger.debug("example debug message")
+    def emit_err(i):
+        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
+
+    for i in range(50):
+        emit_err(i)
+    time.sleep(31) #demonstrate 30s time window
+    for i in range(100):
+        emit_err(i)
+
+
 
     # HandlerTypes demo
     if not handlertypes:
         return
 
-    # #* Add all dummy handlers which have not been developed yet
+    #* Add all dummy handlers which have not been developed yet
+    dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
+    dummy_add_Throttle_handler(main_logger, True)
     
-    def emit_err(i):
-        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.File, HandlerType.Throttle]})
 
-    main_logger.critical("Throw me",extra={"handlers": [HandlerType.Throttle]} )
-    main_logger.critical("Throw file me",extra={"handlers": [HandlerType.Throttle, HandlerType.File,]} )
-
-    # #* Test choosing which handler to use individually
-    for i in range(50):
-        emit_err(i)
-    time.sleep(6)
-    emit_err(0)
-
-    for i in range(500000):
-        emit_err(i)
+    #* Test choosing which handler to use individually
+    main_logger.debug("Default go to tty / rich / file when added")
+    main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})
+    main_logger.critical("Should only go to file", extra={"handlers": [HandlerType.File]})
+    main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
+    main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
+    main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
+    main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
 
     
+    #* Interlude: Inject sample environment variables
     os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
     os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
     os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
-    os.environ["DUNEDAQ_ERS_ERROR"] = (
-        "erstrace,"
-        "throttle,"
-        "lstdout,"
-        "protobufstream(monkafka.cern.ch:30092)"
-    )
-
-
+    os.environ["DUNEDAQ_ERS_ERROR"] = "erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)"
     
+    main_logger.info(f"{os.getenv('DUNEDAQ_ERS_ERROR')=}")
+    main_logger.info(f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}")
+
+    #* Test the routing to the Base and Opmon streams
     handlerconf = LogHandlerConf()
     main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
+    main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
+
+    #* Test ERS Streams
+    main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)
     main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
-
-    # test ers throttling
-    for i in range(100):
-        main_logger.warning("ERS warning throttle erstrace,lstdout", extra=handlerconf.ERS)
-
-
-    # main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})
-    # main_logger.critical("Should only go to file", extra={"handlers": [HandlerType.File]})
-    # main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
-    # main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
-    # main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
-    # main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
+    main_logger.debug("ERS Debug none", extra=handlerconf.ERS)
+    main_logger.error("ERS Error erstrace,throttle,lstdout,protobufstream(monkafka.cern.ch:30092)", extra=handlerconf.ERS) 
+    
     return
 
 

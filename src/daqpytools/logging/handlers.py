@@ -207,11 +207,11 @@ class BaseHandlerFilter(logging.Filter):
                 return None
             
             allowed = ershandlerconf.handlers
-            
+
+
         # Handle the non-ERS case
         else:
             allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
-        
         return allowed
         
 class HandleIDFilter(BaseHandlerFilter):
@@ -238,8 +238,6 @@ class HandleIDFilter(BaseHandlerFilter):
         if not allowed:
             return False
         return bool(self.handler_ids & set(allowed))
-
-
 
 class ThrottleFilter(BaseHandlerFilter):
     """

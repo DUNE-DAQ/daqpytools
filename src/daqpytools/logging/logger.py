@@ -155,7 +155,6 @@ def get_daq_logger(
         # Note: Default parameters used. No functionality on customisability yet
         logger.addFilter(ThrottleFilter())
 
-
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:
         for handler in logger.handlers:

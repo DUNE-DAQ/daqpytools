@@ -168,6 +168,14 @@ class LogHandlerConf:
         """
         return LogHandlerConf._BASE_HANDLERS
 
+class ThrottleFilter(logging.Filter):
+    """
+    """
+    # Needs to be able to accept arguments as it gets iinitialised
+    # Needs to be added to each of the relevant log handlers
+    # needs to do nothing unless the extra arggument contains the throttle thing
+    # see the copilot code for the output
+    pass
 
 class HandleIDFilter(logging.Filter):
     """Filter class that accepts a list of 'allowed' handlers and will only fire

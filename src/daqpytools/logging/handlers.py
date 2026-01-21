@@ -172,23 +172,6 @@ class LogHandlerConf:
         """
         return LogHandlerConf._BASE_HANDLERS
 
-class ThrottleFilterFake(logging.Filter):
-    """
-    """
-    # Needs to be able to accept arguments as it gets iinitialised
-    # Needs to be added to each of the relevant log handlers
-    # needs to do nothing unless the extra arggument contains the throttle thing
-    # see the copilot code for the output
-
-    def __init__(self):
-        super().__init__()
-    
-    def filter(self,record):
-        issue_id = f"{record.pathname}:{record.lineno}"
-        print(issue_id)
-        return True
-
-
 class IssueRecord:
     """Tracks throttling state for a unique issue (identified by file: line)."""
     
@@ -203,8 +186,6 @@ class IssueRecord:
         self.threshold:  int = 10
         self.suppressed_counter: int = 0
         self.last_occurrence_formatted: str = ""
-
-
 
 
 class BaseHandlerFilter(logging.Filter):
@@ -387,7 +368,7 @@ class ThrottleFilter(BaseHandlerFilter):
             sinfo=None
         )
 
-        #! Attach other attributes and set throttle suppression
+        # Attach other attributes and set throttle suppression
         suppression_record._throttle_suppression = True
         for key in record.__dict__:
             if not hasattr(suppression_record, key):
@@ -711,12 +692,6 @@ def dummy_add_erstrace_handler(log: logging.Logger, use_parent_handlers: bool) -
     handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
     log.addHandler(handler)
 
-def dummy_add_throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = ThrottleDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Throttle))
-    log.addHandler(handler)
 class ClassNameRichHandler(FormattedRichHandler):
     """Handler that displays the class name instead of time. Temporary class."""
 
@@ -775,7 +750,4 @@ class LstdoutDummy(ClassNameRichHandler):
 
 class ERSTraceDummy(ClassNameRichHandler):
     """ERSTraceDummy placeholder class."""
-    pass
-class ThrottleDummy(ClassNameRichHandler):
-    """ThrottleDummy placeholder class."""
     pass

@@ -145,10 +145,6 @@ class LogHandlerConf:
         for h in envvalue.split(","):
             handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
             ershandlerconf.handlers.append(handlertype)
-
-            # TODO/ask: Current implementation only supports one protobuf handler
-            # Do we want to support any more? Eg if the environment variable includes
-            # Two "protobufstream(url:port)"
             if kafkaconf:
                 ershandlerconf.protobufconf = kafkaconf 
         return ershandlerconf

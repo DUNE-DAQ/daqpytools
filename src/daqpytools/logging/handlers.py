@@ -28,25 +28,25 @@ from daqpytools.logging.utils import get_width
 
 
 class StreamType(Enum):
-    """Enumtype to classify the set of relevant handlers (i.e streams)"""
+    """Enumtype to classify the set of relevant handlers (i.e streams)."""
     BASE="base"
     OPMON="opmon"
     ERS="ers"
 
 @dataclass 
 class ProtobufConf:
-    """Dataclass to hold Protobut Configuration"""
+    """Dataclass to hold Protobut Configuration."""
     url:str= "monkafka.cern.ch"
     port:int= 30092
 
-    def get_string(self):
-        """Converts back to string version"""
+    def get_string(self) -> str:
+        """Converts back to string version."""
         return f"{self.url}:{self.port}"
 
 class HandlerType(Enum):
-    """Enumtype to classify the existing set of Handlers
+    """Enumtype to classify the existing set of Handlers.
     Values must match exactly what is given in the OKS configuration, if any
-    All are in lowercase
+    All are in lowercase.
     """
     Unknown = "unknown"
     Stream = "stream"
@@ -58,8 +58,8 @@ class HandlerType(Enum):
     Throttle = "throttle"
 
     @classmethod
-    def from_string(self, s: str) -> HandlerType:
-        """Converts from a case-independent string to the"""
+    def from_string(cls, s: str) -> HandlerType:
+        """Converts from a case-independent string to HandlerType."""
         return HandlerType(s.lower())
 
 
@@ -84,7 +84,7 @@ class ERSHandlerConf:
 
 @dataclass
 class LogHandlerConf:
-    """Dataclass that holds the various streams and relevant handlers
+    """Dataclass that holds the various streams and relevant handlers.
     
     Attributes:
         _BASE_HANDLERS: Private class variable for default base handlers
@@ -94,7 +94,9 @@ class LogHandlerConf:
         ERS: Instance field for ERS configuration (loaded from environment)
     """
 
-    _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich, HandlerType.File}
+    _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich,
+        HandlerType.File
+        }
     _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Lstdout, HandlerType.Rich}
     
     Base: ClassVar[dict] = {
@@ -115,7 +117,8 @@ class LogHandlerConf:
     )
 
     @staticmethod
-    def _convert_str_to_handlertype(handler_str: str) -> tuple[HandlerType, ProtobufConf | None]:
+    def _convert_str_to_handlertype(handler_str: str) -> tuple[HandlerType,
+        ProtobufConf | None]:
         """Parses a given environment variable to obtain the
         HandlerType and ProtobufConf as necessary. 
 
@@ -128,17 +131,17 @@ class LogHandlerConf:
 
         match = re.search(r"\(([^:]+):(\d+)\)", handler_str)
         if not match:
-            raise ValueError("protobufstream must contain url and port in format (url:port)")
+            raise ValueError("protobufstream must be formatted (url:port)")
         url, port = match.group(1), int(match.group(2))
         return HandlerType.Protobufstream, ProtobufConf(url=url, port=port)
 
     @staticmethod
     def _make_ers_handler_conf(ers_log_level :str) ->ERSHandlerConf:
-        """Generates the ERSHandlerConf from reading an environment variable"""
+        """Generates the ERSHandlerConf from reading an environment variable."""
         ershandlerconf = ERSHandlerConf()
         envvalue = os.getenv(ers_log_level)
         if envvalue is None:
-            #TODO/ask: Need to decide what happens if no environment variable is detected
+            #TODO/ask: decide what happens if no environment variable is detected
             # Do we return None or do we raise an error? 
             raise ValueError(f"The environment variable {ers_log_level} is empty")
         
@@ -150,8 +153,8 @@ class LogHandlerConf:
         return ershandlerconf
 
     @staticmethod
-    def _get_oks_conf():
-        """From the set of known environment variables, generate the ERS conf dict"""
+    def _get_oks_conf() -> dict:
+        """From the set of known environment variables, generate the ERS conf dict."""
         ers_env_vars = [
             "DUNEDAQ_ERS_WARNING",
             "DUNEDAQ_ERS_INFO",
@@ -162,8 +165,8 @@ class LogHandlerConf:
     
     @staticmethod
     def get_base() -> set[HandlerType]:
-        """Returns the default list of handlers from LogHandlerConf._BASE_HANDLERS without having
-        to initialise an instance
+        """Returns the default list of handlers from 
+        LogHandlerConf._BASE_HANDLERS without having to initialise an instance.
         """
         return LogHandlerConf._BASE_HANDLERS
 
@@ -171,7 +174,7 @@ class LogHandlerConf:
 class HandleIDFilter(logging.Filter):
     """Filter class that accepts a list of 'allowed' handlers and will only fire
     if the current handler (defined by the handler_id) is within the set of 
-    allowed handlers
+    allowed handlers.
     """
     
     def __init__(self, handler_id:HandlerType):
@@ -179,7 +182,7 @@ class HandleIDFilter(logging.Filter):
         self.handler_id = handler_id
     
     def filter(self, record):
-        # TODO/future: kafka protobufs should validate url/port match before transmitting
+        # TODO/future: kafka protobufs should validate url/port match before trasmit
         
         # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
@@ -294,7 +297,7 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
 def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
                                  address: str ="monkafka.cern.ch:30092") -> None:
-    # TODO/future: topic and address are new, propagate to all the relevant implementation
+    # TODO/future: topic and address are new, propagate to all relevant implementation
     """Add an ers protobuf handler to the root logger."""
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
@@ -511,7 +514,9 @@ class ClassNameRichHandler(FormattedRichHandler):
         # Use class name instead of time
         class_name: str = self.__class__.__name__
         padding: int = LOG_RECORD_PADDING.get("time", 25)
-        class_name_text: Text = Text(class_name.ljust(padding)[:padding], style="logging.time")
+        class_name_text: Text = Text(class_name.ljust(padding)[:padding], 
+            style="logging.time"
+        )
 
         padding = LOG_RECORD_PADDING.get("level", 10)
         level_text: Text = Text(
@@ -548,9 +553,12 @@ class ClassNameRichHandler(FormattedRichHandler):
 
 
 class LstdoutDummy(ClassNameRichHandler):
+    """LstdoutDummy placeholder class."""
     pass
 
 class ERSTraceDummy(ClassNameRichHandler):
+    """ERSTraceDummy placeholder class."""
     pass
 class ThrottleDummy(ClassNameRichHandler):
+    """ThrottleDummy placeholder class."""
     pass

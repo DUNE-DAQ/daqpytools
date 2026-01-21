@@ -211,13 +211,15 @@ def main(
     # Throttle demo
 
     def emit_err(i):
-        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
+        main_logger.info(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
 
-    for i in range(50):
-        emit_err(i)
-    time.sleep(31) #demonstrate 30s time window
-    for i in range(100):
-        emit_err(i)
+    if throttle:
+        for i in range(50):
+            emit_err(i)
+        main_logger.warning("Sleeping for 30 seconds")
+        time.sleep(31) #demonstrate 30s time window
+        for i in range(100):
+            emit_err(i)
 
 
 
@@ -226,9 +228,7 @@ def main(
         return
 
     #* Add all dummy handlers which have not been developed yet
-    dummy_add_Lstdout_handler(main_logger, True)
     dummy_add_ERSTrace_handler(main_logger, True)
-    dummy_add_Throttle_handler(main_logger, True)
     
 
     #* Test choosing which handler to use individually

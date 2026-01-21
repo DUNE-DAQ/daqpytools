@@ -154,21 +154,23 @@ def main(
     if not handlertypes:
         return
 
-    #* Add all dummy handlers which have not been developed yet
-    dummy_add_lstdout_handler(main_logger, True)
-    dummy_add_erstrace_handler(main_logger, True)
-    dummy_add_throttle_handler(main_logger, True)
+    # #* Add all dummy handlers which have not been developed yet
+    dummy_add_Lstdout_handler(main_logger, True)
+    dummy_add_ERSTrace_handler(main_logger, True)
     
     def emit_err(i):
-        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
+        main_logger.critical(f"Throttle test {i}", extra={"handlers": [HandlerType.File, HandlerType.Throttle]})
 
-    #* Test choosing which handler to use individually
+    main_logger.critical("Throw me",extra={"handlers": [HandlerType.Throttle]} )
+    main_logger.critical("Throw file me",extra={"handlers": [HandlerType.Throttle, HandlerType.File,]} )
+
+    # #* Test choosing which handler to use individually
     for i in range(50):
         emit_err(i)
     time.sleep(6)
     emit_err(0)
 
-    for i in range(50):
+    for i in range(500000):
         emit_err(i)
 
     
@@ -187,6 +189,10 @@ def main(
     handlerconf = LogHandlerConf()
     main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
     main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
+
+    # test ers throttling
+    for i in range(100):
+        main_logger.warning("ERS warning throttle erstrace,lstdout", extra=handlerconf.ERS)
 
 
     # main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})

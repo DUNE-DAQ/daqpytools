@@ -300,6 +300,9 @@ class ThrottleFilter(BaseHandlerFilter):
         if HandlerType.Throttle not in self.get_allowed(record):
             return True
         
+        if getattr(record, '_throttle_suppression', False):
+            return True
+        
         # Create unique issue ID from file path and line number
         issue_id = f"{record.pathname}:{record.lineno}"
     
@@ -383,6 +386,12 @@ class ThrottleFilter(BaseHandlerFilter):
             func=record.funcName,
             sinfo=None
         )
+
+        #! Attach other attributes and set throttle suppression
+        suppression_record._throttle_suppression = True
+        for key in record.__dict__:
+            if not hasattr(suppression_record, key):
+                setattr(suppression_record, key, getattr(record, key))
         
         # Append suppression information to the message
         original_msg = record.getMessage()
@@ -393,16 +402,10 @@ class ThrottleFilter(BaseHandlerFilter):
         suppression_record.msg = original_msg + suppression_msg
         suppression_record.args = ()  # Clear args since we already formatted
         
-        # Emit the suppression notice through the logger
-        # We need to temporarily remove this filter to avoid recursion
-
-        #! I need to study this
+        # Emit directly - will pass through filter due to flag
         logger = logging.getLogger(record.name)
-        logger.removeFilter(self)
-        try:
-            logger.handle(suppression_record)
-        finally:
-            logger.addFilter(self)
+        logger.handle(suppression_record)
+
         
         # Reset suppression tracking
         rec.last_report = time.time()

@@ -28,7 +28,7 @@ class IssueRecord:
         self.last_report: float = 0.0
         self.initial_counter: int = 0
         self.threshold:  int = 10
-        self. suppressed_counter: int = 0
+        self.suppressed_counter: int = 0
         self.last_occurrence_formatted: str = ""
 
 

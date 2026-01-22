@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import copy
 import os
 import re
 import sys
@@ -190,17 +191,22 @@ class IssueRecord:
 class BaseHandlerFilter(logging.Filter):
     def __init__(self):
         super().__init__()
+        #TODO/ask: See if we want to define this mapping elsewhere
+        self.level_to_ers_var = {
+                logging.ERROR: "DUNEDAQ_ERS_ERROR",
+                logging.WARNING: "DUNEDAQ_ERS_WARNING",
+                logging.CRITICAL: "DUNEDAQ_ERS_FATAL",
+                logging.INFO: "DUNEDAQ_ERS_INFO",
+            }
     
     def get_allowed(self, record) -> list | None:
         # TODO/future: kafka protobufs should validate url/port match before transmitting
         
         # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
-            #TODO/ask: See if we want to define this mapping elsewhere
-
             # Chain None checks using walrus operator
             if (
-                (ers_level_var := level_to_ers_var.get(record.levelname)) is None
+                (ers_level_var := self.level_to_ers_var.get(record.levelno)) is None
                 or (ers_handlers := getattr(record, "ers_handlers", None)) is None
                 or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
             ):
@@ -357,32 +363,15 @@ class ThrottleFilter(BaseHandlerFilter):
         if rec.suppressed_counter == 0:
             return
         
-        # Create a new log record for the suppression notice
-        suppression_record = logging.LogRecord(
-            name=record.name,
-            level=record.levelno,
-            pathname=record.pathname,
-            lineno=record.lineno,
-            msg=record.msg,
-            args=record.args,
-            exc_info=None,
-            func=record.funcName,
-            sinfo=None
-        )
-
-        # Attach other attributes and set throttle suppression
-        suppression_record._throttle_suppression = True
-        for key in record.__dict__:
-            if not hasattr(suppression_record, key):
-                setattr(suppression_record, key, getattr(record, key))
+        suppression_record = copy.deepcopy(record)
+        suppression_record._throttle_suppression = True # pass through filter to report
         
         # Append suppression information to the message
-        original_msg = record.getMessage()
         suppression_msg = (
             f" -- {rec.suppressed_counter} similar messages suppressed, "
             f"last occurrence was at {rec.last_occurrence_formatted}"
         )
-        suppression_record.msg = original_msg + suppression_msg
+        suppression_record.msg = record.getMessage() + suppression_msg
         suppression_record.args = ()  # Clear args since we already formatted
         
         # Emit directly - will pass through filter due to flag

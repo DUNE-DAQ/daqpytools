@@ -10,6 +10,8 @@ from daqpytools.logging.handlers import (
     LogHandlerConf,
     dummy_add_erstrace_handler,
     ThrottleFilter,
+    ERSHandlerConf,
+    StreamType,
 )
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger

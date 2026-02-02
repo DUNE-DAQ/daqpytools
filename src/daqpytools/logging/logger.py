@@ -69,7 +69,7 @@ def get_daq_logger(
     rich_handler: bool = False,
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
-    ers_protobuf_handler: bool = False,
+    ers_kafka_handler: bool = False,
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -81,7 +81,7 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_protobuf_handler (bool): Whether to add an ERS protobuf handler.
+        ers_kafka_handler (bool): Whether to add an ERS protobuf handler.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -144,8 +144,7 @@ def get_daq_logger(
     if stream_handlers:
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
-    if ers_protobuf_handler: 
-        #! Change name
+    if ers_kafka_handler: 
         add_ers_kafka_handler(logger, use_parent_handlers, "session_temporary")
 
     # Set log level for all handlers if requested

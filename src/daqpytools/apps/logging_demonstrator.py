@@ -140,7 +140,7 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_protobuf_handler=ersprotobufstream,
+        ers_kafka_handler=ersprotobufstream,
     )
     main_logger.debug("example debug message")
     main_logger.info("example info message")

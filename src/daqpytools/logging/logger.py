@@ -145,7 +145,7 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
     if ers_kafka_handler: 
-        add_ers_kafka_handler(logger, use_parent_handlers, "session_temporary")
+        add_ers_kafka_handler(logger, use_parent_handlers, "session_tester")
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:

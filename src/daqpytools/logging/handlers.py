@@ -39,7 +39,7 @@ class StreamType(Enum):
 
 @dataclass 
 class ProtobufConf:
-    """Dataclass to hold Protobut Configuration."""
+    """Dataclass to hold Protobuf Configuration."""
     url:str= "monkafka.cern.ch"
     port:int= 30092
 

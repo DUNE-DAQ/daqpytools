@@ -102,7 +102,7 @@ class LogHandlerConf:
         HandlerType.File
         }
     _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Rich, HandlerType.Stream,
-        HandlerType.Protobufstream, HandlerType.File}
+        HandlerType.File}
     
     Base: ClassVar[dict] = {
         "handlers": _BASE_HANDLERS,

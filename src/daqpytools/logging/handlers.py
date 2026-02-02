@@ -191,13 +191,6 @@ class IssueRecord:
 class BaseHandlerFilter(logging.Filter):
     def __init__(self):
         super().__init__()
-        #TODO/ask: See if we want to define this mapping elsewhere
-        self.level_to_ers_var = {
-                logging.ERROR: "DUNEDAQ_ERS_ERROR",
-                logging.WARNING: "DUNEDAQ_ERS_WARNING",
-                logging.CRITICAL: "DUNEDAQ_ERS_FATAL",
-                logging.INFO: "DUNEDAQ_ERS_INFO",
-            }
     
     def get_allowed(self, record) -> list | None:
         # TODO/future: kafka protobufs should validate url/port match before transmitting
@@ -206,7 +199,7 @@ class BaseHandlerFilter(logging.Filter):
         if getattr(record, "stream", None) == StreamType.ERS:
             # Chain None checks using walrus operator
             if (
-                (ers_level_var := self.level_to_ers_var.get(record.levelno)) is None
+                (ers_level_var := level_to_ers_var.get(record.levelno)) is None
                 or (ers_handlers := getattr(record, "ers_handlers", None)) is None
                 or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
             ):
@@ -223,10 +216,10 @@ class BaseHandlerFilter(logging.Filter):
 class HandleIDFilter(BaseHandlerFilter):
     """Filter class that accepts a list of 'allowed' handlers and will only fire
     if the current handler (defined by the handler_id) is within the set of 
-    allowed handlers
+    allowed handlers.
     """
 
-    def __init__(self, handler_id: Union[HandlerType, List[HandlerType]]):
+    def __init__(self, handler_id: Union[HandlerType, List[HandlerType]]) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
@@ -238,7 +231,7 @@ class HandleIDFilter(BaseHandlerFilter):
         else:
             self.handler_ids = {handler_id}
     
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
         """Identifies when a log message should be transmitted or not."""
         allowed = self.get_allowed(record)
         if not allowed:

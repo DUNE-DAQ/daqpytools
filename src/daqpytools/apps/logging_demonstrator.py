@@ -8,9 +8,9 @@ from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
-    dummy_add_ERSTrace_handler,
-    dummy_add_Lstdout_handler,
-    dummy_add_Throttle_handler,
+    dummy_add_erstrace_handler,
+    dummy_add_lstdout_handler,
+    dummy_add_throttle_handler,
 )
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger
@@ -205,9 +205,9 @@ def main(
         return
 
     #* Add all dummy handlers which have not been developed yet
-    dummy_add_Lstdout_handler(main_logger, True)
-    dummy_add_ERSTrace_handler(main_logger, True)
-    dummy_add_Throttle_handler(main_logger, True)
+    dummy_add_lstdout_handler(main_logger, True)
+    dummy_add_erstrace_handler(main_logger, True)
+    dummy_add_throttle_handler(main_logger, True)
     
 
     #* Test choosing which handler to use individually

@@ -15,7 +15,11 @@ from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
 
-from daqpytools.logging.exceptions import LoggerHandlerError
+from daqpytools.logging.exceptions import (
+    ERSEnvError,
+    LoggerHandlerError,
+    ProtobufFormatError,
+)
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
     DATE_TIME_FORMAT,
@@ -23,7 +27,7 @@ from daqpytools.logging.formatter import (
     TIME_ZONE,
     LoggingFormatter,
 )
-from daqpytools.logging.levels import logging_log_level_to_str, level_to_ers_var
+from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
 from daqpytools.logging.utils import get_width
 
 
@@ -97,7 +101,8 @@ class LogHandlerConf:
     _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich,
         HandlerType.File
         }
-    _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Rich, HandlerType.Stream, HandlerType.Protobufstream, HandlerType.File}
+    _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Rich, HandlerType.Stream,
+        HandlerType.Protobufstream, HandlerType.File}
     
     Base: ClassVar[dict] = {
         "handlers": _BASE_HANDLERS,
@@ -131,7 +136,7 @@ class LogHandlerConf:
 
         match = re.search(r"\(([^:]+):(\d+)\)", handler_str)
         if not match:
-            raise ValueError("protobufstream must be formatted (url:port)")
+            raise ProtobufFormatError(handler_str)
         url, port = match.group(1), int(match.group(2))
         return HandlerType.Protobufstream, ProtobufConf(url=url, port=port)
 
@@ -141,7 +146,7 @@ class LogHandlerConf:
         erspyloghandlerconf = ERSPyLogHandlerConf()
         envvalue = os.getenv(ers_log_level)
         if envvalue is None:
-            raise ValueError(f"The environment variable {ers_log_level} is empty")
+            raise ERSEnvError(ers_log_level)
         
         for h in envvalue.split(","):
             handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
@@ -158,7 +163,7 @@ class LogHandlerConf:
     
     @staticmethod
     def get_base() -> set[HandlerType]:
-        """Returns the default list of handlers from 
+        """Returns the default list of handlers from
         LogHandlerConf._BASE_HANDLERS without having to initialise an instance.
         """
         return LogHandlerConf._BASE_HANDLERS
@@ -169,12 +174,15 @@ class HandleIDFilter(logging.Filter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-    
-    def __init__(self, handler_id:HandlerType):
+    def __init__(self, handler_id:HandlerType) -> None:
+        """Initialises HandleIDFilter with the handler_id, to identify what
+        kind of handler this filter is.
+        """
         super().__init__()
         self.handler_id = handler_id
     
-    def filter(self, record):
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Identifies when a log message should be transmitted or not."""
         # TODO/future: kafka protobufs should validate url/port match before trasmit
         
         # Handle the ERS case, requires more processing
@@ -470,25 +478,28 @@ class FormattedRichHandler(RichHandler):
 # These are simply RichHandler instances which replace the utc timing info with their
 # Handler names. Will be removed as soon as real handlers are developed
 
-def dummy_add_Lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
+def dummy_add_lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
+    """Adds dummy handler."""
     width: int = get_width()
     handler: RichHandler = LstdoutDummy(width=width)
     handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
     log.addHandler(handler)
 
-def dummy_add_ERSTrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+def dummy_add_erstrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    """Adds dummy handler."""
     width: int = get_width()
     handler: RichHandler = ERSTraceDummy(width=width)
     handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
     log.addHandler(handler)
 
-def dummy_add_Throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+def dummy_add_throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
+    """Adds dummy handler."""
     width: int = get_width()
     handler: RichHandler = ThrottleDummy(width=width)
     handler.addFilter(HandleIDFilter(HandlerType.Throttle))
     log.addHandler(handler)
 class ClassNameRichHandler(FormattedRichHandler):
-    """Handler that displays the class name instead of time."""
+    """Handler that displays the class name instead of time. Temporary class."""
 
     def render(
         self,
@@ -497,6 +508,7 @@ class ClassNameRichHandler(FormattedRichHandler):
         traceback: object,
         message_renderable: ConsoleRenderable,
     ) -> Text:
+        """Method to render an object."""
         # Use class name instead of time
         class_name: str = self.__class__.__name__
         padding: int = LOG_RECORD_PADDING.get("time", 25)

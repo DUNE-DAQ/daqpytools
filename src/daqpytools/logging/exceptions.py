@@ -33,3 +33,25 @@ class LoggerConfigurationError(Exception):
             f"contains invalid configuration:\n {err_msg}"
         )
         super().__init__(err_msg)
+
+
+class ERSEnvError(Exception):
+    """Custom error for ERS environment issues."""
+
+    def __init__(self, ers_log_level:str) -> None:
+        """C'tor."""
+        err_msg = f"The environment variable {ers_log_level} is empty"
+        super().__init__(err_msg)
+
+
+
+class ProtobufFormatError(Exception):
+    """Custom error for Protobuf URL formatting issues."""
+
+    def __init__(self, url:str) -> None:
+        """C'tor."""
+        err_msg = (
+            "protobufstream URLs must be formatted (url:port)."
+            f"Supplied URL is {url}."
+        )
+        super().__init__(err_msg)

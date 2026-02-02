@@ -7,6 +7,7 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
+    add_ers_kafka_handler,
     add_file_handler,
     add_rich_handler,
     add_stderr_handler,
@@ -68,6 +69,7 @@ def get_daq_logger(
     rich_handler: bool = False,
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
+    ers_kafka_handler: bool = False,
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -79,6 +81,7 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
+        ers_kafka_handler (bool): Whether to add an ERS protobuf handler.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -141,6 +144,8 @@ def get_daq_logger(
     if stream_handlers:
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
+    if ers_kafka_handler: 
+        add_ers_kafka_handler(logger, use_parent_handlers, "session_tester")
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:

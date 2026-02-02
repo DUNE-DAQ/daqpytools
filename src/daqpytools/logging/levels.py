@@ -108,6 +108,13 @@ oks_to_logging_map = {
     "kLowestPriority": "DEBUG",
 }
 
+level_to_ers_var = {
+    "ERROR": "DUNEDAQ_ERS_ERROR",
+    "WARNING": "DUNEDAQ_ERS_WARNING",
+    "CRITICAL": "DUNEDAQ_ERS_FATAL",
+    "INFO": "DUNEDAQ_ERS_INFO",
+}
+
 
 def oks_log_level_to_int(log_level: str | int) -> int:
     """Convert the log level to the equivalent level in python logging as an int.

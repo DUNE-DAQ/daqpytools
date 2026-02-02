@@ -23,7 +23,7 @@ from daqpytools.logging.formatter import (
     TIME_ZONE,
     LoggingFormatter,
 )
-from daqpytools.logging.levels import logging_log_level_to_str
+from daqpytools.logging.levels import logging_log_level_to_str, level_to_ers_var
 from daqpytools.logging.utils import get_width
 
 
@@ -64,7 +64,7 @@ class HandlerType(Enum):
 
 
 @dataclass
-class ERSHandlerConf:
+class ERSPyLogHandlerConf:
     """Dataclass that holds the relevant ERS configuration from OKS.
 
     As an example, given the following
@@ -97,7 +97,7 @@ class LogHandlerConf:
     _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich,
         HandlerType.File
         }
-    _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Lstdout, HandlerType.Rich}
+    _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Rich, HandlerType.Stream, HandlerType.Protobufstream, HandlerType.File}
     
     Base: ClassVar[dict] = {
         "handlers": _BASE_HANDLERS,
@@ -136,32 +136,25 @@ class LogHandlerConf:
         return HandlerType.Protobufstream, ProtobufConf(url=url, port=port)
 
     @staticmethod
-    def _make_ers_handler_conf(ers_log_level :str) ->ERSHandlerConf:
-        """Generates the ERSHandlerConf from reading an environment variable."""
-        ershandlerconf = ERSHandlerConf()
+    def _make_ers_handler_conf(ers_log_level :str) -> ERSPyLogHandlerConf:
+        """Generates the ERSPyLogHandlerConf from reading an environment variable."""
+        erspyloghandlerconf = ERSPyLogHandlerConf()
         envvalue = os.getenv(ers_log_level)
         if envvalue is None:
-            #TODO/ask: decide what happens if no environment variable is detected
-            # Do we return None or do we raise an error? 
             raise ValueError(f"The environment variable {ers_log_level} is empty")
         
         for h in envvalue.split(","):
             handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
-            ershandlerconf.handlers.append(handlertype)
+            erspyloghandlerconf.handlers.append(handlertype)
             if kafkaconf:
-                ershandlerconf.protobufconf = kafkaconf 
-        return ershandlerconf
+                erspyloghandlerconf.protobufconf = kafkaconf 
+        return erspyloghandlerconf
 
     @staticmethod
     def _get_oks_conf() -> dict:
         """From the set of known environment variables, generate the ERS conf dict."""
-        ers_env_vars = [
-            "DUNEDAQ_ERS_WARNING",
-            "DUNEDAQ_ERS_INFO",
-            "DUNEDAQ_ERS_FATAL",
-            "DUNEDAQ_ERS_ERROR",
-        ]
-        return {var: LogHandlerConf._make_ers_handler_conf(var) for var in ers_env_vars}
+        return {var: LogHandlerConf._make_ers_handler_conf(var) 
+            for var in list(level_to_ers_var.values())}
     
     @staticmethod
     def get_base() -> set[HandlerType]:
@@ -186,23 +179,16 @@ class HandleIDFilter(logging.Filter):
         
         # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
-            #TODO/ask: See if we want to define this mapping elsewhere
-            level_to_ers_var = {
-                "ERROR": "DUNEDAQ_ERS_ERROR",
-                "WARNING": "DUNEDAQ_ERS_WARNING",
-                "CRITICAL": "DUNEDAQ_ERS_FATAL",
-                "INFO": "DUNEDAQ_ERS_INFO",
-            }
 
             # Chain None checks using walrus operator
             if (
                 (ers_level_var := level_to_ers_var.get(record.levelname)) is None
                 or (ers_handlers := getattr(record, "ers_handlers", None)) is None
-                or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
+                or (erspyloghandlerconf := ers_handlers.get(ers_level_var)) is None
             ):
                 return False
             
-            allowed = ershandlerconf.handlers
+            allowed = erspyloghandlerconf.handlers
             
         
         # Handle the non-ERS case
@@ -294,7 +280,7 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     log.addHandler(handler)
     return
     
-def add_ers_protobuf_handler(log: logging.Logger, use_parent_handlers: bool,
+def add_ers_kafka_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
                                  address: str ="monkafka.cern.ch:30092") -> None:
     # TODO/future: topic and address are new, propagate to all relevant implementation

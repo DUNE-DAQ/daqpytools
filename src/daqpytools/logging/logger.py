@@ -7,7 +7,7 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
-    add_ers_protobuf_handler,
+    add_ers_kafka_handler,
     add_file_handler,
     add_rich_handler,
     add_stderr_handler,
@@ -146,7 +146,7 @@ def get_daq_logger(
         add_stderr_handler(logger, use_parent_handlers)
     if ers_protobuf_handler: 
         #! Change name
-        add_ers_protobuf_handler(logger, use_parent_handlers, "session_temporary")
+        add_ers_kafka_handler(logger, use_parent_handlers, "session_temporary")
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:

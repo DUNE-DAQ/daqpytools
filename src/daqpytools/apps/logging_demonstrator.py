@@ -10,7 +10,6 @@ from daqpytools.logging.handlers import (
     LogHandlerConf,
     dummy_add_erstrace_handler,
     ThrottleFilter,
-    ERSHandlerConf,
     StreamType,
 )
 from daqpytools.logging.levels import logging_log_level_keys
@@ -211,10 +210,8 @@ def main(
 
 
     # Throttle demo
-
     def emit_err(i):
         main_logger.info(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
-
     if throttle:
         for i in range(50):
             emit_err(i)
@@ -230,7 +227,7 @@ def main(
         return
 
     #* Add all dummy handlers which have not been developed yet
-    dummy_add_ERSTrace_handler(main_logger, True)
+    dummy_add_erstrace_handler(main_logger, True)
     
 
     #* Test choosing which handler to use individually

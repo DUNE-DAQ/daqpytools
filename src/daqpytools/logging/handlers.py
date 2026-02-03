@@ -199,8 +199,11 @@ class BaseHandlerFilter(logging.Filter):
         if getattr(record, "stream", None) == StreamType.ERS:
             # Chain None checks using walrus operator
             if (
+                # Checks if python log level has an ERS severity level match
                 (ers_level_var := level_to_ers_var.get(record.levelno)) is None
+                # Checks if ers_handlers (specifically for ERS) is supplied by the msg
                 or (ers_handlers := getattr(record, "ers_handlers", None)) is None
+                # _Assigns_ the relevant ERS handler conf from supplied level
                 or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
             ):
                 return None
@@ -233,8 +236,7 @@ class HandleIDFilter(BaseHandlerFilter):
     
     def filter(self, record: logging.LogRecord) -> bool:
         """Identifies when a log message should be transmitted or not."""
-        allowed = self.get_allowed(record)
-        if not allowed:
+        if not (allowed:= self.get_allowed(record)):
             return False
         return bool(self.handler_ids & set(allowed))
 
@@ -266,7 +268,7 @@ class ThrottleFilter(BaseHandlerFilter):
         self.initial_threshold = initial_threshold
         self.time_limit = time_limit
         self.issue_map: Dict[str, IssueRecord] = defaultdict(IssueRecord)
-        self.mutex = Lock()
+        self.mutex = Lock() # Ensures thread safety
     
     def filter(self, record: logging.LogRecord) -> bool:
         """
@@ -279,15 +281,16 @@ class ThrottleFilter(BaseHandlerFilter):
             True if the record should be logged, False to suppress it
         """
         # Check if we want to apply the filter
-        if HandlerType.Throttle not in self.get_allowed(record):
+        if not (allowed:= self.get_allowed(record)):
+            return False
+        if HandlerType.Throttle not in allowed:
             return True
         
+        # Used to bypass the filter to report suppression messages
         if getattr(record, '_throttle_suppression', False):
             return True
         
-        # Create unique issue ID from file path and line number
         issue_id = f"{record.pathname}:{record.lineno}"
-    
         with self.mutex:
             issue_record = self.issue_map[issue_id]
             return self._throttle(issue_record, record)

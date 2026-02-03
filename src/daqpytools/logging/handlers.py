@@ -127,7 +127,7 @@ class FormattedRichHandler(RichHandler):
             )
         )
 
-# This is rpetty hacky.. we need to find a way to dynamically set the log level
+# This is pretty hacky.. we need to find a way to dynamically set the log level
 log: logging.Logger = logging.getLogger(__name__)
 log.addHandler(FormattedRichHandler(width=get_width()))
 log.setLevel("INFO")
@@ -327,7 +327,6 @@ class HandleIDFilter(BaseHandlerFilter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-
     def __init__(self, handler_id: Union[HandlerType, List[HandlerType]]) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.

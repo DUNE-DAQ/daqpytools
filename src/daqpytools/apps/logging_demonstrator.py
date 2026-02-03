@@ -8,7 +8,6 @@ from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
-    dummy_add_erstrace_handler,
     ThrottleFilter,
     StreamType,
 )
@@ -226,16 +225,11 @@ def main(
     if not handlertypes:
         return
 
-    #* Add all dummy handlers which have not been developed yet
-    dummy_add_erstrace_handler(main_logger, True)
-    
-
     #* Test choosing which handler to use individually
     main_logger.debug("Default go to tty / rich / file when added")
     main_logger.critical("Should only go to tty", extra={"handlers": [HandlerType.Rich]})
     main_logger.critical("Should only go to file", extra={"handlers": [HandlerType.File]})
     main_logger.critical("Should only go to Lstdout", extra={"handlers": [HandlerType.Lstdout]})
-    main_logger.critical("Should only go to ERSTrace", extra={"handlers": [HandlerType.ERSTrace]})
     main_logger.critical("Should only go to Throttle", extra={"handlers": [HandlerType.Throttle]})
     main_logger.critical("Should go to tty and Protobufstream", extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]})
 

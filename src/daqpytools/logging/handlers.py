@@ -35,6 +35,103 @@ from daqpytools.logging.formatter import (
 from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
 from daqpytools.logging.utils import get_width
 
+class FormattedRichHandler(RichHandler):
+    """RichHandler that formats log messages with time, aligned columns, and styles."""
+
+    def __init__(self, width: int = 100) -> None:
+        """Initialize with custom console and style settings."""
+        console: Console = Console(
+            force_terminal=True, width=width, theme=CONSOLE_THEME
+        )
+        super().__init__(
+            console=console,
+            omit_repeated_times=False,
+            markup=True,
+            rich_tracebacks=True,
+            show_path=False,
+            show_time=False,  # We format time ourselves
+        )
+
+    def render(
+        self,
+        *,
+        record: logging.LogRecord,
+        traceback: object,
+        message_renderable: ConsoleRenderable,
+    ) -> Text:
+        """Render the log record into a rich Text object with custom formatting.
+
+        Args:
+            record (logging.LogRecord): The log record to render.
+            traceback (object): The traceback object (not used here).
+            message_renderable (ConsoleRenderable): The log message renderable.
+
+        Returns:
+            Text: The formatted log record as a rich Text object.
+
+        Raises:
+            None
+        """
+        dt: datetime = datetime.fromtimestamp(record.created, tz=TIME_ZONE)
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        time_str: str = dt.strftime(DATE_TIME_FORMAT).ljust(padding)[:padding]
+        time_text: Text = Text(time_str, style="logging.time")
+
+        padding = LOG_RECORD_PADDING.get("level", 10)
+        level_text: Text = Text(
+            record.levelname.ljust(padding)[:padding],
+            style=self._get_level_style(record.levelno),
+        )
+
+        file_and_no: str = f"{record.filename}:{record.lineno}"
+        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
+        file_and_no_text: Text = Text(
+            file_and_no.ljust(padding)[:padding], style="logging.location"
+        )
+
+        padding = LOG_RECORD_PADDING.get("logger_name", 45)
+        logger_name_text: Text = Text(
+            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
+        )
+
+        # Convert message_renderable to Text for type consistency
+        message_text: Text
+        if isinstance(message_renderable, Text):
+            message_text = message_renderable
+        else:
+            message_text = Text.from_markup(str(message_renderable))
+
+        components: list[Text] = [
+            time_text,
+            level_text,
+            file_and_no_text,
+            logger_name_text,
+            message_text,
+        ]
+
+        return Text(" ").join(components)
+
+    def _get_level_style(self, level_no: int) -> str:
+        """Get the style string for the given log level number from the theme defined in
+        CONSOLE_THEME.
+
+        Args:
+            level_no (int): The log level number.
+
+        Returns:
+            str: The style string for the log level.
+        """
+        return str(
+            CONSOLE_THEME.styles.get(
+                f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
+            )
+        )
+
+# This is rpetty hacky.. we need to find a way to dynamically set the log level
+log: logging.Logger = logging.getLogger(__name__)
+log.addHandler(FormattedRichHandler(width=get_width()))
+log.setLevel("INFO")
+
 
 class StreamType(Enum):
     """Enumtype to classify the set of relevant handlers (i.e streams)."""
@@ -63,12 +160,17 @@ class HandlerType(Enum):
     File = "file"
     Protobufstream = "protobufstream"
     Lstdout = "lstdout"
-    ERSTrace = "erstrace"
     Throttle = "throttle"
     @classmethod
-    def from_string(cls, s: str) -> HandlerType:
+    def from_string(cls, s: str) -> HandlerType | None:
         """Converts from a case-independent string to HandlerType."""
-        return HandlerType(s.lower())
+        try:
+            h = HandlerType(s.lower())
+            return h
+        except:
+            msg=f"{s} is not a known handler type"
+            log.warning(msg)
+            return None
 
 
 @dataclass
@@ -135,7 +237,11 @@ class LogHandlerConf:
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
+        # TODO/now Do not like this hardcoding of cases, try fixing
         if "protobufstream" not in handler_str:
+            if "erstrace" in handler_str:
+                log.debug("ERSTrace is a C++ implementation, does not have an equivalent in Python")
+                return None, None
             return HandlerType.from_string(handler_str), None
 
         match = re.search(r"\(([^:]+):(\d+)\)", handler_str)
@@ -566,164 +672,3 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str) 
     log.addHandler(file_handler)
     return
 
-
-class FormattedRichHandler(RichHandler):
-    """RichHandler that formats log messages with time, aligned columns, and styles."""
-
-    def __init__(self, width: int = 100) -> None:
-        """Initialize with custom console and style settings."""
-        console: Console = Console(
-            force_terminal=True, width=width, theme=CONSOLE_THEME
-        )
-        super().__init__(
-            console=console,
-            omit_repeated_times=False,
-            markup=True,
-            rich_tracebacks=True,
-            show_path=False,
-            show_time=False,  # We format time ourselves
-        )
-
-    def render(
-        self,
-        *,
-        record: logging.LogRecord,
-        traceback: object,
-        message_renderable: ConsoleRenderable,
-    ) -> Text:
-        """Render the log record into a rich Text object with custom formatting.
-
-        Args:
-            record (logging.LogRecord): The log record to render.
-            traceback (object): The traceback object (not used here).
-            message_renderable (ConsoleRenderable): The log message renderable.
-
-        Returns:
-            Text: The formatted log record as a rich Text object.
-
-        Raises:
-            None
-        """
-        dt: datetime = datetime.fromtimestamp(record.created, tz=TIME_ZONE)
-        padding: int = LOG_RECORD_PADDING.get("time", 25)
-        time_str: str = dt.strftime(DATE_TIME_FORMAT).ljust(padding)[:padding]
-        time_text: Text = Text(time_str, style="logging.time")
-
-        padding = LOG_RECORD_PADDING.get("level", 10)
-        level_text: Text = Text(
-            record.levelname.ljust(padding)[:padding],
-            style=self._get_level_style(record.levelno),
-        )
-
-        file_and_no: str = f"{record.filename}:{record.lineno}"
-        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
-        file_and_no_text: Text = Text(
-            file_and_no.ljust(padding)[:padding], style="logging.location"
-        )
-
-        padding = LOG_RECORD_PADDING.get("logger_name", 45)
-        logger_name_text: Text = Text(
-            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
-        )
-
-        # Convert message_renderable to Text for type consistency
-        message_text: Text
-        if isinstance(message_renderable, Text):
-            message_text = message_renderable
-        else:
-            message_text = Text.from_markup(str(message_renderable))
-
-        components: list[Text] = [
-            time_text,
-            level_text,
-            file_and_no_text,
-            logger_name_text,
-            message_text,
-        ]
-
-        return Text(" ").join(components)
-
-    def _get_level_style(self, level_no: int) -> str:
-        """Get the style string for the given log level number from the theme defined in
-        CONSOLE_THEME.
-
-        Args:
-            level_no (int): The log level number.
-
-        Returns:
-            str: The style string for the log level.
-        """
-        return str(
-            CONSOLE_THEME.styles.get(
-                f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
-            )
-        )
-
-
-
-# Placeholder code for currently nonexisting handlers. 
-# These are simply RichHandler instances which replace the utc timing info with their
-# Handler names. Will be removed as soon as real handlers are developed
-
-def dummy_add_erstrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = ERSTraceDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
-    log.addHandler(handler)
-
-class ClassNameRichHandler(FormattedRichHandler):
-    """Handler that displays the class name instead of time. Temporary class."""
-
-    def render(
-        self,
-        *,
-        record: logging.LogRecord,
-        traceback: object,
-        message_renderable: ConsoleRenderable,
-    ) -> Text:
-        """Method to render an object."""
-        # Use class name instead of time
-        class_name: str = self.__class__.__name__
-        padding: int = LOG_RECORD_PADDING.get("time", 25)
-        class_name_text: Text = Text(class_name.ljust(padding)[:padding], 
-            style="logging.time"
-        )
-
-        padding = LOG_RECORD_PADDING.get("level", 10)
-        level_text: Text = Text(
-            record.levelname.ljust(padding)[:padding],
-            style=self._get_level_style(record.levelno),
-        )
-
-        file_and_no: str = f"{record.filename}:{record.lineno}"
-        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
-        file_and_no_text: Text = Text(
-            file_and_no.ljust(padding)[:padding], style="logging.location"
-        )
-
-        padding = LOG_RECORD_PADDING.get("logger_name", 45)
-        logger_name_text: Text = Text(
-            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
-        )
-
-        message_text: Text
-        if isinstance(message_renderable, Text):
-            message_text = message_renderable
-        else:
-            message_text = Text.from_markup(str(message_renderable))
-
-        components: list[Text] = [
-            class_name_text,
-            level_text,
-            file_and_no_text,
-            logger_name_text,
-            message_text,
-        ]
-
-        return Text(" ").join(components)
-
-
-class ERSTraceDummy(ClassNameRichHandler):
-    """ERSTraceDummy placeholder class."""
-    pass

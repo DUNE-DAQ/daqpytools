@@ -127,7 +127,7 @@ class FormattedRichHandler(RichHandler):
             )
         )
 
-# This is pretty hacky.. we need to find a way to dynamically set the log level
+# Initialise a logger to catch erstrace + other unknown handlertypes from OKS
 log: logging.Logger = logging.getLogger(__name__)
 log.addHandler(FormattedRichHandler(width=get_width()))
 log.setLevel("INFO")
@@ -168,7 +168,7 @@ class HandlerType(Enum):
             h = HandlerType(s.lower())
             return h
         except:
-            msg=f"{s} is not a known handler type"
+            msg=f"[red]{s}[/red] is not a known handler type"
             log.warning(msg)
             return None
 
@@ -237,11 +237,11 @@ class LogHandlerConf:
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
-        # TODO/now Do not like this hardcoding of cases, try fixing
-        if "protobufstream" not in handler_str:
-            if "erstrace" in handler_str:
-                log.debug("ERSTrace is a C++ implementation, does not have an equivalent in Python")
-                return None, None
+        if "erstrace" in handler_str:
+            log.debug("ERSTrace is a C++ implementation, does not have an equivalent in Python")
+            return None, None
+
+        if HandlerType.Protobufstream.value not in handler_str:
             return HandlerType.from_string(handler_str), None
 
         match = re.search(r"\(([^:]+):(\d+)\)", handler_str)

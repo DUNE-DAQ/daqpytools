@@ -7,12 +7,12 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
+    ThrottleFilter,
     add_ers_kafka_handler,
     add_file_handler,
     add_rich_handler,
     add_stderr_handler,
     add_stdout_handler,
-    ThrottleFilter,
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width

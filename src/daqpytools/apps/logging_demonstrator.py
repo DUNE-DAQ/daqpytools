@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+
 import click
 from rich.traceback import install as rich_traceback_install
 
@@ -8,8 +9,6 @@ from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
-    ThrottleFilter,
-    StreamType,
 )
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger
@@ -71,10 +70,11 @@ def validate_test_configuration(
         )
     )
 @click.option(
+    "-t",
     "--throttle", 
     is_flag=True, 
     help=(
-        "Demonstrate throttling functionality"
+        "Demonstrate throttling functionality. Requires Rich handlers"
         )
     )
 @click.option(
@@ -131,6 +131,7 @@ def main(
             to be set to true.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes
             and streams.
+        throttle (bool): If true, demonstrates the throttling feature. Requires Rich.
 
     Returns:
         None
@@ -209,14 +210,27 @@ def main(
 
 
     # Throttle demo
-    def emit_err(i):
-        main_logger.info(f"Throttle test {i}", extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]})
+    def emit_err(i: int) -> None:
+        """Short function that prints out a log message.
+        This is used to ensure that the log message is kept on the same line,
+        but also to feed in how many repetitions it has gone through
+        Args:
+            i (int): Integer to be transmitted in the log message.
+
+        Returns:
+            None.
+        """
+        throttle_msg = f"Throttle test {i}"
+        main_logger.info(throttle_msg, extra={"handlers": 
+            [HandlerType.Rich, HandlerType.Throttle]
+        })
+    
     if throttle:
         for i in range(50):
             emit_err(i)
         main_logger.warning("Sleeping for 30 seconds")
-        time.sleep(31) #demonstrate 30s time window
-        for i in range(100):
+        time.sleep(31)
+        for i in range(1000):
             emit_err(i)
 
 

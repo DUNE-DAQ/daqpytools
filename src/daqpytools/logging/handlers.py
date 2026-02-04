@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import copy
 import io
 import logging
-import copy
 import os
 import re
 import sys
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import ClassVar, cast, Dict, Optional
-
-import time
-from collections import defaultdict
 from threading import Lock
+from typing import ClassVar, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.console import Console, ConsoleRenderable
@@ -34,6 +33,7 @@ from daqpytools.logging.formatter import (
 )
 from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
 from daqpytools.logging.utils import get_width
+
 
 class FormattedRichHandler(RichHandler):
     """RichHandler that formats log messages with time, aligned columns, and styles."""
@@ -165,9 +165,8 @@ class HandlerType(Enum):
     def from_string(cls, s: str) -> HandlerType | None:
         """Converts from a case-independent string to HandlerType."""
         try:
-            h = HandlerType(s.lower())
-            return h
-        except:
+            return HandlerType(s.lower())
+        except ValueError:
             msg=f"[red]{s}[/red] is not a known handler type"
             log.warning(msg)
             return None
@@ -238,7 +237,11 @@ class LogHandlerConf:
             protobuf configuration
         """
         if "erstrace" in handler_str:
-            log.debug("ERSTrace is a C++ implementation, does not have an equivalent in Python")
+            msg = (
+                "ERSTrace is a C++ implementation, "
+                "does not have an equivalent in Python"
+            )
+            log.debug(msg)
             return None, None
 
         if HandlerType.Protobufstream.value not in handler_str:
@@ -281,10 +284,11 @@ class LogHandlerConf:
 class IssueRecord:
     """Tracks throttling state for a unique issue (identified by file: line)."""
     
-    def __init__(self):
+    def __init__(self) -> None:
+        """C'tor."""
         self.reset()
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset all counters and timestamps."""
         self.last_occurrence:  float = 0.0
         self.last_report: float = 0.0
@@ -295,11 +299,16 @@ class IssueRecord:
 
 
 class BaseHandlerFilter(logging.Filter):
-    def __init__(self):
+    """Base filter that hold the logic on choosing if a handler should emit
+    based on what HandlersTypes are supplied to it.
+    """
+    def __init__(self) -> None:
+        """C'tor."""
         super().__init__()
     
-    def get_allowed(self, record) -> list | None:
-        # TODO/future: kafka protobufs should validate url/port match before transmitting
+    def get_allowed(self, record: logging.LogRecord) -> list | None:
+        """Parses the record to obtain the set of Handlers that allows transmission."""
+        # TODO/future: kafkaprotobufs should validate url/port match before transmitting
         
         # Handle the ERS case, requires more processing
         if getattr(record, "stream", None) == StreamType.ERS:
@@ -327,7 +336,7 @@ class HandleIDFilter(BaseHandlerFilter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-    def __init__(self, handler_id: Union[HandlerType, List[HandlerType]]) -> None:
+    def __init__(self, handler_id: HandlerType | list[HandlerType]) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
@@ -346,11 +355,11 @@ class HandleIDFilter(BaseHandlerFilter):
         return bool(self.handler_ids & set(allowed))
 
 class ThrottleFilter(BaseHandlerFilter):
-    """
-    Advanced logging filter with escalating throttle thresholds.
+    """Advanced logging filter with escalating throttle thresholds.
     
     Args:
-        initial_threshold: Number of initial occurrences to let through immediately (default: 30)
+        initial_threshold: Number of initial occurrences 
+            to let through immediately (default: 30)
         time_limit: Time window in seconds for resetting state (default: 30)
         name: Optional filter name
     
@@ -368,16 +377,16 @@ class ThrottleFilter(BaseHandlerFilter):
         ...     logger.error("Repeated error message")
     """
     
-    def __init__(self, initial_threshold: int = 30, time_limit:  int = 30):
+    def __init__(self, initial_threshold: int = 30, time_limit:  int = 30) -> None:
+        """C'tor."""
         super().__init__()
         self.initial_threshold = initial_threshold
         self.time_limit = time_limit
-        self.issue_map: Dict[str, IssueRecord] = defaultdict(IssueRecord)
+        self.issue_map: dict[str, IssueRecord] = defaultdict(IssueRecord)
         self.mutex = Lock() # Ensures thread safety
     
     def filter(self, record: logging.LogRecord) -> bool:
-        """
-        Determine if a log record should be emitted.
+        """Determine if a log record should be emitted.
         
         Args:
             record: The log record to filter
@@ -401,8 +410,7 @@ class ThrottleFilter(BaseHandlerFilter):
             return self._throttle(issue_record, record)
     
     def _throttle(self, rec: IssueRecord, record:  logging.LogRecord) -> bool:
-        """
-        Apply throttling logic to determine if record should be emitted.
+        """Apply throttling logic to determine if record should be emitted.
         
         Args:
             rec: The issue record tracking state for this unique issue
@@ -432,7 +440,7 @@ class ThrottleFilter(BaseHandlerFilter):
             return not reported
         
         # Step 3: Check if we hit the escalating threshold
-        elif rec.suppressed_counter >= rec.threshold:
+        if rec.suppressed_counter >= rec.threshold:
             rec.threshold = rec.threshold * 10  # Escalate:  10 -> 100 -> 1000 ... 
             rec.last_occurrence = current_time
             rec. last_occurrence_formatted = self._format_timestamp(current_time)
@@ -440,22 +448,20 @@ class ThrottleFilter(BaseHandlerFilter):
             return False  # Don't emit the original record
         
         # Step 4: Check if enough time passed since last report
-        elif current_time - rec.last_report > self.time_limit:
+        if current_time - rec.last_report > self.time_limit:
             rec.last_occurrence = current_time
             rec. last_occurrence_formatted = self._format_timestamp(current_time)
             self._report_suppression(rec, record)
             return False  # Don't emit the original record
         
         # Step 5: Suppress silently
-        else:
-            rec.suppressed_counter += 1
-            rec.last_occurrence = current_time
-            rec. last_occurrence_formatted = self._format_timestamp(current_time)
-            return False
+        rec.suppressed_counter += 1
+        rec.last_occurrence = current_time
+        rec. last_occurrence_formatted = self._format_timestamp(current_time)
+        return False
     
-    def _report_suppression(self, rec: IssueRecord, record: logging.LogRecord):
-        """
-        Create and emit a suppression notice.
+    def _report_suppression(self, rec: IssueRecord, record: logging.LogRecord) -> None:
+        """Create and emit a suppression notice.
         
         Args:
             rec: The issue record with suppression count
@@ -486,8 +492,7 @@ class ThrottleFilter(BaseHandlerFilter):
     
     @staticmethod
     def _format_timestamp(timestamp: float) -> str:
-        """
-        Format timestamp in ISO format with microseconds.
+        """Format timestamp in ISO format with microseconds.
         
         Args:
             timestamp: Unix timestamp

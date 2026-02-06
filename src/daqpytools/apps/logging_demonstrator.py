@@ -42,6 +42,10 @@ def test_main_functions(main_logger):
     main_logger.debug("example debug message")
     main_logger.info("example info message")
     main_logger.warning("example warning message")
+    
+    # Error and critical will print twice when using stream handlers
+    # This is because StreamHandlers add in a stream each for stdout and stderr
+    # stderr log level set to error, so at error or above both handlers will fire
     main_logger.error("example error message")
     main_logger.critical("example critical message")
     main_logger.info(

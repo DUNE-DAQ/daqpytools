@@ -143,6 +143,11 @@ def test_handlertypes(main_logger):
 
 
 def test_handlerconf(main_logger):
+    #* Test the routing to the Base and Opmon streams
+    handlerconf = LogHandlerConf(init_ers=False) # False is the default
+    main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
+    main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
+
     #* Interlude: Inject sample environment variables
     os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
     os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
@@ -159,11 +164,13 @@ def test_handlerconf(main_logger):
     critical_out = f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}"
     main_logger.info(critical_out)
 
-    #* Test the routing to the Base and Opmon streams
-    handlerconf = LogHandlerConf()
-    main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
-    main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
-
+    #* Init ERS stream
+    # Note to developers:
+    # HandlerConf will require that these variables are defined!
+    # They come from the OKS, so whatever tools you have should have this up
+    # You can also initialise via handlerconf = LogHandlerConf(init_ers=True)
+    handlerconf.init_ERS()
+    
     #* Test ERS Streams
     main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
     main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)

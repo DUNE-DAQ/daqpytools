@@ -85,12 +85,168 @@ Note that a particular exceptoin is that they _don't_ inheret any filters attach
 A useful diagram to peruse is the [logging flow in the official docs](https://docs.python.org/2/howto/logging.html#logging-flow).
 
 
-# Daqpytools
+## Using logging with daqpytools
 
-## Initialising a handler
+The [daqpytools](https://github.com/DUNE-DAQ/daqpytools) contains several quality of life improvements to DAQ pytools, the most relevant to this document of which being the logging tools.
 
-## Subsec of existing handlers, filters, and walkthrough
+These include:
+- standardised ways of initialising top-level 'root' loggers
+- constructors for default logging instances
+- many bespoke handlers 
+- filters relevant to the DAQ
+- handler configurations
 
+
+A lot of these features can be demonstrated via the logging demonstrator functionality. With the DUNE environments loaded, simply run 
+
+```
+daqpytools-logging-demonstrator
+```
+
+and view the help string to learn more, and view the script itself in the repository to see how it is implemented. 
+
+
+
+### Initialising a handler
+
+Initialising a handler is simple:
+
+```python
+from daqpytools.logging.logger import get_daq_logger
+test_logger = get_daq_logger(
+    logger_name = "test_logger",
+    log_level = "INFO",
+    use_parent_handlers = True,
+    rich_handler = True,
+    stream_handlers = False
+)
+
+test_logger.warning("Hello, world!")
+```
+
+As shown above, initialising a logging instance with a specific handler is as easy as modifying a flag in the constructor.
+
+
+The core philosophy of the logging framework in daqpytools is that each logger should only have _one_ instance of a specific type of logger. This means that while a single logger can have both a Rich and a Stream handler, a single logger cannot have _two_ Rich handlers to prevent duplicating messages.
+
+
+Please refer to the docstrings for the most up to date definitions on the options and what handlers may or may not be included. 
+
+
+### Subsec of existing handlers, filters, and walkthrough
+
+As seen in the previous section, there are several handlers and filters that are present in the daqpytools that may readily be used. What follows will be a brief description of each handlers as well as a quick example,  but for more complete docs please refer to the docstrings and the logging demonstrator
+
+#### Rich handler
+
+The Rich handler should be the 'default' handler for any messages that should be transmitted in the terminal. This handler has great support of colors, and delivers a complete message out to the terminal to make it easy to view and also trace back to the relevant message. 
+
+![rich_demo](img/demo_rich.png)
+
+
+#### File handler
+
+As the name suggests, the file handler is used to transmit messages directly to a log file. Unlike stream and rich handlers, instead of defining a boolean in the constructor the user must supply the _filename_ of the target file for the messages to go into.
+
+![file_demo](img/demo_file.png)
+
+
+#### Stream handlers
+
+Stream handlers are used to transmit messages directly to the terminal without any color formatting. This is of great use for the logs of the controllers in drunc, which has its own method of capturing logs via a capture of the terminal output and a pipe to the relevant log file. 
+
+Note that the stream handlers consist of two handlers, one which outputs do `stdout` and another to `stderr`. The latter will only transmit if the record severity level is Error or higher.
+
+![streams_demo](img/demo_streams.png)
+
+#### ERS Kafka handler
+
+The ERS Kafka handler is used to transmit ERS messages via Kafka, which is incredibly useful to show on the dashboards messages as they happen. 
+
+This handler is not included in the default list of handlers to emit. An extra configuration must be used to properly transmit this message; eg. 
+
+```python
+from daqpytools.logging.handlers import HandlerType
+from daqpytools.logging.logger import get_daq_logger
+
+main_logger: logging.Logger = get_daq_logger(
+    logger_name="daqpytools_logging_demonstrator",
+    ers_kafka_handler=True
+)
+
+main_logger.error(
+    "ERS Message",
+    extra={"handlers": [HandlerType.Protobufstream]} 
+)
+```
+
+See the advanced section for more details.
+
+![ers_demo](img/demo_ers.png)
+
+**Notes**
+At the moment, by default they will be sent via the following:
+```
+session_name: session_tester
+topic: ers_stream
+addres: monkafka.cern
+port: 30092
+```
+
+
+#### Throttle filter
+
+There are times when an application decides to send a huge amount of logs of a single message in a very short time, which can overwhelm the systems. When such an event occurs, it is wise to throttle the output coming out. 
+
+The throttle filter replicates the same logic that exists in the ERS C++ implementation, which dynamically limits how many messages get transmitted. The filter is by default attached to the _logger_ instance, with no support for this filter being attached to a specific handler just yet. 
+
+Initialising the filter takes in two argument:
+ - `initial_treshold`: number of initial occurences to let through immediately
+ - `time_limit`: time window in seconds for resetting state
+
+The basic logic is as follows. 
+
+1. The first N messages will instantly get transmitted, up to `initial_treshold`
+2. The next 10 messages will be suppressed, with the next single message reported at the end
+3. The next 100 messages will be suppressed, with the next single message reported at the end
+4. This continues, with the treshold increaseing by 10x everytime
+5. After `time_limit` seconds after the last message, the filter gets reset, allowing messages to be sent once more
+
+
+For the throttle filter, a 'log record' is **uniquely** defined by the record's pathname and linenumber. Therefore, 50 records that contain the same 'messege' but defined in different line numbers in the script will not be erroneously filtered.
+
+
+An example is as follows:
+
+```python
+from daqpytools.logging.handlers import HandlerType
+from daqpytools.logging.logger import get_daq_logger
+
+main_logger: logging.Logger = get_daq_logger(
+    logger_name="daqpytools_logging_demonstrator",
+    stream_handlers=True
+    throttle=True
+)
+
+emit_err = lambda i: main_logger.info(
+    f"Throttle test {i}",
+    extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]},
+)
+
+for i in range(50):
+        emit_err(i)
+    main_logger.warning("Sleeping for 30 seconds")
+    time.sleep(30)
+for i in range(1000):
+    emit_err(i)
+```
+
+Which will behave as expected.
+
+![throttle_demo](img/demo_throttle.png) 
+
+**Note**
+By default, throttle filters obtained via `get_daq_logger` will be initialised with an `initial_treshold` of 30 and a `time_limit` of 30. 
 
 
 ### Advanced logging

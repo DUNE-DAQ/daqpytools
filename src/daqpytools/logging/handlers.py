@@ -196,7 +196,8 @@ class LogHandlerConf:
     """Dataclass that holds the various streams and relevant handlers.
     
     Attributes:
-        init_ers: If True, automatically initializes ERS configuration during construction.
+        init_ers: If True, automatically initializes ERS configuration 
+            during construction.
         _BASE_HANDLERS: Private class variable for default base handlers
         _OPMON_HANDLERS: Private class variable for opmon handlers
         BASE_CONFIG: Class variable for base stream configuration
@@ -222,7 +223,7 @@ class LogHandlerConf:
         "stream": StreamType.OPMON
     }
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize ERS configuration if init_ers field is True.
 
         This method is called automatically after dataclass initialization.
@@ -230,23 +231,25 @@ class LogHandlerConf:
         ERS initialization.
         """
         if self.init_ers:
-            self.init_ERS()
+            self.init_ers_stream()
 
     @property
-    def ERS(self):
+    def ERS(self) -> dict : # noqa: N802
         """Get the ERS configuration dictionary.
         
         Returns:
             dict: Contains 'ers_handlers' and 'stream' configuration for ERS
             
         Raises:
-            AttributeError: If ERS has not been initialized (call init_ERS() first)
+            AttributeError: If ERS has not been
+                initialized (call init_ers_stream() first)
         """
         if not self._ERS:
-            raise AttributeError("ERS stream not initialised. Call init_ERS() first")
+            err_msg = "ERS stream not initialised. Call init_ers_stream() first"
+            raise AttributeError(err_msg)
         return self._ERS
 
-    def init_ERS(self):
+    def init_ers_stream(self) -> None:
         """Initialize ERS configuration from environment variables.
         
         Loads ERS configuration from OKS environment variables and populates

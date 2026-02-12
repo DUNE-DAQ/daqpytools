@@ -38,7 +38,12 @@ def validate_test_configuration(
 
 
 
-def test_main_functions(main_logger):
+def test_main_functions(main_logger:logging.Logger) -> None:
+    """Demonstrates the main functionality of the daqpytools logger.
+    
+    Args:
+        main_logger (logging.Logger): A logger to print messages with
+    """
     main_logger.debug("example debug message")
     main_logger.info("example info message")
     main_logger.warning("example warning message")
@@ -68,51 +73,78 @@ def test_main_functions(main_logger):
     )
 
 def test_child_logger(
-        logger_name,
-        log_level,
-        disable_logger_inheritance,
-        rich_handler,
-        file_handler_path,
-        stream_handlers
-):
-        nested_logger: logging.Logger = get_daq_logger(
-            logger_name=f"{logger_name}.child",
-            log_level=log_level,
-            use_parent_handlers=not disable_logger_inheritance,
-            rich_handler=rich_handler,
-            file_handler_path=file_handler_path,
-            stream_handlers=stream_handlers,
-        )
-        nested_logger.debug("example debug message")
-        nested_logger.info("example info message")
-        nested_logger.warning("example warning message")
-        nested_logger.error("example error message")
-        nested_logger.critical("example critical message")
-        nested_logger.info(
-            "[dim cyan]You[/dim cyan] "
-            "[bold green]can[/bold green] "
-            "[bold yellow]also[/bold yellow] "
-            "[bold red]add[/bold red] "
-            "[bold white on red]colours[/bold white on red] "
-            "[bold red]to[/bold red] "
-            "[bold yellow]your[/bold yellow] "
-            "[bold green]log[/bold green] "
-            "[dim cyan]record[/dim cyan] "
-            "[bold green]text[/bold green] "
-            "[bold yellow]with[/bold yellow] "
-            "[bold green]markdown[/bold green]!"
-        )
-        nested_logger.warning(
-            "Note: [red] the daqpytools.logging.formatter removes markdown-style "
-            "comments from the log record message [/red]."
-        )
+        logger_name:str,
+        log_level: int|str,
+        disable_logger_inheritance:bool,
+        rich_handler:bool,
+        file_handler_path: str,
+        stream_handlers:bool,
+) -> None:
+    """Demonstrates inheritance with child handlers.
 
-def test_throttle(main_logger):
-    
-    emit_err = lambda i: main_logger.info(
-        f"Throttle test {i}",
-        extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]},
+    Args:
+        logger_name (str): Name of the initial parent logger.
+        log_level (str): Log level to set for the logger.
+        
+        disable_logger_inheritance (bool): If true, disable logger inheritance so each
+            logger instance only uses the logger handlers assigned to the given logger
+            instance.
+        rich_handler (bool): If true, set up a rich handler.
+        file_handler_path (str): If provided, set up a file handler with the given path.
+        stream_handlers (bool): If true, set up stdout and stderr stream handlers.
+    """
+    nested_logger: logging.Logger = get_daq_logger(
+        logger_name=f"{logger_name}.child",
+        log_level=log_level,
+        use_parent_handlers=not disable_logger_inheritance,
+        rich_handler=rich_handler,
+        file_handler_path=file_handler_path,
+        stream_handlers=stream_handlers,
     )
+    nested_logger.debug("example debug message")
+    nested_logger.info("example info message")
+    nested_logger.warning("example warning message")
+    nested_logger.error("example error message")
+    nested_logger.critical("example critical message")
+    nested_logger.info(
+        "[dim cyan]You[/dim cyan] "
+        "[bold green]can[/bold green] "
+        "[bold yellow]also[/bold yellow] "
+        "[bold red]add[/bold red] "
+        "[bold white on red]colours[/bold white on red] "
+        "[bold red]to[/bold red] "
+        "[bold yellow]your[/bold yellow] "
+        "[bold green]log[/bold green] "
+        "[dim cyan]record[/dim cyan] "
+        "[bold green]text[/bold green] "
+        "[bold yellow]with[/bold yellow] "
+        "[bold green]markdown[/bold green]!"
+    )
+    nested_logger.warning(
+        "Note: [red] the daqpytools.logging.formatter removes markdown-style "
+        "comments from the log record message [/red]."
+    )
+
+def test_throttle(main_logger: logging.Logger) -> None:
+    """Demonstrates the throttle filter.
+    
+    Args:
+        main_logger (logging.Logger): A logger to print messages with
+    """
+    def emit_err(i: int) -> None:
+        """Short function that prints out a log message.
+        This is used to ensure that the log message is kept on the same line,
+        but also to feed in how many repetitions it has gone through
+        Args:
+            i (int): Integer to be transmitted in the log message.
+
+        Returns:
+            None.
+        """
+        throttle_msg = f"Throttle test {i}"
+        main_logger.info(throttle_msg, extra={"handlers": 
+            [HandlerType.Rich, HandlerType.Throttle]
+        })
     
     for i in range(50):
         emit_err(i)
@@ -122,7 +154,12 @@ def test_throttle(main_logger):
         emit_err(i)
     
 
-def test_handlertypes(main_logger):
+def test_handlertypes(main_logger: logging.Logger) -> None:
+    """Demonstrates the handlertype functionality.
+    
+    Args:
+        main_logger (logging.Logger): A logger to print messages with
+    """
     #* Test choosing which handler to use individually
     main_logger.debug("Default go to tty / rich / file when added")
     main_logger.critical("Should only go to tty", 
@@ -142,7 +179,12 @@ def test_handlertypes(main_logger):
     )
 
 
-def test_handlerconf(main_logger):
+def test_handlerconf(main_logger: logging.Logger) -> None:
+    """Demonstrates the main functionality of the handlerconf. With ERS support.
+    
+    Args:
+        main_logger (logging.Logger): A logger to print messages with
+    """
     #* Test the routing to the Base and Opmon streams
     handlerconf = LogHandlerConf(init_ers=False) # False is the default
     main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
@@ -169,7 +211,7 @@ def test_handlerconf(main_logger):
     # HandlerConf will require that these variables are defined!
     # They come from the OKS, so whatever tools you have should have this up
     # You can also initialise via handlerconf = LogHandlerConf(init_ers=True)
-    handlerconf.init_ERS()
+    handlerconf.init_ers_stream()
     
     #* Test ERS Streams
     main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
@@ -293,8 +335,8 @@ def main(
         handlerconf (bool): If true, demonstrates the advanced feature of HandlerConf
             and streams.
         throttle (bool): If true, demonstrates the throttling feature. Requires Rich.
-        supress_basic (bool): If true, supresses basic functionality. Useful to only test 
-            the advanced features of logging
+        suppress_basic (bool): If true, supresses basic functionality. 
+            Useful to only test the advanced features of logging
 
     Returns:
         None
@@ -302,7 +344,6 @@ def main(
     Raises:
         LoggerSetupError: If no handlers are set up for the logger.
     """
-
     logger_name = "daqpytools_logging_demonstrator"
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,

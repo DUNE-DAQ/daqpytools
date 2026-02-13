@@ -226,14 +226,25 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     )     
 
 class AllOptionsCommand(click.Command):
-    """
-    Parse the arguments passed and validate they are acceptable, otherwise print the
-    relevant options
+    """Parse the arguments passed and validate they are acceptable, otherwise print the
+    relevant options.
 
     Click's default functionality does not pick up the optional arguments well. This
     catches any incorrect options or typos, makes the log clearer.
     """
-    def parse_args(self, ctx: click.Context, args: list[str]):
+    def parse_args(self, ctx: click.Context, args: list[str]) -> None:
+        """Parse the arguments passed to the click command, format them if necessary.
+
+        Args:
+            ctx: click context from which the commands are called
+            args: list of args to format
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         # If the arguments are valid, run the command with the relevant arguments
         try:
             return super().parse_args(ctx, args)

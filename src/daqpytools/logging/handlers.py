@@ -198,18 +198,22 @@ class LogHandlerConf:
     """Dataclass that holds the various streams and relevant handlers.
     
     Attributes:
+        init_ers: If True, automatically initializes ERS configuration 
+            during construction.
         _BASE_HANDLERS: Private class variable for default base handlers
         _OPMON_HANDLERS: Private class variable for opmon handlers
         BASE_CONFIG: Class variable for base stream configuration
         OPMON_CONFIG: Class variable for opmon stream configuration
         ERS: Instance field for ERS configuration (loaded from environment)
     """
+    init_ers: bool = False
 
     _BASE_HANDLERS: ClassVar[set] = {HandlerType.Stream, HandlerType.Rich,
         HandlerType.File
         }
     _OPMON_HANDLERS: ClassVar[set] = {HandlerType.Rich, HandlerType.Stream,
         HandlerType.File}
+    _ERS: object = None
     
     Base: ClassVar[dict] = {
         "handlers": _BASE_HANDLERS,
@@ -221,12 +225,45 @@ class LogHandlerConf:
         "stream": StreamType.OPMON
     }
 
-    ERS: dict=field(default_factory = lambda:
-    {
-        "ers_handlers":  LogHandlerConf._get_oks_conf(),
-        "stream": StreamType.ERS
-    }
-    )
+    def __post_init__(self) -> None:
+        """Initialize ERS configuration if init_ers field is True.
+
+        This method is called automatically after dataclass initialization.
+        If the init_ers attribute was set to True, it triggers the complete
+        ERS initialization.
+        """
+        if self.init_ers:
+            self.init_ers_stream()
+
+    @property
+    def ERS(self) -> dict : # noqa: N802
+        """Get the ERS configuration dictionary.
+        
+        Returns:
+            dict: Contains 'ers_handlers' and 'stream' configuration for ERS
+            
+        Raises:
+            AttributeError: If ERS has not been
+                initialized (call init_ers_stream() first)
+        """
+        if not self._ERS:
+            err_msg = "ERS stream not initialised. Call init_ers_stream() first"
+            raise AttributeError(err_msg)
+        return self._ERS
+
+    def init_ers_stream(self) -> None:
+        """Initialize ERS configuration from environment variables.
+        
+        Loads ERS configuration from OKS environment variables and populates
+        the _ERS dict with handlers and stream information.
+        
+        Called automatically during construction if init_ers=True, or can be
+        called manually afterwards.
+        """
+        self._ERS = {
+            "ers_handlers":  LogHandlerConf._get_oks_conf(),
+            "stream": StreamType.ERS
+        }   
 
     @staticmethod
     def _convert_str_to_handlertype(handler_str: str) -> tuple[HandlerType,

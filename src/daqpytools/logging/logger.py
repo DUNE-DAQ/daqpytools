@@ -1,4 +1,5 @@
 import logging
+import sys
 from logging import PlaceHolder
 
 import kafka
@@ -159,7 +160,8 @@ def get_daq_logger(
     if log_level is not logging.NOTSET:
         for handler in logger.handlers:
             # Ignore stderr handler resets, needs to be fixed at the error level
-            if type(handler).__name__ == "StderrHandler":
+            if (isinstance(handler, logging.StreamHandler)
+                and handler.stream == sys.stderr):
                 continue
             handler.setLevel(log_level)
 

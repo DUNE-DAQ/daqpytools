@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import copy
 import io
 import logging
 import os
 import re
 import sys
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from threading import Lock
 from typing import ClassVar, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
@@ -22,6 +26,7 @@ from daqpytools.logging.exceptions import (
 )
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
+    DATE_TIME_BASE_FORMAT,
     DATE_TIME_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
@@ -29,6 +34,104 @@ from daqpytools.logging.formatter import (
 )
 from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
 from daqpytools.logging.utils import get_width
+
+
+class FormattedRichHandler(RichHandler):
+    """RichHandler that formats log messages with time, aligned columns, and styles."""
+
+    def __init__(self, width: int = 100) -> None:
+        """Initialize with custom console and style settings."""
+        console: Console = Console(
+            force_terminal=True, width=width, theme=CONSOLE_THEME
+        )
+        super().__init__(
+            console=console,
+            omit_repeated_times=False,
+            markup=True,
+            rich_tracebacks=True,
+            show_path=False,
+            show_time=False,  # We format time ourselves
+        )
+
+    def render(
+        self,
+        *,
+        record: logging.LogRecord,
+        traceback: object,
+        message_renderable: ConsoleRenderable,
+    ) -> Text:
+        """Render the log record into a rich Text object with custom formatting.
+
+        Args:
+            record (logging.LogRecord): The log record to render.
+            traceback (object): The traceback object (not used here).
+            message_renderable (ConsoleRenderable): The log message renderable.
+
+        Returns:
+            Text: The formatted log record as a rich Text object.
+
+        Raises:
+            None
+        """
+        dt: datetime = datetime.fromtimestamp(record.created, tz=TIME_ZONE)
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        time_str: str = dt.strftime(DATE_TIME_FORMAT).ljust(padding)[:padding]
+        time_text: Text = Text(time_str, style="logging.time")
+
+        padding = LOG_RECORD_PADDING.get("level", 10)
+        level_text: Text = Text(
+            record.levelname.ljust(padding)[:padding],
+            style=self._get_level_style(record.levelno),
+        )
+
+        file_and_no: str = f"{record.filename}:{record.lineno}"
+        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
+        file_and_no_text: Text = Text(
+            file_and_no.ljust(padding)[:padding], style="logging.location"
+        )
+
+        padding = LOG_RECORD_PADDING.get("logger_name", 45)
+        logger_name_text: Text = Text(
+            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
+        )
+
+        # Convert message_renderable to Text for type consistency
+        message_text: Text
+        if isinstance(message_renderable, Text):
+            message_text = message_renderable
+        else:
+            message_text = Text.from_markup(str(message_renderable))
+
+        components: list[Text] = [
+            time_text,
+            level_text,
+            file_and_no_text,
+            logger_name_text,
+            message_text,
+        ]
+
+        return Text(" ").join(components)
+
+    def _get_level_style(self, level_no: int) -> str:
+        """Get the style string for the given log level number from the theme defined in
+        CONSOLE_THEME.
+
+        Args:
+            level_no (int): The log level number.
+
+        Returns:
+            str: The style string for the log level.
+        """
+        return str(
+            CONSOLE_THEME.styles.get(
+                f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
+            )
+        )
+
+# Initialise a logger to catch erstrace + other unknown handlertypes from OKS
+log: logging.Logger = logging.getLogger(__name__)
+log.addHandler(FormattedRichHandler(width=get_width()))
+log.setLevel("INFO")
 
 
 class StreamType(Enum):
@@ -58,13 +161,17 @@ class HandlerType(Enum):
     File = "file"
     Protobufstream = "protobufstream"
     Lstdout = "lstdout"
-    ERSTrace = "erstrace"
+    Lstderr = "lstderr"
     Throttle = "throttle"
-
     @classmethod
-    def from_string(cls, s: str) -> HandlerType:
+    def from_string(cls, s: str) -> HandlerType | None:
         """Converts from a case-independent string to HandlerType."""
-        return HandlerType(s.lower())
+        try:
+            return HandlerType(s.lower())
+        except ValueError:
+            msg=f"[red]{s}[/red] is not a known handler type"
+            log.warning(msg)
+            return None
 
 
 @dataclass
@@ -131,7 +238,15 @@ class LogHandlerConf:
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
-        if "protobufstream" not in handler_str:
+        if "erstrace" in handler_str:
+            msg = (
+                "ERSTrace is a C++ implementation, "
+                "does not have an equivalent in Python"
+            )
+            log.debug(msg)
+            return None, None
+
+        if HandlerType.Protobufstream.value not in handler_str:
             return HandlerType.from_string(handler_str), None
 
         match = re.search(r"\(([^:]+):(\d+)\)", handler_str)
@@ -168,43 +283,229 @@ class LogHandlerConf:
         """
         return LogHandlerConf._BASE_HANDLERS
 
+class IssueRecord:
+    """Tracks throttling state for a unique issue (identified by file: line)."""
+    
+    def __init__(self) -> None:
+        """C'tor."""
+        self.reset()
+    
+    def reset(self) -> None:
+        """Reset all counters and timestamps."""
+        self.last_occurrence:  float = 0.0
+        self.last_report: float = 0.0
+        self.initial_counter: int = 0
+        self.threshold:  int = 10
+        self.suppressed_counter: int = 0
+        self.last_occurrence_formatted: str = ""
 
-class HandleIDFilter(logging.Filter):
+
+class BaseHandlerFilter(logging.Filter):
+    """Base filter that hold the logic on choosing if a handler should emit
+    based on what HandlersTypes are supplied to it.
+    """
+    def __init__(self) -> None:
+        """C'tor."""
+        super().__init__()
+    
+    def get_allowed(self, record: logging.LogRecord) -> list | None:
+        """Parses the record to obtain the set of Handlers that allows transmission."""
+        # TODO/future: kafkaprotobufs should validate url/port match before transmitting
+        
+        # Handle the ERS case, requires more processing
+        if getattr(record, "stream", None) == StreamType.ERS:
+            # Chain None checks using walrus operator
+            if (
+                # Checks if python log level has an ERS severity level match
+                (ers_level_var := level_to_ers_var.get(record.levelno)) is None
+                # Checks if ers_handlers (specifically for ERS) is supplied by the msg
+                or (ers_handlers := getattr(record, "ers_handlers", None)) is None
+                # _Assigns_ the relevant ERS handler conf from supplied level
+                or (ershandlerconf := ers_handlers.get(ers_level_var)) is None
+            ):
+                return None
+            
+            allowed = ershandlerconf.handlers
+
+
+        # Handle the non-ERS case
+        else:
+            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
+        return allowed
+        
+class HandleIDFilter(BaseHandlerFilter):
     """Filter class that accepts a list of 'allowed' handlers and will only fire
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-    def __init__(self, handler_id:HandlerType) -> None:
+    def __init__(self, handler_id: HandlerType | list[HandlerType]) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
         super().__init__()
-        self.handler_id = handler_id
+        
+        # Normalise handler_id to be a set
+        if isinstance(handler_id, list):
+            self.handler_ids = set(handler_id)
+        else:
+            self.handler_ids = {handler_id}
     
     def filter(self, record: logging.LogRecord) -> bool:
         """Identifies when a log message should be transmitted or not."""
-        # TODO/future: kafka protobufs should validate url/port match before trasmit
-        
-        # Handle the ERS case, requires more processing
-        if getattr(record, "stream", None) == StreamType.ERS:
-
-            # Chain None checks using walrus operator
-            if (
-                (ers_level_var := level_to_ers_var.get(record.levelname)) is None
-                or (ers_handlers := getattr(record, "ers_handlers", None)) is None
-                or (erspyloghandlerconf := ers_handlers.get(ers_level_var)) is None
-            ):
-                return False
-            
-            allowed = erspyloghandlerconf.handlers
-            
-        
-        # Handle the non-ERS case
-        else:
-            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
-        if not allowed:
+        if not (allowed:= self.get_allowed(record)):
             return False
-        return self.handler_id in allowed
+        return bool(self.handler_ids & set(allowed))
+
+class ThrottleFilter(BaseHandlerFilter):
+    """Advanced logging filter with escalating throttle thresholds.
+    
+    Args:
+        initial_threshold: Number of initial occurrences 
+            to let through immediately (default: 30)
+        time_limit: Time window in seconds for resetting state (default: 30)
+        name: Optional filter name
+    
+    Example:
+        >>> import logging
+        >>> logger = logging.getLogger(__name__)
+        >>> throttle = ThrottleFilter(initial_threshold=30, time_limit=30)
+        >>> logger.addFilter(throttle)
+        >>> handler = logging.StreamHandler()
+        >>> logger.addHandler(handler)
+        >>> logger.setLevel(logging. ERROR)
+        >>> 
+        >>> # First 30 messages go through immediately
+        >>> for i in range(100):
+        ...     logger.error("Repeated error message")
+    """
+    
+    def __init__(self, initial_threshold: int = 30, time_limit:  int = 30) -> None:
+        """C'tor."""
+        super().__init__()
+        self.initial_threshold = initial_threshold
+        self.time_limit = time_limit
+        self.issue_map: dict[str, IssueRecord] = defaultdict(IssueRecord)
+        self.mutex = Lock() # Ensures thread safety
+    
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Determine if a log record should be emitted.
+        
+        Args:
+            record: The log record to filter
+            
+        Returns:
+            True if the record should be logged, False to suppress it
+        """
+        # Check if we want to apply the filter
+        if not (allowed:= self.get_allowed(record)):
+            return False
+        if HandlerType.Throttle not in allowed:
+            return True
+        
+        # Used to bypass the filter to report suppression messages
+        if getattr(record, '_throttle_suppression', False):
+            return True
+        
+        issue_id = f"{record.pathname}:{record.lineno}"
+        with self.mutex:
+            issue_record = self.issue_map[issue_id]
+            return self._throttle(issue_record, record)
+    
+    def _throttle(self, rec: IssueRecord, record:  logging.LogRecord) -> bool:
+        """Apply throttling logic to determine if record should be emitted.
+        
+        Args:
+            rec: The issue record tracking state for this unique issue
+            record: The log record being evaluated
+            
+        Returns:
+            True if record should be emitted, False otherwise
+        """
+        current_time = time.time()
+        reported = False
+        
+        # Step 1: Check if time window expired - reset if so
+        if current_time - rec.last_occurrence > self.time_limit:
+            if rec.suppressed_counter > 0:
+                self._report_suppression(rec, record)
+                reported = True
+            rec.reset()
+        
+        # Step 2: Initial phase - let first N messages through
+        if rec.initial_counter < self.initial_threshold:
+            rec.initial_counter += 1
+            rec.last_report = current_time
+            rec.last_occurrence = current_time
+            rec.last_occurrence_formatted = self._format_timestamp(current_time)
+            
+            # Don't double-report if we just reported suppression
+            return not reported
+        
+        # Step 3: Check if we hit the escalating threshold
+        if rec.suppressed_counter >= rec.threshold:
+            rec.threshold = rec.threshold * 10  # Escalate:  10 -> 100 -> 1000 ... 
+            rec.last_occurrence = current_time
+            rec. last_occurrence_formatted = self._format_timestamp(current_time)
+            self._report_suppression(rec, record)
+            return False  # Don't emit the original record
+        
+        # Step 4: Check if enough time passed since last report
+        if current_time - rec.last_report > self.time_limit:
+            rec.last_occurrence = current_time
+            rec. last_occurrence_formatted = self._format_timestamp(current_time)
+            self._report_suppression(rec, record)
+            return False  # Don't emit the original record
+        
+        # Step 5: Suppress silently
+        rec.suppressed_counter += 1
+        rec.last_occurrence = current_time
+        rec. last_occurrence_formatted = self._format_timestamp(current_time)
+        return False
+    
+    def _report_suppression(self, rec: IssueRecord, record: logging.LogRecord) -> None:
+        """Create and emit a suppression notice.
+        
+        Args:
+            rec: The issue record with suppression count
+            record: The original log record (used as template)
+        """
+        if rec.suppressed_counter == 0:
+            return
+        
+        suppression_record = copy.deepcopy(record)
+        suppression_record._throttle_suppression = True # pass through filter to report
+        
+        # Append suppression information to the message
+        suppression_msg = (
+            f" -- {rec.suppressed_counter} similar messages suppressed, "
+            f"last occurrence was at {rec.last_occurrence_formatted}"
+        )
+        suppression_record.msg = record.getMessage() + suppression_msg
+        suppression_record.args = ()  # Clear args since we already formatted
+        
+        # Emit directly - will pass through filter due to flag
+        logger = logging.getLogger(record.name)
+        logger.handle(suppression_record)
+
+        
+        # Reset suppression tracking
+        rec.last_report = time.time()
+        rec.suppressed_counter = 0
+    
+    @staticmethod
+    def _format_timestamp(timestamp: float) -> str:
+        """Format timestamp in ISO format with microseconds.
+        
+        Args:
+            timestamp: Unix timestamp
+            
+        Returns:
+            Formatted timestamp string
+        """
+        dt = datetime.fromtimestamp(timestamp, tz=TIME_ZONE)
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        time_str: str = dt.strftime(DATE_TIME_BASE_FORMAT).ljust(padding)[:padding]
+        return Text(time_str, style="logging.time")
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -322,7 +623,7 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(LoggingFormatter())
-    stdout_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    stdout_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstdout]))
     log.addHandler(stdout_handler)
     return
 
@@ -352,7 +653,7 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(LoggingFormatter())
-    stderr_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    stderr_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstderr]))
     stderr_handler.setLevel(logging.ERROR)
     log.addHandler(stderr_handler)
     return
@@ -379,184 +680,3 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str) 
     log.addHandler(file_handler)
     return
 
-
-class FormattedRichHandler(RichHandler):
-    """RichHandler that formats log messages with time, aligned columns, and styles."""
-
-    def __init__(self, width: int = 100) -> None:
-        """Initialize with custom console and style settings."""
-        console: Console = Console(
-            force_terminal=True, width=width, theme=CONSOLE_THEME
-        )
-        super().__init__(
-            console=console,
-            omit_repeated_times=False,
-            markup=True,
-            rich_tracebacks=True,
-            show_path=False,
-            show_time=False,  # We format time ourselves
-        )
-
-    def render(
-        self,
-        *,
-        record: logging.LogRecord,
-        traceback: object,
-        message_renderable: ConsoleRenderable,
-    ) -> Text:
-        """Render the log record into a rich Text object with custom formatting.
-
-        Args:
-            record (logging.LogRecord): The log record to render.
-            traceback (object): The traceback object (not used here).
-            message_renderable (ConsoleRenderable): The log message renderable.
-
-        Returns:
-            Text: The formatted log record as a rich Text object.
-
-        Raises:
-            None
-        """
-        dt: datetime = datetime.fromtimestamp(record.created, tz=TIME_ZONE)
-        padding: int = LOG_RECORD_PADDING.get("time", 25)
-        time_str: str = dt.strftime(DATE_TIME_FORMAT).ljust(padding)[:padding]
-        time_text: Text = Text(time_str, style="logging.time")
-
-        padding = LOG_RECORD_PADDING.get("level", 10)
-        level_text: Text = Text(
-            record.levelname.ljust(padding)[:padding],
-            style=self._get_level_style(record.levelno),
-        )
-
-        file_and_no: str = f"{record.filename}:{record.lineno}"
-        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
-        file_and_no_text: Text = Text(
-            file_and_no.ljust(padding)[:padding], style="logging.location"
-        )
-
-        padding = LOG_RECORD_PADDING.get("logger_name", 45)
-        logger_name_text: Text = Text(
-            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
-        )
-
-        # Convert message_renderable to Text for type consistency
-        message_text: Text
-        if isinstance(message_renderable, Text):
-            message_text = message_renderable
-        else:
-            message_text = Text.from_markup(str(message_renderable))
-
-        components: list[Text] = [
-            time_text,
-            level_text,
-            file_and_no_text,
-            logger_name_text,
-            message_text,
-        ]
-
-        return Text(" ").join(components)
-
-    def _get_level_style(self, level_no: int) -> str:
-        """Get the style string for the given log level number from the theme defined in
-        CONSOLE_THEME.
-
-        Args:
-            level_no (int): The log level number.
-
-        Returns:
-            str: The style string for the log level.
-        """
-        return str(
-            CONSOLE_THEME.styles.get(
-                f"logging.level.{logging_log_level_to_str(level_no).lower()}", ""
-            )
-        )
-
-
-
-# Placeholder code for currently nonexisting handlers. 
-# These are simply RichHandler instances which replace the utc timing info with their
-# Handler names. Will be removed as soon as real handlers are developed
-
-def dummy_add_lstdout_handler(log : logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = LstdoutDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Lstdout))
-    log.addHandler(handler)
-
-def dummy_add_erstrace_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = ERSTraceDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.ERSTrace))
-    log.addHandler(handler)
-
-def dummy_add_throttle_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
-    """Adds dummy handler."""
-    width: int = get_width()
-    handler: RichHandler = ThrottleDummy(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Throttle))
-    log.addHandler(handler)
-class ClassNameRichHandler(FormattedRichHandler):
-    """Handler that displays the class name instead of time. Temporary class."""
-
-    def render(
-        self,
-        *,
-        record: logging.LogRecord,
-        traceback: object,
-        message_renderable: ConsoleRenderable,
-    ) -> Text:
-        """Method to render an object."""
-        # Use class name instead of time
-        class_name: str = self.__class__.__name__
-        padding: int = LOG_RECORD_PADDING.get("time", 25)
-        class_name_text: Text = Text(class_name.ljust(padding)[:padding], 
-            style="logging.time"
-        )
-
-        padding = LOG_RECORD_PADDING.get("level", 10)
-        level_text: Text = Text(
-            record.levelname.ljust(padding)[:padding],
-            style=self._get_level_style(record.levelno),
-        )
-
-        file_and_no: str = f"{record.filename}:{record.lineno}"
-        padding = LOG_RECORD_PADDING.get("file_and_line", 40)
-        file_and_no_text: Text = Text(
-            file_and_no.ljust(padding)[:padding], style="logging.location"
-        )
-
-        padding = LOG_RECORD_PADDING.get("logger_name", 45)
-        logger_name_text: Text = Text(
-            f"{record.name}".ljust(padding)[:padding], style="logging.logger_name"
-        )
-
-        message_text: Text
-        if isinstance(message_renderable, Text):
-            message_text = message_renderable
-        else:
-            message_text = Text.from_markup(str(message_renderable))
-
-        components: list[Text] = [
-            class_name_text,
-            level_text,
-            file_and_no_text,
-            logger_name_text,
-            message_text,
-        ]
-
-        return Text(" ").join(components)
-
-
-class LstdoutDummy(ClassNameRichHandler):
-    """LstdoutDummy placeholder class."""
-    pass
-
-class ERSTraceDummy(ClassNameRichHandler):
-    """ERSTraceDummy placeholder class."""
-    pass
-class ThrottleDummy(ClassNameRichHandler):
-    """ThrottleDummy placeholder class."""
-    pass

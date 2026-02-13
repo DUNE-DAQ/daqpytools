@@ -109,10 +109,10 @@ oks_to_logging_map = {
 }
 
 level_to_ers_var = {
-    "ERROR": "DUNEDAQ_ERS_ERROR",
-    "WARNING": "DUNEDAQ_ERS_WARNING",
-    "CRITICAL": "DUNEDAQ_ERS_FATAL",
-    "INFO": "DUNEDAQ_ERS_INFO",
+    logging.ERROR: "DUNEDAQ_ERS_ERROR",
+    logging.WARNING: "DUNEDAQ_ERS_WARNING",
+    logging.CRITICAL: "DUNEDAQ_ERS_FATAL",
+    logging.INFO: "DUNEDAQ_ERS_INFO",
 }
 
 

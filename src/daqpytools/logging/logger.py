@@ -7,6 +7,7 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
+    ThrottleFilter,
     add_ers_kafka_handler,
     add_file_handler,
     add_rich_handler,
@@ -70,6 +71,7 @@ def get_daq_logger(
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
     ers_kafka_handler: bool = False,
+    throttle: bool = False
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -82,6 +84,8 @@ def get_daq_logger(
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
         ers_kafka_handler (bool): Whether to add an ERS protobuf handler.
+        throttle (bool): Whether to add the throttle filter or not. Note, does not mean 
+            outputs are filtered by default! See ThrottleFilter for details.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -146,6 +150,10 @@ def get_daq_logger(
         add_stderr_handler(logger, use_parent_handlers)
     if ers_kafka_handler: 
         add_ers_kafka_handler(logger, use_parent_handlers, "session_tester")
+
+    if throttle:
+        # Note: Default parameters used. No functionality on customisability yet
+        logger.addFilter(ThrottleFilter())
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:

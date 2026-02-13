@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 
 import click
 from rich.traceback import install as rich_traceback_install
@@ -8,9 +9,6 @@ from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
-    dummy_add_erstrace_handler,
-    dummy_add_lstdout_handler,
-    dummy_add_throttle_handler,
 )
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger
@@ -72,6 +70,14 @@ def validate_test_configuration(
         )
     )
 @click.option(
+    "-t",
+    "--throttle", 
+    is_flag=True, 
+    help=(
+        "Demonstrate throttling functionality. Requires Rich handlers"
+        )
+    )
+@click.option(
     "-s",
     "--stream_handlers",
     is_flag=True,
@@ -104,6 +110,7 @@ def main(
     disable_logger_inheritance: bool,
     ersprotobufstream: bool,
     handlertypes:bool,
+    throttle: bool,
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
@@ -124,6 +131,7 @@ def main(
             to be set to true.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes
             and streams.
+        throttle (bool): If true, demonstrates the throttling feature. Requires Rich.
 
     Returns:
         None
@@ -141,6 +149,7 @@ def main(
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
         ers_kafka_handler=ersprotobufstream,
+        throttle=throttle
     )
     main_logger.debug("example debug message")
     main_logger.info("example info message")
@@ -200,15 +209,35 @@ def main(
         )
 
 
+    # Throttle demo
+    def emit_err(i: int) -> None:
+        """Short function that prints out a log message.
+        This is used to ensure that the log message is kept on the same line,
+        but also to feed in how many repetitions it has gone through
+        Args:
+            i (int): Integer to be transmitted in the log message.
+
+        Returns:
+            None.
+        """
+        throttle_msg = f"Throttle test {i}"
+        main_logger.info(throttle_msg, extra={"handlers": 
+            [HandlerType.Rich, HandlerType.Throttle]
+        })
+    
+    if throttle:
+        for i in range(50):
+            emit_err(i)
+        main_logger.warning("Sleeping for 30 seconds")
+        time.sleep(31)
+        for i in range(1000):
+            emit_err(i)
+
+
+
     # HandlerTypes demo
     if not handlertypes:
         return
-
-    #* Add all dummy handlers which have not been developed yet
-    dummy_add_lstdout_handler(main_logger, True)
-    dummy_add_erstrace_handler(main_logger, True)
-    dummy_add_throttle_handler(main_logger, True)
-    
 
     #* Test choosing which handler to use individually
     main_logger.debug("Default go to tty / rich / file when added")
@@ -220,9 +249,6 @@ def main(
     )
     main_logger.critical("Should only go to Lstdout",
         extra={"handlers": [HandlerType.Lstdout]}
-    )
-    main_logger.critical("Should only go to ERSTrace",
-        extra={"handlers": [HandlerType.ERSTrace]}
     )
     main_logger.critical("Should only go to Throttle",
         extra={"handlers": [HandlerType.Throttle]}

@@ -26,6 +26,7 @@ from daqpytools.logging.exceptions import (
 )
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
+    DATE_TIME_BASE_FORMAT,
     DATE_TIME_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
@@ -160,6 +161,7 @@ class HandlerType(Enum):
     File = "file"
     Protobufstream = "protobufstream"
     Lstdout = "lstdout"
+    Lstderr = "lstderr"
     Throttle = "throttle"
     @classmethod
     def from_string(cls, s: str) -> HandlerType | None:
@@ -537,8 +539,10 @@ class ThrottleFilter(BaseHandlerFilter):
         Returns:
             Formatted timestamp string
         """
-        dt = datetime.fromtimestamp(timestamp)
-        return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+        dt = datetime.fromtimestamp(timestamp, tz=TIME_ZONE)
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        time_str: str = dt.strftime(DATE_TIME_BASE_FORMAT).ljust(padding)[:padding]
+        return Text(time_str, style="logging.time")
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -686,7 +690,7 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(LoggingFormatter())
-    stderr_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    stderr_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstderr]))
     stderr_handler.setLevel(logging.ERROR)
     log.addHandler(stderr_handler)
     return

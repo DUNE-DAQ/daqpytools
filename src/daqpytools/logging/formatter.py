@@ -40,6 +40,14 @@ if not DATE_TIME_FORMAT:
     )
     raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
 
+DATE_TIME_BASE_FORMAT = CONFIG.get("logging", "date_time_base")
+if not DATE_TIME_BASE_FORMAT:
+    err_msg = (
+        f"Date and time base format in '{CONFIGURATION_FILE}' is empty or not defined "
+        "under 'format'."
+    )
+    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
+
 CONSOLE_THEME = Theme(dict(CONFIG.items("theme")))
 if not CONSOLE_THEME:
     err_msg = (

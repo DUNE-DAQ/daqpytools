@@ -160,6 +160,7 @@ class HandlerType(Enum):
     File = "file"
     Protobufstream = "protobufstream"
     Lstdout = "lstdout"
+    Lstderr = "lstderr"
     Throttle = "throttle"
     @classmethod
     def from_string(cls, s: str) -> HandlerType | None:
@@ -649,7 +650,7 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(LoggingFormatter())
-    stderr_handler.addFilter(HandleIDFilter(HandlerType.Stream))
+    stderr_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstderr]))
     stderr_handler.setLevel(logging.ERROR)
     log.addHandler(stderr_handler)
     return

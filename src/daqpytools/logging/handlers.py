@@ -26,6 +26,7 @@ from daqpytools.logging.exceptions import (
 )
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
+    DATE_TIME_BASE_FORMAT,
     DATE_TIME_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
@@ -501,8 +502,10 @@ class ThrottleFilter(BaseHandlerFilter):
         Returns:
             Formatted timestamp string
         """
-        dt = datetime.fromtimestamp(timestamp)
-        return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
+        dt = datetime.fromtimestamp(timestamp, tz=TIME_ZONE)
+        padding: int = LOG_RECORD_PADDING.get("time", 25)
+        time_str: str = dt.strftime(DATE_TIME_BASE_FORMAT).ljust(padding)[:padding]
+        return Text(time_str, style="logging.time")
 
 def check_parent_handlers(
     log: logging.Logger,

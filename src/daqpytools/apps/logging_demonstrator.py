@@ -6,6 +6,7 @@ import click
 from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.formatter import CONTEXT_SETTINGS
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
@@ -224,7 +225,46 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         extra=handlerconf.ERS
     )     
 
-@click.command()
+class AllOptionsCommand(click.Command):
+    """
+    Parse the arguments passed and validate they are acceptable, otherwise print the
+    relevant options
+
+    Click's default functionality does not pick up the optional arguments well. This
+    catches any incorrect options or typos, makes the log clearer.
+    """
+    def parse_args(self, ctx: click.Context, args: list[str]):
+        # If the arguments are valid, run the command with the relevant arguments
+        try:
+            return super().parse_args(ctx, args)
+        except click.NoSuchOption as e:
+            # Get the list of available options, format them in a readable way
+            formatted_opts = []
+            
+            for param in self.params:
+                if isinstance(param, click.Option) and param.opts:
+                    # For each option, format as "short_opt (long_opt)"
+                    opts = sorted(param.opts, key=len)
+                    
+                    if len(opts) > 1:
+                        # Multiple options
+                        formatted_opts.append(f"{opts[0]} ({opts[1]})")
+                    else:
+                        # One long option
+                        formatted_opts.append(opts[0])
+            
+            # Inform the user why what they have tried to use is wrong
+            click.echo(ctx.get_usage() + "\n", err=True)
+            
+            # Print formatted available options
+            msg = (
+                f"Error: No such option: {e.option_name}. \n"
+                f"Available options: {', '.join(sorted(formatted_opts))}"
+            )
+            click.echo(msg, err=True)
+            ctx.exit(2)
+
+@click.command(cls=AllOptionsCommand, context_settings=CONTEXT_SETTINGS)
 @click.option(
     "-l",
     "--log-level",
@@ -232,7 +272,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     default="DEBUG",
     help="Set the log level.",
 )
-@click.option("-r", "--rich_handler", is_flag=True, help=("Set up a rich handler"))
+@click.option("-r", "--rich-handler", is_flag=True, help=("Set up a rich handler"))
 @click.option(
     "-f",
     "--file-handler-path",
@@ -243,6 +283,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     ),
 )
 @click.option(
+    "-e",
     "--ersprotobufstream", 
     is_flag=True, 
     help=(
@@ -250,6 +291,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         )
     )
 @click.option(
+    "-ht",
     "--handlertypes", 
     is_flag=True, 
     help=(
@@ -257,6 +299,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         )
     )
 @click.option(
+    "-hc",
     "--handlerconf", 
     is_flag=True, 
     help=(
@@ -264,6 +307,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         )
     )
 @click.option(
+    "-sb",
     "--suppress-basic", 
     is_flag=True, 
     help=(
@@ -280,7 +324,7 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     )
 @click.option(
     "-s",
-    "--stream_handlers",
+    "--stream-handlers",
     is_flag=True,
     help=("Set up stdout and stderr stream handlers"),
 )

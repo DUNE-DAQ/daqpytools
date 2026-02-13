@@ -156,6 +156,7 @@ def test_throttle(main_logger: logging.Logger) -> None:
 
 def test_handlertypes(main_logger: logging.Logger) -> None:
     """Demonstrates the handlertype functionality.
+    Note - to have the messages published, the relevant handlers must be enabled.
     
     Args:
         main_logger (logging.Logger): A logger to print messages with
@@ -330,7 +331,7 @@ def main(
             instance.
         ersprotobufstream (bool): If true, sets up an ERS protobuf handler. Error msg
             are demonstrated in the HandlerType demonstration, requiring handlerconf
-            to be set to true.
+            to be set to true. The topic for these tests is session_tester.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes.
         handlerconf (bool): If true, demonstrates the advanced feature of HandlerConf
             and streams.

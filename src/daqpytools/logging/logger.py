@@ -71,7 +71,7 @@ def get_daq_logger(
     rich_handler: bool = False,
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
-    ers_kafka_handler: bool = False,
+    ers_kafka_handler: str | None = None,
     throttle: bool = False
 ) -> logging.Logger:
     """C'tor for the default logging instances.
@@ -84,7 +84,7 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_kafka_handler (bool): Whether to add an ERS protobuf handler.
+        ers_kafka_handler (str): Whether to add an ERS protobuf handler. str is session name
         throttle (bool): Whether to add the throttle filter or not. Note, does not mean 
             outputs are filtered by default! See ThrottleFilter for details.
 
@@ -150,7 +150,7 @@ def get_daq_logger(
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
     if ers_kafka_handler: 
-        add_ers_kafka_handler(logger, use_parent_handlers, "session_tester")
+        add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler)
 
     if throttle:
         # Note: Default parameters used. No functionality on customisability yet

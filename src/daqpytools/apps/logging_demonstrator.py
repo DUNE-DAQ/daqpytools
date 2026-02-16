@@ -296,7 +296,7 @@ class AllOptionsCommand(click.Command):
 @click.option(
     "-e",
     "--ersprotobufstream", 
-    is_flag=True, 
+    type=str,
     help=(
         "Set up an ERS handler, and publish to ERS"
         )
@@ -364,7 +364,7 @@ def main(
     stream_handlers: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
-    ersprotobufstream: bool,
+    ersprotobufstream: str,
     handlertypes:bool,
     handlerconf:bool,
     throttle: bool,
@@ -384,7 +384,7 @@ def main(
         disable_logger_inheritance (bool): If true, disable logger inheritance so each
             logger instance only uses the logger handlers assigned to the given logger
             instance.
-        ersprotobufstream (bool): If true, sets up an ERS protobuf handler. Error msg
+        ersprotobufstream (str): Sets up an ERS protobuf handler with supplied session name. Error msg
             are demonstrated in the HandlerType demonstration, requiring handlerconf
             to be set to true. The topic for these tests is session_tester.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes.

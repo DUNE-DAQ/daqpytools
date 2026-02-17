@@ -149,7 +149,7 @@ def get_daq_logger(
     if stream_handlers:
         add_stdout_handler(logger, use_parent_handlers)
         add_stderr_handler(logger, use_parent_handlers)
-    if ers_kafka_handler: 
+    if ers_kafka_handler:
         add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler)
 
     if throttle:

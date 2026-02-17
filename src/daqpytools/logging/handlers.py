@@ -191,7 +191,7 @@ class ERSPyLogHandlerConf:
     are not yet supported.
     """
     handlers: list = field(default_factory = lambda: [])
-    protobufconf: ProtobufConf = field(default_factory = lambda: ProtobufConf())
+    protobufconf: ProtobufConf = field(default_factory = lambda: None)
 
 @dataclass
 class LogHandlerConf:

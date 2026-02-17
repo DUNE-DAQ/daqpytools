@@ -275,6 +275,7 @@ class LogHandlerConf:
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
+        # print(f"{handler_str=}")
         if "erstrace" in handler_str:
             msg = (
                 "ERSTrace is a C++ implementation, "
@@ -297,10 +298,12 @@ class LogHandlerConf:
         """Generates the ERSPyLogHandlerConf from reading an environment variable."""
         erspyloghandlerconf = ERSPyLogHandlerConf()
         envvalue = os.getenv(ers_log_level)
+        # print(f"{envvalue=}")
         if envvalue is None:
             raise ERSEnvError(ers_log_level)
         
         for h in envvalue.split(","):
+            # print(f"{h=}")
             handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
             erspyloghandlerconf.handlers.append(handlertype)
             if kafkaconf:
@@ -543,6 +546,19 @@ class ThrottleFilter(BaseHandlerFilter):
         padding: int = LOG_RECORD_PADDING.get("time", 25)
         time_str: str = dt.strftime(DATE_TIME_BASE_FORMAT).ljust(padding)[:padding]
         return Text(time_str, style="logging.time")
+    
+
+def add_throttle_filter(log: logging.Logger) -> None:
+    """Add the Throttle filter to the logger.
+
+    Args:
+        log (logging.Logger): Logger to add the rich handler to.
+
+    Returns:
+        None
+    """
+    log.addFilter(ThrottleFilter())
+    return
 
 def check_parent_handlers(
     log: logging.Logger,
@@ -716,4 +732,106 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str) 
     file_handler.addFilter(HandleIDFilter(HandlerType.File))
     log.addHandler(file_handler)
     return
+
+
+def _logger_has_handler(
+    log: logging.Logger,
+    handler_type: type[logging.Handler],
+    target_stream: io.IOBase | None = None,
+) -> bool:
+    """Check if logger already has a matching handler.
+
+    For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
+    """
+    type_matches = [isinstance(handler, handler_type) for handler in log.handlers]
+    stream_matches = [
+        handler.stream is target_stream if target_stream else False
+        for handler in log.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
+    return any(type_matches + stream_matches)
+
+
+def _logger_has_filter(log: logging.Logger, filter_type: type[logging.Filter]) -> bool:
+    """Check if logger already has a matching filter type."""
+    return any(isinstance(logger_filter, filter_type) for logger_filter in log.filters)
+
+
+def add_handlers_from_types(
+    log: logging.Logger,
+    handler_types: set[HandlerType],
+    ers_session_name: str | None,
+) -> None:
+    """Add handlers to a logger based on HandlerType values.
+
+    This helper intentionally supports only the default options for now:
+    - ``use_parent_handlers`` is always True.
+    - ``HandlerType.File`` is not supported and raises immediately.
+    - ``HandlerType.Protobufstream`` requires ``ers_session_name``.
+    """
+    if HandlerType.File in handler_types:
+        err_msg = "HandlerType.File is not supported by add_handlers_from_types"
+        raise ValueError(err_msg)
+
+    if HandlerType.Protobufstream in handler_types and not ers_session_name:
+        err_msg = "ers_session_name is required for HandlerType.Protobufstream"
+        raise ValueError(err_msg)
+
+    effective_handler_types = set(handler_types)
+    if HandlerType.Stream in effective_handler_types:
+        effective_handler_types.update({HandlerType.Lstdout, HandlerType.Lstderr})
+
+    existing_stream_handlers = {
+        HandlerType.Lstdout
+        if _logger_has_handler(
+            log, logging.StreamHandler, target_stream=cast(io.IOBase, sys.stdout)
+        )
+        else None,
+        HandlerType.Lstderr
+        if _logger_has_handler(
+            log, logging.StreamHandler, target_stream=cast(io.IOBase, sys.stderr)
+        )
+        else None,
+    }
+    existing_stream_handlers.discard(None)
+
+    existing_handlers = {
+        HandlerType.Rich if _logger_has_handler(log, FormattedRichHandler) else None,
+        HandlerType.Protobufstream
+        if _logger_has_handler(log, ERSKafkaLogHandler)
+        else None,
+        HandlerType.Throttle if _logger_has_filter(log, ThrottleFilter) else None,
+    }
+    existing_handlers.discard(None)
+    existing_handlers.update(existing_stream_handlers)
+
+    dispatch = {
+        HandlerType.Rich: lambda: add_rich_handler(log, True),
+        HandlerType.Lstdout: lambda: add_stdout_handler(log, True),
+        HandlerType.Lstderr: lambda: add_stderr_handler(log, True),
+        HandlerType.Protobufstream: lambda: add_ers_kafka_handler(
+            log, True, ers_session_name
+        ),
+        HandlerType.Throttle: lambda: add_throttle_filter(log)
+    }
+
+    #! Try to revisit this logic
+
+    install_order = [
+        HandlerType.Rich,
+        HandlerType.Lstdout,
+        HandlerType.Lstderr,
+        HandlerType.Protobufstream,
+        HandlerType.Throttle,
+    ]
+
+    for handler_type in install_order:
+        if handler_type not in effective_handler_types:
+            continue
+        if handler_type in existing_handlers:
+            continue
+        installer = dispatch.get(handler_type)
+        if installer is None:
+            continue
+        installer()
 

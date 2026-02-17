@@ -401,36 +401,58 @@ def main(
         LoggerSetupError: If no handlers are set up for the logger.
     """
     logger_name = "daqpytools_logging_demonstrator"
+
+    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_INFO"] = "lstderr,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "rich,lstdout"
+    os.environ["DUNEDAQ_ERS_ERROR"] = (
+        "erstrace,"
+        "throttle,"
+        "lstdout,"
+        "protobufstream(monkafka.cern.ch:30092)"
+    )
+
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,
         log_level=log_level,
-        use_parent_handlers=not disable_logger_inheritance,
-        rich_handler=rich_handler,
-        file_handler_path=file_handler_path,
-        stream_handlers=stream_handlers,
-        ers_kafka_handler=ersprotobufstream,
-        throttle=throttle
+        rich_handler=False,
+        setup_ers_handlers=True,
+        ers_kafka_handler="session_temp"
     )
 
-    if not suppress_basic:
-        test_main_functions(main_logger)
-    
-    if child_logger: 
-        test_child_logger(
-            logger_name,
-            log_level,
-            disable_logger_inheritance,
-            rich_handler,
-            file_handler_path,
-            stream_handlers
-        )
+    main_logger.warning("test")
 
-    if throttle:
-        test_throttle(main_logger)
-    if handlertypes:
-        test_handlertypes(main_logger)
-    if handlerconf:
-        test_handlerconf(main_logger)
+
+    # main_logger: logging.Logger = get_daq_logger(
+    #     logger_name=logger_name,
+    #     log_level=log_level,
+    #     use_parent_handlers=not disable_logger_inheritance,
+    #     rich_handler=rich_handler,
+    #     file_handler_path=file_handler_path,
+    #     stream_handlers=stream_handlers,
+    #     ers_kafka_handler=ersprotobufstream,
+    #     throttle=throttle
+    # )
+
+    # if not suppress_basic:
+    #     test_main_functions(main_logger)
+    
+    # if child_logger: 
+    #     test_child_logger(
+    #         logger_name,
+    #         log_level,
+    #         disable_logger_inheritance,
+    #         rich_handler,
+    #         file_handler_path,
+    #         stream_handlers
+    #     )
+
+    # if throttle:
+    #     test_throttle(main_logger)
+    # if handlertypes:
+    #     test_handlertypes(main_logger)
+    # if handlerconf:
+    #     test_handlerconf(main_logger)
 
 
 if __name__ == "__main__":

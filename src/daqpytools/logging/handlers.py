@@ -193,6 +193,7 @@ class ERSPyLogHandlerConf:
     handlers: list = field(default_factory = lambda: [])
     protobufconf: ProtobufConf = field(default_factory = lambda: None)
 
+#! TODO/now= consider @dataclass(frozen=True)
 @dataclass
 class LogHandlerConf:
     """Dataclass that holds the various streams and relevant handlers.
@@ -344,8 +345,9 @@ class BaseHandlerFilter(logging.Filter):
     """Base filter that hold the logic on choosing if a handler should emit
     based on what HandlersTypes are supplied to it.
     """
-    def __init__(self) -> None:
+    def __init__(self, default_case = LogHandlerConf.get_base() ) -> None:
         """C'tor."""
+        self.default_case = default_case
         super().__init__()
     
     def get_allowed(self, record: logging.LogRecord) -> list | None:
@@ -370,7 +372,7 @@ class BaseHandlerFilter(logging.Filter):
 
         # Handle the non-ERS case
         else:
-            allowed = getattr(record, "handlers", LogHandlerConf.get_base()) 
+            allowed = getattr(record, "handlers", self.default_case) 
         return allowed
         
 class HandleIDFilter(BaseHandlerFilter):
@@ -378,11 +380,13 @@ class HandleIDFilter(BaseHandlerFilter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-    def __init__(self, handler_id: HandlerType | list[HandlerType]) -> None:
+    def __init__(self, handler_id: HandlerType | list[HandlerType], default_case = LogHandlerConf.get_base()) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
-        super().__init__()
+        super().__init__(
+            default_case = default_case
+        )
         
         # Normalise handler_id to be a set
         if isinstance(handler_id, list):
@@ -560,6 +564,23 @@ def add_throttle_filter(log: logging.Logger) -> None:
     log.addFilter(ThrottleFilter())
     return
 
+def _logger_has_handler(
+    log: logging.Logger,
+    handler_type: type[logging.Handler],
+    target_stream: io.IOBase | None = None,
+) -> bool:
+    """Check if logger already has a matching handler.
+
+    For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
+    """
+    type_matches = [isinstance(handler, handler_type) for handler in log.handlers]
+    stream_matches = [
+        handler.stream is target_stream if target_stream else False
+        for handler in log.handlers
+        if isinstance(handler, logging.StreamHandler)
+    ]
+    return any(type_matches + stream_matches)
+
 def check_parent_handlers(
     log: logging.Logger,
     use_parent_handlers: bool,
@@ -588,8 +609,9 @@ def check_parent_handlers(
     # Check that we are not using the true logging root logger
     python_root_logger_name = logging.getLogger().name
     if log.name == python_root_logger_name:
-        err_nsg = "You should not be interfacing with the root logger"
-        raise ValueError(err_nsg)
+        err_msg = "You should not be interfacing with the root logger"
+        raise ValueError(err_msg)
+        
     # Validate the stream handler has a target stream
     if handler_type.__name__ == "StreamHandler" and target_stream is None:
         err_msg = (
@@ -607,15 +629,7 @@ def check_parent_handlers(
     logger_parent = log.parent
     this_is_root_logger = logger_parent.name == python_root_logger_name
     while not this_is_root_logger:
-        handler_checking = [
-            isinstance(handler, handler_type) for handler in logger_parent.handlers
-        ]
-        stream_handler_checking = [
-            handler.stream is target_stream if target_stream else False
-            for handler in logger_parent.handlers
-            if isinstance(handler, logging.StreamHandler)
-        ]
-        if any(handler_checking + stream_handler_checking):
+        if _logger_has_handler(logger_parent,handler_type, target_stream):
             raise LoggerHandlerError(logger_parent.name, handler_type)
         logger_parent = logger_parent.parent
         this_is_root_logger = logger_parent.name == python_root_logger_name
@@ -638,10 +652,14 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
     width: int = get_width()
     handler: RichHandler = FormattedRichHandler(width=width)
-    handler.addFilter(HandleIDFilter(HandlerType.Rich))
+
+    #! Here you better initialise handlerid filter
+    my_default_case = {HandlerType.Rich}
+    my_rich_filter = HandleIDFilter(handler_id=HandlerType.Rich, default_case=my_default_case) # Should accept the base handlers here
+    handler.addFilter(my_rich_filter)
     log.addHandler(handler)
     return
-    
+
 def add_ers_kafka_handler(log: logging.Logger, use_parent_handlers: bool,
                                  session_name:str, topic: str = "ers_stream", 
                                  address: str ="monkafka.cern.ch:30092") -> None:
@@ -676,11 +694,16 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     )
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(LoggingFormatter())
-    stdout_handler.addFilter(HandleIDFilter([HandlerType.Stream, HandlerType.Lstdout]))
+    
+    # repeat ad infinitum for all handlers.... 
+    my_default_case = {HandlerType.Rich}
+    my_stdout_filter = HandleIDFilter(handler_id=[HandlerType.Stream, HandlerType.Lstdout],default_case=my_default_case)
+    stdout_handler.addFilter(my_stdout_filter)
+    
     log.addHandler(stdout_handler)
     return
 
-
+# Consider seeing if there is a way to generalify the add X handler..
 def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool) -> None:
     """Add a stderr handler to the logger.
 
@@ -734,24 +757,6 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str) 
     return
 
 
-def _logger_has_handler(
-    log: logging.Logger,
-    handler_type: type[logging.Handler],
-    target_stream: io.IOBase | None = None,
-) -> bool:
-    """Check if logger already has a matching handler.
-
-    For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
-    """
-    type_matches = [isinstance(handler, handler_type) for handler in log.handlers]
-    stream_matches = [
-        handler.stream is target_stream if target_stream else False
-        for handler in log.handlers
-        if isinstance(handler, logging.StreamHandler)
-    ]
-    return any(type_matches + stream_matches)
-
-
 def _logger_has_filter(log: logging.Logger, filter_type: type[logging.Filter]) -> bool:
     """Check if logger already has a matching filter type."""
     return any(isinstance(logger_filter, filter_type) for logger_filter in log.filters)
@@ -762,7 +767,7 @@ def add_handlers_from_types(
     handler_types: set[HandlerType],
     ers_session_name: str | None,
 ) -> None:
-    """Add handlers to a logger based on HandlerType values.
+    """Add handlers to a logger based on a set of HandlerType values.
 
     This helper intentionally supports only the default options for now:
     - ``use_parent_handlers`` is always True.
@@ -777,10 +782,12 @@ def add_handlers_from_types(
         err_msg = "ers_session_name is required for HandlerType.Protobufstream"
         raise ValueError(err_msg)
 
+    # Update relevant handler types that was parsed
     effective_handler_types = set(handler_types)
     if HandlerType.Stream in effective_handler_types:
         effective_handler_types.update({HandlerType.Lstdout, HandlerType.Lstderr})
 
+    # Check if current logger has stream handlers, convert to handlertypes
     existing_stream_handlers = {
         HandlerType.Lstdout
         if _logger_has_handler(
@@ -795,6 +802,7 @@ def add_handlers_from_types(
     }
     existing_stream_handlers.discard(None)
 
+    # Check if current logger has the interested handler
     existing_handlers = {
         HandlerType.Rich if _logger_has_handler(log, FormattedRichHandler) else None,
         HandlerType.Protobufstream
@@ -805,7 +813,7 @@ def add_handlers_from_types(
     existing_handlers.discard(None)
     existing_handlers.update(existing_stream_handlers)
 
-    dispatch = {
+    handlers_init_map = {
         HandlerType.Rich: lambda: add_rich_handler(log, True),
         HandlerType.Lstdout: lambda: add_stdout_handler(log, True),
         HandlerType.Lstderr: lambda: add_stderr_handler(log, True),
@@ -815,9 +823,7 @@ def add_handlers_from_types(
         HandlerType.Throttle: lambda: add_throttle_filter(log)
     }
 
-    #! Try to revisit this logic
-
-    install_order = [
+    supported_handers = [
         HandlerType.Rich,
         HandlerType.Lstdout,
         HandlerType.Lstderr,
@@ -825,12 +831,12 @@ def add_handlers_from_types(
         HandlerType.Throttle,
     ]
 
-    for handler_type in install_order:
+    for handler_type in supported_handers:
         if handler_type not in effective_handler_types:
             continue
         if handler_type in existing_handlers:
             continue
-        installer = dispatch.get(handler_type)
+        installer = handlers_init_map.get(handler_type)
         if installer is None:
             continue
         installer()

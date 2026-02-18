@@ -145,6 +145,10 @@ def get_daq_logger(
         logger.setLevel(log_level)
     logger.propagate = use_parent_handlers
 
+    #! Okay so before this bit, you capture all the handlers that you want to have
+    # That would now be the default base handlers
+    # You apss this in each of the requested handlers here..
+
     # Add requested handlers
     if rich_handler:
         add_rich_handler(logger, use_parent_handlers)
@@ -162,18 +166,6 @@ def get_daq_logger(
 
 
 
-    if setup_ers_handlers:
-
-        # need to grab the list of relevant handlers that exist in ERS
-        #! This is very dependent on ERS env variables existing!!! 
-        lhc_conf = LogHandlerConf._get_oks_conf()
-        all_handlers = {handler for handler_conf in lhc_conf.values() for handler in handler_conf.handlers}
-        
-        print(all_handlers)
-
-        add_handlers_from_types(logger, all_handlers, ers_kafka_handler)
-
-        # now what.. Well we have a list of handlers to add now huh..
 
 
 
@@ -191,3 +183,21 @@ def get_daq_logger(
             handler.setLevel(log_level)
 
     return logger
+
+
+#! This will mean now that you need some function here that will allow you to go through all the handlers and all the filters and update that stupid self.default_case
+
+def setup_daq_ers_logger(logger, ers_session_name):
+
+    # need to grab the list of relevant handlers that exist in ERS
+    #! This is very dependent on ERS env variables existing!!! 
+    
+    all_handlers = {handler for handler_conf in LogHandlerConf._get_oks_conf().values() for handler in handler_conf.handlers}
+    
+    print(all_handlers)
+
+    add_handlers_from_types(logger, all_handlers, ers_session_name)
+
+
+    # now what.. Well we have a list of handlers to add now huh..
+

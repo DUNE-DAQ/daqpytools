@@ -10,9 +10,11 @@ from daqpytools.logging.formatter import CONTEXT_SETTINGS
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
+    add_stdout_handler,
 )
+
 from daqpytools.logging.levels import logging_log_level_keys
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging.logger import get_daq_logger, setup_daq_ers_logger
 from daqpytools.logging.utils import get_width
 
 
@@ -402,25 +404,61 @@ def main(
     """
     logger_name = "daqpytools_logging_demonstrator"
 
-    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
-    os.environ["DUNEDAQ_ERS_INFO"] = "lstderr,throttle,lstdout"
-    os.environ["DUNEDAQ_ERS_FATAL"] = "rich,lstdout"
+    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstderr"
+    os.environ["DUNEDAQ_ERS_INFO"] = "lstderr,throttle,lstderr"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr"
     os.environ["DUNEDAQ_ERS_ERROR"] = (
         "erstrace,"
         "throttle,"
-        "lstdout,"
+        "lstderr,"
         "protobufstream(monkafka.cern.ch:30092)"
     )
+
+    handlerconf = LogHandlerConf(init_ers=True)
 
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,
         log_level=log_level,
-        rich_handler=False,
-        setup_ers_handlers=True,
-        ers_kafka_handler="session_temp"
+        stream_handlers=False,
+        rich_handler=True # only rich was defined
     )
 
-    main_logger.warning("test")
+    main_logger.warning("Only Rich")
+
+    # add_stdout_handler(main_logger, True)
+    setup_daq_ers_logger(main_logger, "session_temp")
+
+    main_logger.critical("Should be only rich")
+
+
+    # main_logger.critical("test") #use only rich because we only iniitlaise with rich
+
+    main_logger.critical("Stream", extra={"handlers": [HandlerType.Stream]})
+
+    
+    
+    main_logger.critical("ERS (lstderr only)", extra=handlerconf.ERS)
+
+    
+
+
+
+    # define a default handlerconf so for example 
+
+
+    """
+    Concrete suggestions
+
+    For now:
+    get_daq_logger = rich_handler = True  # save rich_handler and set as base class
+
+    setup_ers(log) #adds stream handler and what have you
+    
+    log.warning("something") # only goes to rich because we only initialise with rich
+
+    log.warning("something else", extra= ers) # use whatever is in ers
+    
+    """
 
 
     # main_logger: logging.Logger = get_daq_logger(

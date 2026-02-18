@@ -16,6 +16,7 @@ from daqpytools.logging.handlers import (
     add_rich_handler,
     add_stderr_handler,
     add_stdout_handler,
+    HandlerType
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
@@ -149,27 +150,38 @@ def get_daq_logger(
     # That would now be the default base handlers
     # You apss this in each of the requested handlers here..
 
+
+    default_case = {HandlerType.Rich}
+
     # Add requested handlers
+    # if rich_handler:
+    #     add_rich_handler(logger, use_parent_handlers)
+    # if file_handler_path:
+    #     add_file_handler(logger, use_parent_handlers, file_handler_path)
+    # if stream_handlers:
+    #     add_stdout_handler(logger, use_parent_handlers)
+    #     add_stderr_handler(logger, use_parent_handlers)
+    # if ers_kafka_handler:
+    #     add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler)
+
+    # if throttle:
+    #     # Note: Default parameters used. No functionality on customisability yet
+    #     add_throttle_filter(logger)
+
+
     if rich_handler:
-        add_rich_handler(logger, use_parent_handlers)
+        add_rich_handler(logger, use_parent_handlers, default_case)
     if file_handler_path:
-        add_file_handler(logger, use_parent_handlers, file_handler_path)
+        add_file_handler(logger, use_parent_handlers, file_handler_path, default_case)
     if stream_handlers:
-        add_stdout_handler(logger, use_parent_handlers)
-        add_stderr_handler(logger, use_parent_handlers)
+        add_stdout_handler(logger, use_parent_handlers, default_case)
+        add_stderr_handler(logger, use_parent_handlers, default_case)
     if ers_kafka_handler:
-        add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler)
+        add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler, default_case)
 
     if throttle:
         # Note: Default parameters used. No functionality on customisability yet
-        add_throttle_filter(logger)
-
-
-
-
-
-
-
+        add_throttle_filter(logger, default_case)
 
 
 
@@ -194,7 +206,7 @@ def setup_daq_ers_logger(logger, ers_session_name):
     
     all_handlers = {handler for handler_conf in LogHandlerConf._get_oks_conf().values() for handler in handler_conf.handlers}
     
-    print(all_handlers)
+    print(f"{all_handlers=}")
 
     add_handlers_from_types(logger, all_handlers, ers_session_name)
 

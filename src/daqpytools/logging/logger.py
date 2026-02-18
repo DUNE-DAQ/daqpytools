@@ -8,15 +8,9 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.handlers import (
+    HandlerType,
     LogHandlerConf,
     add_handlers_from_types,
-    add_throttle_filter,
-    add_ers_kafka_handler,
-    add_file_handler,
-    add_rich_handler,
-    add_stderr_handler,
-    add_stdout_handler,
-    HandlerType
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
@@ -76,8 +70,6 @@ def get_daq_logger(
     stream_handlers: bool = False,
     ers_kafka_handler: str | None = None,
     throttle: bool = False,
-
-    setup_ers_handlers: bool = False,
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -89,8 +81,9 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_kafka_handler (str): Whether to add an ERS protobuf handler. str is session name
-        throttle (bool): Whether to add the throttle filter or not. Note, does not mean 
+        ers_kafka_handler (str | None): ERS session name used to add an ERS
+            protobuf handler. If None, no ERS protobuf handler is added.
+        throttle (bool): Whether to add the throttle filter or not. Note, does not mean
             outputs are filtered by default! See ThrottleFilter for details.
 
     Returns:
@@ -146,42 +139,26 @@ def get_daq_logger(
         logger.setLevel(log_level)
     logger.propagate = use_parent_handlers
 
-    #! Okay so before this bit, you capture all the handlers that you want to have
-    # That would now be the default base handlers
-    # You apss this in each of the requested handlers here..
-
-
-    default_case = {HandlerType.Rich}
-
-    # Add requested handlers
-    # if rich_handler:
-    #     add_rich_handler(logger, use_parent_handlers)
-    # if file_handler_path:
-    #     add_file_handler(logger, use_parent_handlers, file_handler_path)
-    # if stream_handlers:
-    #     add_stdout_handler(logger, use_parent_handlers)
-    #     add_stderr_handler(logger, use_parent_handlers)
-    # if ers_kafka_handler:
-    #     add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler)
-
-    # if throttle:
-    #     # Note: Default parameters used. No functionality on customisability yet
-    #     add_throttle_filter(logger)
-
-
+    default_case: set[HandlerType] = set()
     if rich_handler:
-        add_rich_handler(logger, use_parent_handlers, default_case)
+        default_case.add(HandlerType.Rich)
     if file_handler_path:
-        add_file_handler(logger, use_parent_handlers, file_handler_path, default_case)
+        default_case.add(HandlerType.File)
     if stream_handlers:
-        add_stdout_handler(logger, use_parent_handlers, default_case)
-        add_stderr_handler(logger, use_parent_handlers, default_case)
+        default_case.add(HandlerType.Stream)
     if ers_kafka_handler:
-        add_ers_kafka_handler(logger, use_parent_handlers, ers_kafka_handler, default_case)
-
+        default_case.add(HandlerType.Protobufstream)
     if throttle:
-        # Note: Default parameters used. No functionality on customisability yet
-        add_throttle_filter(logger, default_case)
+        default_case.add(HandlerType.Throttle)
+
+    add_handlers_from_types(
+        logger,
+        default_case,
+        use_parent_handlers,
+        file_handler_path,
+        ers_kafka_handler,
+        default_case,
+    )
 
 
 
@@ -197,19 +174,31 @@ def get_daq_logger(
     return logger
 
 
-#! This will mean now that you need some function here that will allow you to go through all the handlers and all the filters and update that stupid self.default_case
+def setup_daq_ers_logger(
+    logger: logging.Logger,
+    ers_session_name: str,
+) -> None:
+    """Configure logger handlers from ERS environment-derived configuration.
 
-def setup_daq_ers_logger(logger, ers_session_name):
+    Args:
+        logger (logging.Logger): Logger to configure.
+        ers_session_name (str): ERS session name used for protobufstream handler.
 
-    # need to grab the list of relevant handlers that exist in ERS
-    #! This is very dependent on ERS env variables existing!!! 
-    
-    all_handlers = {handler for handler_conf in LogHandlerConf._get_oks_conf().values() for handler in handler_conf.handlers}
-    
-    print(f"{all_handlers=}")
+    Returns:
+        None
+    """
+    all_handlers = {
+        handler
+        for handler_conf in LogHandlerConf._get_oks_conf().values()
+        for handler in handler_conf.handlers
+    }
 
-    add_handlers_from_types(logger, all_handlers, ers_session_name)
-
-
-    # now what.. Well we have a list of handlers to add now huh..
+    add_handlers_from_types(
+        logger,
+        all_handlers,
+        use_parent_handlers=True,
+        file_name=None,
+        ers_session_name=ers_session_name,
+        default_case={HandlerType.Unknown},
+    )
 

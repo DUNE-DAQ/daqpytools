@@ -8,6 +8,7 @@ import re
 import sys
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -193,7 +194,6 @@ class ERSPyLogHandlerConf:
     handlers: list = field(default_factory = lambda: [])
     protobufconf: ProtobufConf = field(default_factory = lambda: None)
 
-#! TODO/now= consider @dataclass(frozen=True)
 @dataclass
 class LogHandlerConf:
     """Dataclass that holds the various streams and relevant handlers.
@@ -342,8 +342,10 @@ class BaseHandlerFilter(logging.Filter):
     """Base filter that hold the logic on choosing if a handler should emit
     based on what HandlersTypes are supplied to it.
     """
-    def __init__(self, default_case = LogHandlerConf.get_base() ) -> None:
+    def __init__(self, default_case: set[HandlerType] | None = None) -> None:
         """C'tor."""
+        if default_case is None:
+            default_case = set(LogHandlerConf.get_base())
         self.default_case = default_case
         super().__init__()
     
@@ -377,7 +379,11 @@ class HandleIDFilter(BaseHandlerFilter):
     if the current handler (defined by the handler_id) is within the set of 
     allowed handlers.
     """
-    def __init__(self, handler_id: HandlerType | list[HandlerType], default_case = LogHandlerConf.get_base()) -> None:
+    def __init__(
+        self,
+        handler_id: HandlerType | list[HandlerType],
+        default_case: set[HandlerType] | None = None,
+    ) -> None:
         """Initialises HandleIDFilter with the handler_id, to identify what
         kind of handler this filter is.
         """
@@ -420,7 +426,12 @@ class ThrottleFilter(BaseHandlerFilter):
         ...     logger.error("Repeated error message")
     """
     
-    def __init__(self, default_case=LogHandlerConf.get_base(), initial_threshold: int = 30, time_limit:  int = 30) -> None:
+    def __init__(
+        self,
+        default_case: set[HandlerType] | None = None,
+        initial_threshold: int = 30,
+        time_limit: int = 30,
+    ) -> None:
         """C'tor."""
         super().__init__(
             default_case = default_case
@@ -551,15 +562,22 @@ class ThrottleFilter(BaseHandlerFilter):
         return Text(time_str, style="logging.time")
     
 
-def add_throttle_filter(log: logging.Logger, default_case = {HandlerType.Throttle}) -> None:
+def add_throttle_filter(
+    log: logging.Logger,
+    default_case: set[HandlerType] | None = None,
+) -> None:
     """Add the Throttle filter to the logger.
 
     Args:
         log (logging.Logger): Logger to add the rich handler to.
+        default_case (set[HandlerType] | None): Default handler set used when
+            records do not explicitly include handler routing.
 
     Returns:
         None
     """
+    if default_case is None:
+        default_case = {HandlerType.Throttle}
     log.addFilter(ThrottleFilter(default_case=default_case))
     return
 
@@ -572,8 +590,11 @@ def _logger_has_handler(
 
     For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
     """
-
-    type_matches = [isinstance(handler, handler_type) for handler in log.handlers if not isinstance(handler, logging.StreamHandler)]
+    type_matches = [
+        isinstance(handler, handler_type)
+        for handler in log.handlers
+        if not isinstance(handler, logging.StreamHandler)
+    ]
 
     stream_matches = [
             handler.stream is target_stream if target_stream else False
@@ -636,12 +657,18 @@ def check_parent_handlers(
     return
 
 
-def add_rich_handler(log: logging.Logger, use_parent_handlers: bool, default_case={HandlerType.Rich}) -> None:
+def add_rich_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    default_case: set[HandlerType] | None = None,
+) -> None:
     """Add a rich handler to the logger.
 
     Args:
         log (logging.Logger): Logger to add the rich handler to.
         use_parent_handlers (bool): Whether to check parent handlers.
+        default_case (set[HandlerType] | None): Default handler set used when
+            records do not explicitly include handler routing.
 
     Returns:
         None
@@ -649,6 +676,8 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool, default_cas
     Raises:
         LoggerHandlerError: If a parent logger has a rich handler.
     """
+    if default_case is None:
+        default_case = {HandlerType.Rich}
     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
     width: int = get_width()
     handler: RichHandler = FormattedRichHandler(width=width)    
@@ -662,11 +691,18 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool, default_cas
     log.addHandler(handler)
     return
 
-def add_ers_kafka_handler(log: logging.Logger, use_parent_handlers: bool,
-                                 session_name:str, default_case = {HandlerType.Protobufstream}, topic: str = "ers_stream", 
-                                 address: str ="monkafka.cern.ch:30092") -> None:
+def add_ers_kafka_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    session_name: str,
+    default_case: set[HandlerType] | None = None,
+    topic: str = "ers_stream",
+    address: str = "monkafka.cern.ch:30092",
+) -> None:
     # TODO/future: topic and address are new, propagate to all relevant implementation
     """Add an ers protobuf handler to the root logger."""
+    if default_case is None:
+        default_case = {HandlerType.Protobufstream}
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
                                                      kafka_address = address, 
@@ -681,12 +717,18 @@ def add_ers_kafka_handler(log: logging.Logger, use_parent_handlers: bool,
     )
     log.addHandler(handler)
 
-def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool, default_case={HandlerType.Stream, HandlerType.Lstdout}) -> None:
+def add_stdout_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    default_case: set[HandlerType] | None = None,
+) -> None:
     """Add a stdout handler to the logger.
 
     Args:
         log (logging.Logger): Logger to add the stdout handler to.
         use_parent_handlers (bool): Whether to check parent handlers.
+        default_case (set[HandlerType] | None): Default handler set used when
+            records do not explicitly include handler routing.
 
     Returns:
         None
@@ -694,6 +736,8 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     Raises:
         LoggerHandlerError: If a parent logger has a stdout handler.
     """
+    if default_case is None:
+        default_case = {HandlerType.Stream, HandlerType.Lstdout}
     check_parent_handlers(
         log,
         use_parent_handlers,
@@ -712,8 +756,11 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     log.addHandler(stdout_handler)
     return
 
-# Consider seeing if there is a way to generalify the add X handler..
-def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool, default_case={HandlerType.Lstderr, HandlerType.Stream}) -> None:
+def add_stderr_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    default_case: set[HandlerType] | None = None,
+) -> None:
     """Add a stderr handler to the logger.
 
     The error is set to the ERROR level, and will only log messages at that level
@@ -723,6 +770,8 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     Args:
         log (logging.Logger): Logger to add the stderr handler to.
         use_parent_handlers (bool): Whether to check parent handlers.
+        default_case (set[HandlerType] | None): Default handler set used when
+            records do not explicitly include handler routing.
 
     Returns:
         None
@@ -730,6 +779,8 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     Raises:
         LoggerHandlerError: If a parent logger has a stderr handler.
     """
+    if default_case is None:
+        default_case = {HandlerType.Lstderr, HandlerType.Stream}
     check_parent_handlers(
         log,
         use_parent_handlers,
@@ -749,13 +800,20 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     return
 
 
-def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str, default_case={HandlerType.File}) -> None:
+def add_file_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    path: str,
+    default_case: set[HandlerType] | None = None,
+) -> None:
     """Add a file handler to the root logger.
 
     Args:
         log (logging.Logger): Logger to add the file handler to.
         use_parent_handlers (bool): Whether to check parent handlers.
         path (str): Path to the log file.
+        default_case (set[HandlerType] | None): Default handler set used when
+            records do not explicitly include handler routing.
 
     Returns:
         None
@@ -763,6 +821,8 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str, 
     Raises:
         LoggerHandlerError: If a parent logger has a file handler.
     """
+    if default_case is None:
+        default_case = {HandlerType.File}
     check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
     file_handler = logging.FileHandler(filename=path)
     file_handler.setFormatter(LoggingFormatter())
@@ -784,7 +844,10 @@ def _logger_has_filter(log: logging.Logger, filter_type: type[logging.Filter]) -
 def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],
+    use_parent_handlers: bool,
+    file_name: str | None,
     ers_session_name: str | None,
+    default_case: set[HandlerType],
 ) -> None:
     """Add handlers to a logger based on a set of HandlerType values.
 
@@ -793,14 +856,12 @@ def add_handlers_from_types(
     - ``HandlerType.File`` is not supported and raises immediately.
     - ``HandlerType.Protobufstream`` requires ``ers_session_name``.
     """
-
-    default_case = {HandlerType.Unknown}
-    if HandlerType.File in handler_types:
-        err_msg = "HandlerType.File is not supported by add_handlers_from_types"
-        raise ValueError(err_msg)
-
     if HandlerType.Protobufstream in handler_types and not ers_session_name:
         err_msg = "ers_session_name is required for HandlerType.Protobufstream"
+        raise ValueError(err_msg)
+    
+    if HandlerType.File in handler_types and not file_name:
+        err_msg = "file_name is required for HandlerType.File"
         raise ValueError(err_msg)
 
     # Update relevant handler types that was parsed
@@ -822,7 +883,6 @@ def add_handlers_from_types(
         else None,
     }
     existing_stream_handlers.discard(None)
-    print(f"{existing_stream_handlers=}")
 
     # Check if current logger has the interested handler
     existing_handlers = {
@@ -831,29 +891,38 @@ def add_handlers_from_types(
         if _logger_has_handler(log, ERSKafkaLogHandler)
         else None,
         HandlerType.Throttle if _logger_has_filter(log, ThrottleFilter) else None,
+        HandlerType.File if _logger_has_filter(log, logging.FileHandler) else None,
     }
     existing_handlers.discard(None)
     existing_handlers.update(existing_stream_handlers)
 
-    # print(f"{existing_handlers=}")
-    # print(f"{effective_handler_types=}")
-
-    handlers_init_map = {
-        HandlerType.Rich: lambda: add_rich_handler(log, True, default_case),
-        HandlerType.Lstdout: lambda: add_stdout_handler(log, True, default_case),
-        HandlerType.Lstderr: lambda: add_stderr_handler(log, True, default_case),
-        HandlerType.Protobufstream: lambda: add_ers_kafka_handler(
-            log, True, ers_session_name, default_case
+    handlers_init_map: dict[HandlerType, Callable[[], None]] = {
+        HandlerType.Rich: lambda: add_rich_handler(
+            log, use_parent_handlers, default_case
         ),
-        HandlerType.Throttle: lambda: add_throttle_filter(log, {HandlerType.Rich})
+        HandlerType.Lstdout: lambda: add_stdout_handler(
+            log, use_parent_handlers, default_case
+        ),
+        HandlerType.Lstderr: lambda: add_stderr_handler(
+            log, use_parent_handlers, default_case
+        ),
+        HandlerType.File: lambda: add_file_handler(
+            log, use_parent_handlers, file_name, default_case
+        ),
+        HandlerType.Protobufstream: lambda: add_ers_kafka_handler(
+            log, use_parent_handlers, ers_session_name, default_case
+        ),
+        HandlerType.Throttle: lambda: add_throttle_filter(log, default_case),
     }
 
+    # Need to clean this bit up
     supported_handers = [
         HandlerType.Rich,
         HandlerType.Lstdout,
         HandlerType.Lstderr,
         HandlerType.Protobufstream,
         HandlerType.Throttle,
+        HandlerType.File,
     ]
 
     for handler_type in supported_handers:
@@ -864,7 +933,5 @@ def add_handlers_from_types(
         installer = handlers_init_map.get(handler_type)
         if installer is None:
             continue
-        print(handler_type)
-
         installer()
 

@@ -276,7 +276,6 @@ class LogHandlerConf:
             converts "protobufstream(url:port)" to return both the HandlerType and the 
             protobuf configuration
         """
-        # print(f"{handler_str=}")
         if "erstrace" in handler_str:
             msg = (
                 "ERSTrace is a C++ implementation, "
@@ -299,12 +298,10 @@ class LogHandlerConf:
         """Generates the ERSPyLogHandlerConf from reading an environment variable."""
         erspyloghandlerconf = ERSPyLogHandlerConf()
         envvalue = os.getenv(ers_log_level)
-        # print(f"{envvalue=}")
         if envvalue is None:
             raise ERSEnvError(ers_log_level)
         
         for h in envvalue.split(","):
-            # print(f"{h=}")
             handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
             erspyloghandlerconf.handlers.append(handlertype)
             if kafkaconf:
@@ -425,8 +422,6 @@ class ThrottleFilter(BaseHandlerFilter):
     
     def __init__(self, default_case=LogHandlerConf.get_base(), initial_threshold: int = 30, time_limit:  int = 30) -> None:
         """C'tor."""
-        #! THERES A BUG HERE.. WHERE IF YOU WRONGLY INITIALISE IT ITS NOT GONNA FIRE AT ALL.........
-        
         super().__init__(
             default_case = default_case
             )
@@ -577,32 +572,14 @@ def _logger_has_handler(
 
     For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
     """
-    #EXCEPT STREAM HANDLER YOU FOOL
+
     type_matches = [isinstance(handler, handler_type) for handler in log.handlers if not isinstance(handler, logging.StreamHandler)]
 
-    
-    stream_matches = []
-
-    # print(f"{handler_type=},{target_stream = } ")
-
-    for handler in log.handlers:
-        if isinstance(handler, logging.StreamHandler):
-            # print(f"{handler=}, {handler.stream=}")
-            if target_stream:
-                # print("Target stream")
-                if handler.stream is target_stream:
-                    # print("dice")
-                    stream_matches.append(True)
-                else:
-                    # print("no dice")
-                    stream_matches.append(False)
-            else:
-                # print("No Stream")
-                stream_matches.append(False)
-            
-    # print(f"{type_matches=}, {stream_matches=}" )
-    # print(f"outcome: {any(type_matches + stream_matches)}")
-    # print("")
+    stream_matches = [
+            handler.stream is target_stream if target_stream else False
+            for handler in log.handlers
+            if isinstance(handler, logging.StreamHandler)
+        ]
     return any(type_matches + stream_matches)
 
 def check_parent_handlers(
@@ -635,7 +612,6 @@ def check_parent_handlers(
     if log.name == python_root_logger_name:
         err_msg = "You should not be interfacing with the root logger"
         raise ValueError(err_msg)
-        
     # Validate the stream handler has a target stream
     if handler_type.__name__ == "StreamHandler" and target_stream is None:
         err_msg = (
@@ -675,12 +651,14 @@ def add_rich_handler(log: logging.Logger, use_parent_handlers: bool, default_cas
     """
     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
     width: int = get_width()
-    handler: RichHandler = FormattedRichHandler(width=width)
-
-    #! Here you better initialise handlerid filter
+    handler: RichHandler = FormattedRichHandler(width=width)    
     
-    my_filter = HandleIDFilter(handler_id=HandlerType.Rich, default_case=default_case) # Should accept the base handlers here
-    handler.addFilter(my_filter)
+    handler.addFilter(
+        HandleIDFilter(
+            handler_id=HandlerType.Rich,
+            default_case=default_case
+            )
+    )
     log.addHandler(handler)
     return
 
@@ -694,10 +672,13 @@ def add_ers_kafka_handler(log: logging.Logger, use_parent_handlers: bool,
                                                      kafka_address = address, 
                                                      kafka_topic = topic
                                                      )
-    
-        
-    my_filter = HandleIDFilter(HandlerType.Protobufstream, default_case=default_case)
-    handler.addFilter(my_filter)
+
+    handler.addFilter(
+        HandleIDFilter(
+            handler_id=HandlerType.Protobufstream,
+            default_case=default_case
+            )
+    )
     log.addHandler(handler)
 
 def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool, default_case={HandlerType.Stream, HandlerType.Lstdout}) -> None:
@@ -722,10 +703,12 @@ def add_stdout_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setFormatter(LoggingFormatter())
     
-    # repeat ad infinitum for all handlers.... 
-    my_filter = HandleIDFilter(handler_id=[HandlerType.Stream, HandlerType.Lstdout],default_case=default_case)
-    stdout_handler.addFilter(my_filter)
-    
+    stdout_handler.addFilter(
+        HandleIDFilter(
+            handler_id=[HandlerType.Stream, HandlerType.Lstdout],
+            default_case=default_case
+            )
+    )    
     log.addHandler(stdout_handler)
     return
 
@@ -755,10 +738,12 @@ def add_stderr_handler(log: logging.Logger, use_parent_handlers: bool, default_c
     )
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(LoggingFormatter())
-    
-    my_filter = HandleIDFilter(handler_id=[HandlerType.Stream, HandlerType.Lstderr],default_case=default_case)
-    stderr_handler.addFilter(my_filter)
-    
+    stderr_handler.addFilter(
+        HandleIDFilter(
+            handler_id=[HandlerType.Stream, HandlerType.Lstderr],
+            default_case=default_case
+            )
+    )    
     stderr_handler.setLevel(logging.ERROR)
     log.addHandler(stderr_handler)
     return
@@ -781,10 +766,12 @@ def add_file_handler(log: logging.Logger, use_parent_handlers: bool, path: str, 
     check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
     file_handler = logging.FileHandler(filename=path)
     file_handler.setFormatter(LoggingFormatter())
-    
-    my_filter = HandleIDFilter(HandlerType.File, default_case)
-    file_handler.addFilter(my_filter)
-    
+    file_handler.addFilter(
+        HandleIDFilter(
+            handler_id=HandlerType.File,
+            default_case=default_case
+            )
+    )
     log.addHandler(file_handler)
     return
 

@@ -275,11 +275,14 @@ def test_ers_handler_configuration(log_level: str) -> None:
         logger_name="ers_logger",
         log_level=log_level,
         stream_handlers=False,
-        rich_handler=False,
+        rich_handler=True,
     )
+    ers_logger.info("Just rich is added")
+   
     # Sets up the logger with all the relevant handlers
     setup_daq_ers_logger(ers_logger, "session_temp")
-
+    ers_logger.info("ERS configured, but should still only be rich")
+    
     ers_hc = LogHandlerConf(init_ers=True)
     ers_logger.info("ERS Info rich ", extra=ers_hc.ERS)
     ers_logger.warning("ERS error lstdout", extra=ers_hc.ERS)

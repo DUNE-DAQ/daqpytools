@@ -586,7 +586,7 @@ def logger_has_filter(log: logging.Logger, filter_type: type[logging.Filter]) ->
     """Check if logger already has a matching filter type."""
     return any(isinstance(logger_filter, filter_type) for logger_filter in log.filters)
 
-def check_parent_handlers(
+def ancestors_have_handlers(
     log: logging.Logger,
     use_parent_handlers: bool,
     handler_type: type[logging.Handler],
@@ -609,7 +609,7 @@ def check_parent_handlers(
     """
     # Sanity check
     if not use_parent_handlers:
-        return
+        return False
 
     # Check that we are not using the true logging root logger
     python_root_logger_name = logging.getLogger().name
@@ -634,10 +634,33 @@ def check_parent_handlers(
     this_is_root_logger = logger_parent.name == python_root_logger_name
     while not this_is_root_logger:
         if logger_has_handler(logger_parent,handler_type, target_stream):
-            raise LoggerHandlerError(logger_parent.name, handler_type)
+            return True
         logger_parent = logger_parent.parent
         this_is_root_logger = logger_parent.name == python_root_logger_name
-    return
+    return False
+
+
+def check_parent_handlers(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    handler_type: type[logging.Handler],
+    target_stream: io.IOBase | None = None,
+) -> None:
+    """Raise when a matching handler already exists on an ancestor logger."""
+    if ancestors_have_handlers(log, use_parent_handlers, handler_type, target_stream):
+        raise LoggerHandlerError(log.name, handler_type)
+    
+
+def logger_or_ancestors_have_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    handler_type: type[logging.Handler],
+    target_stream: io.IOBase | None = None,
+) -> bool:
+    """Check if logger or (optionally) its ancestors have a matching handler."""
+    return logger_has_handler(
+        log, handler_type, target_stream
+    ) or ancestors_have_handlers(log, use_parent_handlers, handler_type, target_stream)
 
 def add_throttle_filter(
     log: logging.Logger,
@@ -863,68 +886,82 @@ def add_handlers_from_types(
     if HandlerType.Stream in effective_handler_types:
         effective_handler_types.update({HandlerType.Lstdout, HandlerType.Lstderr})
 
-    # Check if current logger has stream handlers, convert to handlertypes
-    existing_stream_handlers = {
-        HandlerType.Lstdout
-        if logger_has_handler(
-            log, logging.StreamHandler, target_stream=cast(io.IOBase, sys.stdout)
-        )
-        else None,
-        HandlerType.Lstderr
-        if logger_has_handler(
-            log, logging.StreamHandler, target_stream=cast(io.IOBase, sys.stderr)
-        )
-        else None,
+    # Generate handler configurations based on arguments for auto install
+    handler_configs: dict[
+        HandlerType,
+        tuple[
+            type[logging.Handler] | None, # Handler as seen by Python's Logger
+            io.IOBase | None, # Used for streamhandling
+            type[logging.Filter] | None, # For filters attached to loggers
+            Callable[[], None],  # Installer code
+        ],
+    ] = {
+        HandlerType.Rich: (
+            FormattedRichHandler,
+            None,
+            None,
+            lambda: add_rich_handler(log, use_parent_handlers, fallback_handlers),
+        ),
+        HandlerType.Lstdout: (
+            logging.StreamHandler,
+            cast(io.IOBase, sys.stdout),
+            None,
+            lambda: add_stdout_handler(log, use_parent_handlers, fallback_handlers),
+        ),
+        HandlerType.Lstderr: (
+            logging.StreamHandler,
+            cast(io.IOBase, sys.stderr),
+            None,
+            lambda: add_stderr_handler(log, use_parent_handlers, fallback_handlers),
+        ),
+        HandlerType.Protobufstream: (
+            ERSKafkaLogHandler,
+            None,
+            None,
+            lambda: add_ers_kafka_handler(
+                log, use_parent_handlers, ers_session_name, fallback_handlers
+            ),
+        ),
+        HandlerType.Throttle: (
+            None,
+            None,
+            ThrottleFilter,
+            lambda: add_throttle_filter(log, fallback_handlers),
+        ),
+        HandlerType.File: (
+            logging.FileHandler,
+            None,
+            None,
+            lambda: add_file_handler(
+                log, use_parent_handlers, file_name, fallback_handlers
+            ),
+        ),
     }
-    existing_stream_handlers.discard(None)
 
-    # Check if current logger has the interested handler
-    existing_handlers = {
-        HandlerType.Rich if logger_has_handler(log, FormattedRichHandler) else None,
-        HandlerType.Protobufstream
-        if logger_has_handler(log, ERSKafkaLogHandler)
-        else None,
-        HandlerType.Throttle if logger_has_filter(log, ThrottleFilter) else None,
-        HandlerType.File if logger_has_filter(log, logging.FileHandler) else None,
-    }
-    existing_handlers.discard(None)
-    existing_handlers.update(existing_stream_handlers)
 
-    handlers_init_map: dict[HandlerType, Callable[[], None]] = {
-        HandlerType.Rich: lambda: add_rich_handler(
-            log, use_parent_handlers, fallback_handlers
-        ),
-        HandlerType.Lstdout: lambda: add_stdout_handler(
-            log, use_parent_handlers, fallback_handlers
-        ),
-        HandlerType.Lstderr: lambda: add_stderr_handler(
-            log, use_parent_handlers, fallback_handlers
-        ),
-        HandlerType.File: lambda: add_file_handler(
-            log, use_parent_handlers, file_name, fallback_handlers
-        ),
-        HandlerType.Protobufstream: lambda: add_ers_kafka_handler(
-            log, use_parent_handlers, ers_session_name, fallback_handlers
-        ),
-        HandlerType.Throttle: lambda: add_throttle_filter(log, fallback_handlers),
-    }
-
-    # Need to clean this bit up
-    supported_handers = [
-        HandlerType.Rich,
-        HandlerType.Lstdout,
-        HandlerType.Lstderr,
-        HandlerType.Protobufstream,
-        HandlerType.Throttle,
-        HandlerType.File,
-    ]
-
-    for handler_type in supported_handers:
+    for handler_type, (
+        handler_class,
+        target_stream,
+        filter_type,
+        installer,
+    ) in handler_configs.items():
+        
+        # Skips if it encounters an unrequested handler
         if handler_type not in effective_handler_types:
             continue
-        if handler_type in existing_handlers:
+        
+        # Skips if handler/filter exists in either the logger or any of its ancestors
+        handler_exists = (
+            handler_class is not None
+            and logger_or_ancestors_have_handler(
+                log,
+                use_parent_handlers,
+                handler_class,
+                target_stream=target_stream,
+            )
+        ) or (filter_type is not None and logger_has_filter(log, filter_type))
+        
+        if handler_exists:
             continue
-        installer = handlers_init_map.get(handler_type)
-        if installer is None:
-            continue
+        
         installer()

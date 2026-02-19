@@ -139,25 +139,25 @@ def get_daq_logger(
         logger.setLevel(log_level)
     logger.propagate = use_parent_handlers
 
-    default_case: set[HandlerType] = set()
+    fallback_handlers: set[HandlerType] = set()
     if rich_handler:
-        default_case.add(HandlerType.Rich)
+        fallback_handlers.add(HandlerType.Rich)
     if file_handler_path:
-        default_case.add(HandlerType.File)
+        fallback_handlers.add(HandlerType.File)
     if stream_handlers:
-        default_case.add(HandlerType.Stream)
+        fallback_handlers.add(HandlerType.Stream)
     if ers_kafka_handler:
-        default_case.add(HandlerType.Protobufstream)
+        fallback_handlers.add(HandlerType.Protobufstream)
     if throttle:
-        default_case.add(HandlerType.Throttle)
+        fallback_handlers.add(HandlerType.Throttle)
 
     add_handlers_from_types(
         logger,
-        default_case,
+        fallback_handlers,
         use_parent_handlers,
         file_handler_path,
         ers_kafka_handler,
-        default_case,
+        fallback_handlers,
     )
 
 
@@ -199,6 +199,6 @@ def setup_daq_ers_logger(
         use_parent_handlers=True,
         file_name=None,
         ers_session_name=ers_session_name,
-        default_case={HandlerType.Unknown},
+        fallback_handlers={HandlerType.Unknown},
     )
 

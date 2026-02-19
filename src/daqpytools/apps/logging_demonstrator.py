@@ -10,9 +10,9 @@ from daqpytools.logging.formatter import CONTEXT_SETTINGS
 from daqpytools.logging.handlers import (
     HandlerType,
     LogHandlerConf,
+    add_stderr_handler,
     add_stdout_handler,
 )
-
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger, setup_daq_ers_logger
 from daqpytools.logging.utils import get_width
@@ -227,6 +227,65 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         extra=handlerconf.ERS
     )     
 
+
+def test_fallback_handlers(log_level: str) -> None:
+    """Demonstrate fallback handler behavior for a logger.
+
+    Args:
+        log_level (str): Log level used to initialize the demo logger.
+
+    Returns:
+        None
+    """
+    fallback_log: logging.Logger = get_daq_logger(
+        logger_name="fallback_logger",
+        log_level=log_level,
+        stream_handlers=False,
+        rich_handler=True,
+    )
+
+    fallback_log.info("Rich Only")
+    
+    add_stdout_handler(fallback_log, True)
+    add_stderr_handler(fallback_log, True, {HandlerType.Unknown})
+
+    fallback_log.critical("Rich + stdout only")
+    fallback_log.critical(
+        "Rich + stdout + stderr",
+        extra={"handlers": [HandlerType.Rich, HandlerType.Stream]},
+    )
+
+    
+def test_ers_handler_configuration(log_level: str) -> None:
+    """Demonstrate ERS-driven handler configuration for a logger.
+
+    Args:
+        log_level (str): Log level used to initialize the demo logger.
+
+    Returns:
+        None
+    """
+    # Injecting specific 
+    os.environ["DUNEDAQ_ERS_WARNING"] = "lstdout"
+    os.environ["DUNEDAQ_ERS_INFO"] = "rich"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr,rich"
+    os.environ["DUNEDAQ_ERS_ERROR"] = "rich"
+
+    ers_logger: logging.Logger = get_daq_logger(
+        logger_name="ers_logger",
+        log_level=log_level,
+        stream_handlers=False,
+        rich_handler=False,
+    )
+    # Sets up the logger with all the relevant handlers
+    setup_daq_ers_logger(ers_logger, "session_temp")
+
+    ers_hc = LogHandlerConf(init_ers=True)
+    ers_logger.info("ERS Info rich ", extra=ers_hc.ERS)
+    ers_logger.warning("ERS error lstdout", extra=ers_hc.ERS)
+    ers_logger.critical("ERS critical lstderr + rich", extra=ers_hc.ERS)
+
+
 class AllOptionsCommand(click.Command):
     """Parse the arguments passed and validate they are acceptable, otherwise print the
     relevant options.
@@ -296,11 +355,19 @@ class AllOptionsCommand(click.Command):
     ),
 )
 @click.option(
-    "-e",
+    "-ep",
     "--ersprotobufstream", 
     type=str,
     help=(
-        "Set up an ERS handler, and publish to ERS"
+        "Set up an ERS protobuf handler, and publish to ERS via protobuf."
+        )
+    )
+@click.option(
+    "-eh",
+    "--ershandlers",
+    is_flag=True,
+    help=(
+        "Demonstrate automatic logger configuration with ers variables."
         )
     )
 @click.option(
@@ -359,6 +426,14 @@ class AllOptionsCommand(click.Command):
         "logger handlers assigned to the given logger instance"
     ),
 )
+@click.option(
+    "-fh",
+    "--fallback-handlers",
+    is_flag=True,
+    help=(
+        "If true, demonstrates the use of fallback handlers."
+    ),
+)
 def main(
     log_level: str,
     rich_handler: bool,
@@ -370,7 +445,10 @@ def main(
     handlertypes:bool,
     handlerconf:bool,
     throttle: bool,
-    suppress_basic: bool
+    suppress_basic: bool,
+    fallback_handlers: bool,
+    ershandlers: bool,
+
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
@@ -386,7 +464,8 @@ def main(
         disable_logger_inheritance (bool): If true, disable logger inheritance so each
             logger instance only uses the logger handlers assigned to the given logger
             instance.
-        ersprotobufstream (str): Sets up an ERS protobuf handler with supplied session name. Error msg
+        ersprotobufstream (str): Sets up an ERS protobuf handler with supplied
+            session name. Error msg
             are demonstrated in the HandlerType demonstration, requiring handlerconf
             to be set to true. The topic for these tests is session_tester.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes.
@@ -395,6 +474,8 @@ def main(
         throttle (bool): If true, demonstrates the throttling feature. Requires Rich.
         suppress_basic (bool): If true, supresses basic functionality. 
             Useful to only test the advanced features of logging
+        fallback_handlers (bool): If true, demonstrates fallback handler behavior.
+        ershandlers (bool): If true, demonstrates ERS-based handler setup.
 
     Returns:
         None
@@ -403,95 +484,40 @@ def main(
         LoggerSetupError: If no handlers are set up for the logger.
     """
     logger_name = "daqpytools_logging_demonstrator"
-
-    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstderr"
-    os.environ["DUNEDAQ_ERS_INFO"] = "lstderr,throttle,lstderr"
-    os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr"
-    os.environ["DUNEDAQ_ERS_ERROR"] = (
-        "erstrace,"
-        "throttle,"
-        "lstderr,"
-        "protobufstream(monkafka.cern.ch:30092)"
-    )
-
-    handlerconf = LogHandlerConf(init_ers=True)
-
     main_logger: logging.Logger = get_daq_logger(
         logger_name=logger_name,
         log_level=log_level,
-        stream_handlers=False,
-        rich_handler=True # only rich was defined
+        use_parent_handlers=not disable_logger_inheritance,
+        rich_handler=rich_handler,
+        file_handler_path=file_handler_path,
+        stream_handlers=stream_handlers,
+        ers_kafka_handler=ersprotobufstream,
+        throttle=throttle
     )
 
-    main_logger.warning("Only Rich")
-
-    # add_stdout_handler(main_logger, True)
-    setup_daq_ers_logger(main_logger, "session_temp")
-
-    main_logger.critical("Should be only rich")
-
-
-    # main_logger.critical("test") #use only rich because we only iniitlaise with rich
-
-    main_logger.critical("Stream", extra={"handlers": [HandlerType.Stream]})
-
+    if not suppress_basic:
+        test_main_functions(main_logger)
     
-    
-    main_logger.critical("ERS (lstderr only)", extra=handlerconf.ERS)
+    if child_logger: 
+        test_child_logger(
+            logger_name,
+            log_level,
+            disable_logger_inheritance,
+            rich_handler,
+            file_handler_path,
+            stream_handlers
+        )
 
-    
-
-
-
-    # define a default handlerconf so for example 
-
-
-    """
-    Concrete suggestions
-
-    For now:
-    get_daq_logger = rich_handler = True  # save rich_handler and set as base class
-
-    setup_ers(log) #adds stream handler and what have you
-    
-    log.warning("something") # only goes to rich because we only initialise with rich
-
-    log.warning("something else", extra= ers) # use whatever is in ers
-    
-    """
-
-
-    # main_logger: logging.Logger = get_daq_logger(
-    #     logger_name=logger_name,
-    #     log_level=log_level,
-    #     use_parent_handlers=not disable_logger_inheritance,
-    #     rich_handler=rich_handler,
-    #     file_handler_path=file_handler_path,
-    #     stream_handlers=stream_handlers,
-    #     ers_kafka_handler=ersprotobufstream,
-    #     throttle=throttle
-    # )
-
-    # if not suppress_basic:
-    #     test_main_functions(main_logger)
-    
-    # if child_logger: 
-    #     test_child_logger(
-    #         logger_name,
-    #         log_level,
-    #         disable_logger_inheritance,
-    #         rich_handler,
-    #         file_handler_path,
-    #         stream_handlers
-    #     )
-
-    # if throttle:
-    #     test_throttle(main_logger)
-    # if handlertypes:
-    #     test_handlertypes(main_logger)
-    # if handlerconf:
-    #     test_handlerconf(main_logger)
-
+    if throttle:
+        test_throttle(main_logger)
+    if handlertypes:
+        test_handlertypes(main_logger)
+    if handlerconf:
+        test_handlerconf(main_logger)
+    if fallback_handlers:
+        test_fallback_handlers(log_level)
+    if ershandlers:
+        test_ers_handler_configuration(log_level)
 
 if __name__ == "__main__":
     main()

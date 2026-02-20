@@ -494,7 +494,8 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_kafka_handler=ersprotobufstream,
+        ers_kafka_session=ersprotobufstream,
+        ers_app_name="Custom App Name", # Can be none!
         throttle=throttle
     )
 

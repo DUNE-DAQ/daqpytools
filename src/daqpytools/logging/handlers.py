@@ -738,6 +738,7 @@ def add_ers_kafka_handler(
     use_parent_handlers: bool,
     session_name: str,
     fallback_handlers: set[HandlerType] | None = None,
+    app_name : str|None =None,
     topic: str = "ers_stream",
     address: str = "monkafka.cern.ch:30092",
 ) -> None:
@@ -748,7 +749,8 @@ def add_ers_kafka_handler(
     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
                                                      kafka_address = address, 
-                                                     kafka_topic = topic
+                                                     kafka_topic = topic,
+                                                     app_name = app_name,
                                                      )
 
     handler.addFilter(
@@ -880,19 +882,20 @@ def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],
     use_parent_handlers: bool,
-    file_name: str | None,
-    ers_session_name: str | None,
     fallback_handlers: set[HandlerType],
+    file_name: str | None,
+    ers_kafka_session: str | None,
+    app_name : str|None = None,
 ) -> None:
     """Add handlers to a logger based on a set of HandlerType values.
 
     This helper intentionally supports only the default options for now:
     - ``use_parent_handlers`` is always True.
     - ``HandlerType.File`` is not supported and raises immediately.
-    - ``HandlerType.Protobufstream`` requires ``ers_session_name``.
+    - ``HandlerType.Protobufstream`` requires ``ers_kafka_session``.
     """
-    if HandlerType.Protobufstream in handler_types and not ers_session_name:
-        err_msg = "ers_session_name is required for HandlerType.Protobufstream"
+    if HandlerType.Protobufstream in handler_types and not ers_kafka_session:
+        err_msg = "ers_kafka_session is required for HandlerType.Protobufstream"
         raise ValueError(err_msg)
     
     if HandlerType.File in handler_types and not file_name:
@@ -937,7 +940,8 @@ def add_handlers_from_types(
             None,
             None,
             lambda: add_ers_kafka_handler(
-                log, use_parent_handlers, ers_session_name, {HandlerType.Unknown}
+                log, use_parent_handlers, ers_kafka_session, {HandlerType.Unknown},
+                app_name
                 # WE DONT WANT TO TRANSMIT BY DEFAULT
             ),
         ),

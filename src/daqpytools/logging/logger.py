@@ -68,7 +68,8 @@ def get_daq_logger(
     rich_handler: bool = False,
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
-    ers_kafka_handler: str | None = None,
+    ers_kafka_session: str | None = None,
+    ers_app_name: str | None = None,
     throttle: bool = False,
 ) -> logging.Logger:
     """C'tor for the default logging instances.
@@ -81,7 +82,7 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_kafka_handler (str | None): ERS session name used to add an ERS
+        ers_kafka_session (str | None): ERS session name used to add an ERS
             protobuf handler. If None, no ERS protobuf handler is added.
         throttle (bool): Whether to add the throttle filter or not. Note, does not mean
             outputs are filtered by default! See ThrottleFilter for details.
@@ -146,7 +147,7 @@ def get_daq_logger(
         fallback_handlers.add(HandlerType.File)
     if stream_handlers:
         fallback_handlers.add(HandlerType.Stream)
-    if ers_kafka_handler:
+    if ers_kafka_session:
         fallback_handlers.add(HandlerType.Protobufstream)
     if throttle:
         fallback_handlers.add(HandlerType.Throttle)
@@ -155,12 +156,11 @@ def get_daq_logger(
         logger,
         fallback_handlers,
         use_parent_handlers,
-        file_handler_path,
-        ers_kafka_handler,
         fallback_handlers,
+        file_handler_path,
+        ers_kafka_session,
+        ers_app_name,
     )
-
-
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:
@@ -176,13 +176,14 @@ def get_daq_logger(
 
 def setup_daq_ers_logger(
     logger: logging.Logger,
-    ers_session_name: str,
+    ers_kafka_session: str,
+    ers_app_name : str | None = None
 ) -> None:
     """Configure logger handlers from ERS environment-derived configuration.
 
     Args:
         logger (logging.Logger): Logger to configure.
-        ers_session_name (str): ERS session name used for protobufstream handler.
+        ers_kafka_session (str): ERS session name used for protobufstream handler.
 
     Returns:
         None
@@ -197,8 +198,10 @@ def setup_daq_ers_logger(
         logger,
         all_handlers,
         use_parent_handlers=True,
-        file_name=None,
-        ers_session_name=ers_session_name,
         fallback_handlers={HandlerType.Unknown},
+        file_name=None,
+        ers_kafka_session=ers_kafka_session,
+        app_name = ers_app_name
+        
     )
 

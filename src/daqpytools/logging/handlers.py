@@ -919,7 +919,8 @@ def add_handlers_from_types(
             None,
             None,
             lambda: add_ers_kafka_handler(
-                log, use_parent_handlers, ers_session_name, fallback_handlers
+                log, use_parent_handlers, ers_session_name, {HandlerType.Unknown}
+                # WE DONT WANT TO TRANSMIT BY DEFAULT
             ),
         ),
         HandlerType.Throttle: (

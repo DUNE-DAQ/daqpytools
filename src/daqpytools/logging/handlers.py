@@ -569,6 +569,10 @@ def logger_has_handler(
 
     For StreamHandler, ``target_stream`` can be used to distinguish stdout/stderr.
     """
+    # Catches cases when a MockLogger is used in pytest
+    if not isinstance(log, logging.Logger):
+        return False
+
     type_matches = [
         isinstance(handler, handler_type)
         for handler in log.handlers
@@ -584,6 +588,9 @@ def logger_has_handler(
 
 def logger_has_filter(log: logging.Logger, filter_type: type[logging.Filter]) -> bool:
     """Check if logger already has a matching filter type."""
+    if not isinstance(log, logging.Logger):
+        return False
+
     return any(isinstance(logger_filter, filter_type) for logger_filter in log.filters)
 
 def ancestors_have_handlers(
@@ -611,6 +618,9 @@ def ancestors_have_handlers(
     if not use_parent_handlers:
         return False
 
+    if not isinstance(log, logging.Logger):
+        return False
+
     # Check that we are not using the true logging root logger
     python_root_logger_name = logging.getLogger().name
     if log.name == python_root_logger_name:
@@ -631,12 +641,20 @@ def ancestors_have_handlers(
         raise ValueError(err_msg)
 
     logger_parent = log.parent
-    this_is_root_logger = logger_parent.name == python_root_logger_name
-    while not this_is_root_logger:
+    visited_logger_ids: set[int] = set()
+
+    while isinstance(logger_parent, logging.Logger):
+        logger_id = id(logger_parent)
+        if logger_id in visited_logger_ids:
+            return False # Prevents infinite loop
+        visited_logger_ids.add(logger_id)
+
+        if logger_parent.name == python_root_logger_name:
+            break
+
         if logger_has_handler(logger_parent,handler_type, target_stream):
             return True
         logger_parent = logger_parent.parent
-        this_is_root_logger = logger_parent.name == python_root_logger_name
     return False
 
 

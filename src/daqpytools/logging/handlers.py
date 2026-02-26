@@ -9,7 +9,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
 from threading import Lock
-from typing import cast
+from typing import cast, Mapping, Any
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 from rich.logging import RichHandler
@@ -24,8 +24,11 @@ from daqpytools.logging.formatter import (
     TIME_ZONE,
     LoggingFormatter,
 )
+
+from daqpytools.logging.rich_handler import FormattedRichHandler
+from daqpytools.logging.specs import HandlerSpec, FilterSpec
+
 from daqpytools.logging.handlerdataclasses import (
-    FormattedRichHandler,
     HandlerType,
     LogHandlerConf,
 )
@@ -385,6 +388,93 @@ def logger_or_ancestors_have_handler(
         log, handler_type, target_stream
     ) or ancestors_have_handlers(log, use_parent_handlers, handler_type, target_stream)
 
+
+def _build_rich_handler(extras: Mapping[str, Any]) -> logging.Handler:
+    """Building the rich handler with any extras."""
+    width = cast(int,  extras.get("width", get_width()))
+    return FormattedRichHandler(width=width)
+
+
+RICH_HANDLER_SPEC = HandlerSpec(
+    representative_type = HandlerType.Rich,
+    handler_type = FormattedRichHandler,
+    factory=_build_rich_handler,
+    filter_handler_ids = (HandlerType.Rich,), # For HandleIDFilter
+)
+
+HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
+    HandlerType.Rich: (RICH_HANDLER_SPEC,),
+}
+
+#! Lets try go tet the add rich handler thing running!
+
+
+def get_handler_specs(handler_type: HandlerType):
+    """Get the specs defined in the registry"""
+    return HANDLER_SPEC_REGISTRY.get(handler_type, tuple())
+
+
+#! This we should be careful with..
+def _resolve_default_case(
+    default_case: set[HandlerType] | None
+) -> set[HandlerType]:
+    "Return a safe copy of default_case with sensible fallback"
+    if default_case is None:
+        return LogHandlerConf.get_base()
+    return set(default_case)
+
+def add_handler(
+    log: logging.logger_has_filter,
+    spec: HandlerSpec,
+    use_parent_handlers:bool, 
+    fallback_handler: set[HandlerType] | None,
+    extras: Mapping[str, Any] | None = None,
+):
+    check_parent_handlers(
+        log,
+        use_parent_handlers,
+        spec.handler_type,
+        target_stream = spec.target_stream
+    )
+
+    handler = spec.factory(extras or {})
+    effective_default_case = _resolve_default_case(fallback_handler)
+
+    handler_ids: HandlerType | list[HandlerType]
+    if len(spec.filter_handler_ids) == 1:
+        handler_ids = cast(HandlerType, spec.filter_handler_ids[0])
+    else: 
+        handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.filter_handler_ids] 
+
+    handler.addFilter(
+        HandleIDFilter(
+            handler_id=handler_ids,
+            fallback_handlers=effective_default_case
+        )
+    )
+
+    log.addHandler(handler)
+
+def add_rich_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    fallback_handlers: set[HandlerType] | None = None,
+) -> None:
+    
+    add_handler(
+        log,
+        RICH_HANDLER_SPEC,
+        use_parent_handlers,
+        fallback_handlers
+    )
+
+##################################################################################################
+##################################################################################################
+##################################################################################################
+##################################################################################################
+##################################################################################################
+
+
 def add_throttle_filter(
     log: logging.Logger,
     fallback_handlers: set[HandlerType] | None = None,
@@ -404,39 +494,39 @@ def add_throttle_filter(
     log.addFilter(ThrottleFilter(fallback_handlers=fallback_handlers))
     return
 
-def add_rich_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    """Add a rich handler to the logger.
+# def add_rich_handler(
+#     log: logging.Logger,
+#     use_parent_handlers: bool,
+#     fallback_handlers: set[HandlerType] | None = None,
+# ) -> None:
+#     """Add a rich handler to the logger.
 
-    Args:
-        log (logging.Logger): Logger to add the rich handler to.
-        use_parent_handlers (bool): Whether to check parent handlers.
-        fallback_handlers (set[HandlerType] | None): Default handler set used when
-            records do not explicitly include handler routing.
+#     Args:
+#         log (logging.Logger): Logger to add the rich handler to.
+#         use_parent_handlers (bool): Whether to check parent handlers.
+#         fallback_handlers (set[HandlerType] | None): Default handler set used when
+#             records do not explicitly include handler routing.
 
-    Returns:
-        None
+#     Returns:
+#         None
 
-    Raises:
-        LoggerHandlerError: If a parent logger has a rich handler.
-    """
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.Rich}
-    check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
-    width: int = get_width()
-    handler: RichHandler = FormattedRichHandler(width=width)    
+#     Raises:
+#         LoggerHandlerError: If a parent logger has a rich handler.
+#     """
+#     if fallback_handlers is None:
+#         fallback_handlers = {HandlerType.Rich}
+#     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
+#     width: int = get_width()
+#     handler: RichHandler = FormattedRichHandler(width=width)    
     
-    handler.addFilter(
-        HandleIDFilter(
-            handler_id=HandlerType.Rich,
-            fallback_handlers=fallback_handlers
-            )
-    )
-    log.addHandler(handler)
-    return
+#     handler.addFilter(
+#         HandleIDFilter(
+#             handler_id=HandlerType.Rich,
+#             fallback_handlers=fallback_handlers
+#             )
+#     )
+#     log.addHandler(handler)
+#     return
 
 def add_ers_kafka_handler(
     log: logging.Logger,

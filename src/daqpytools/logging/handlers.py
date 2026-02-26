@@ -215,13 +215,39 @@ STDERR_HANDLER_SPEC = HandlerSpec(
 
 
 
+def _build_file_handler(extras: Mapping[str, Any]) -> logging.Handler:
+    path = cast(str | None, extras.get("path"))
+    if not path:
+        err_msg = "path is requiired for file handler"
+        raise ValueError(err_msg)
+    handler = logging.FileHandler(filename=path)
+    handler.setFormatter(LoggingFormatter())
+
+    return handler
+
+FILE_HANDLER_SPEC = HandlerSpec(
+    representative_type=HandlerType.File,
+    handler_type = logging.FileHandler,
+    factory = _build_file_handler,
+    filter_handler_ids=(HandlerType.File,)
+)
+
+
+
+
+
+
+
+
+
+
+
 HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
     HandlerType.Rich: (RICH_HANDLER_SPEC,),
     HandlerType.Lstdout: (STDOUT_HANDLER_SPEC,),
     HandlerType.Lstderr: (STDERR_HANDLER_SPEC,),
     HandlerType.Stream: (STDOUT_HANDLER_SPEC,STDERR_HANDLER_SPEC),
-    
-    # Try stream next
+    HandlerType.File: (FILE_HANDLER_SPEC,)
 }
 
 def get_handler_specs(handler_type: HandlerType):
@@ -308,6 +334,23 @@ def add_stderr_handler(
         fallback_handlers
     )
 
+def add_file_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    path: str,
+    fallback_handlers: set[HandlerType] | None = None,
+) -> None:
+    add_handler(
+        log,
+        HandlerType.File,
+        use_parent_handlers,
+        fallback_handlers,
+        extras = {
+            "path" : path
+        }
+    )
+    
+
 from daqpytools.logging.filters import add_throttle_filter
 
 ##################################################################################################
@@ -346,16 +389,18 @@ def add_ers_kafka_handler(
     )
     log.addHandler(handler)
 
-# def add_stdout_handler(
+# def add_file_handler(
 #     log: logging.Logger,
 #     use_parent_handlers: bool,
+#     path: str,
 #     fallback_handlers: set[HandlerType] | None = None,
 # ) -> None:
-#     """Add a stdout handler to the logger.
+#     """Add a file handler to the root logger.
 
 #     Args:
-#         log (logging.Logger): Logger to add the stdout handler to.
+#         log (logging.Logger): Logger to add the file handler to.
 #         use_parent_handlers (bool): Whether to check parent handlers.
+#         path (str): Path to the log file.
 #         fallback_handlers (set[HandlerType] | None): Default handler set used when
 #             records do not explicitly include handler routing.
 
@@ -363,107 +408,21 @@ def add_ers_kafka_handler(
 #         None
 
 #     Raises:
-#         LoggerHandlerError: If a parent logger has a stdout handler.
+#         LoggerHandlerError: If a parent logger has a file handler.
 #     """
 #     if fallback_handlers is None:
-#         fallback_handlers = {HandlerType.Stream, HandlerType.Lstdout}
-#     check_parent_handlers(
-#         log,
-#         use_parent_handlers,
-#         logging.StreamHandler,
-#         target_stream=cast(io.IOBase, sys.stdout),
-#     )
-#     stdout_handler = logging.StreamHandler(sys.stdout)
-#     stdout_handler.setFormatter(LoggingFormatter())
-    
-#     stdout_handler.addFilter(
+#         fallback_handlers = {HandlerType.File}
+#     check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
+#     file_handler = logging.FileHandler(filename=path)
+#     file_handler.setFormatter(LoggingFormatter())
+#     file_handler.addFilter(
 #         HandleIDFilter(
-#             handler_id=[HandlerType.Stream, HandlerType.Lstdout],
+#             handler_id=HandlerType.File,
 #             fallback_handlers=fallback_handlers
 #             )
-#     )    
-#     log.addHandler(stdout_handler)
-#     return
-
-# def add_stderr_handler(
-#     log: logging.Logger,
-#     use_parent_handlers: bool,
-#     fallback_handlers: set[HandlerType] | None = None,
-# ) -> None:
-#     """Add a stderr handler to the logger.
-
-#     The error is set to the ERROR level, and will only log messages at that level
-#     or higher. This is to avoid duplicate logging of error messages when both stdout
-#     and stderr handlers are used.
-
-#     Args:
-#         log (logging.Logger): Logger to add the stderr handler to.
-#         use_parent_handlers (bool): Whether to check parent handlers.
-#         fallback_handlers (set[HandlerType] | None): Default handler set used when
-#             records do not explicitly include handler routing.
-
-#     Returns:
-#         None
-
-#     Raises:
-#         LoggerHandlerError: If a parent logger has a stderr handler.
-#     """
-#     if fallback_handlers is None:
-#         fallback_handlers = {HandlerType.Lstderr, HandlerType.Stream}
-#     check_parent_handlers(
-#         log,
-#         use_parent_handlers,
-#         logging.StreamHandler,
-#         target_stream=cast(io.IOBase, sys.stderr),
 #     )
-#     stderr_handler = logging.StreamHandler(sys.stderr)
-#     stderr_handler.setFormatter(LoggingFormatter())
-#     stderr_handler.addFilter(
-#         HandleIDFilter(
-#             handler_id=[HandlerType.Stream, HandlerType.Lstderr],
-#             fallback_handlers=fallback_handlers
-#             )
-#     )    
-#     stderr_handler.setLevel(logging.ERROR)
-#     log.addHandler(stderr_handler)
+#     log.addHandler(file_handler)
 #     return
-
-
-
-def add_file_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    path: str,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    """Add a file handler to the root logger.
-
-    Args:
-        log (logging.Logger): Logger to add the file handler to.
-        use_parent_handlers (bool): Whether to check parent handlers.
-        path (str): Path to the log file.
-        fallback_handlers (set[HandlerType] | None): Default handler set used when
-            records do not explicitly include handler routing.
-
-    Returns:
-        None
-
-    Raises:
-        LoggerHandlerError: If a parent logger has a file handler.
-    """
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.File}
-    check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
-    file_handler = logging.FileHandler(filename=path)
-    file_handler.setFormatter(LoggingFormatter())
-    file_handler.addFilter(
-        HandleIDFilter(
-            handler_id=HandlerType.File,
-            fallback_handlers=fallback_handlers
-            )
-    )
-    log.addHandler(file_handler)
-    return
 
 
 

@@ -25,12 +25,20 @@ from daqpytools.logging.formatter import (
     LoggingFormatter,
 )
 
+from daqpytools.logging.filters import (
+    IssueRecord,
+    BaseHandlerFilter,
+    HandleIDFilter,
+    ThrottleFilter,
+)
+
 from daqpytools.logging.rich_handler import FormattedRichHandler
 from daqpytools.logging.specs import HandlerSpec, FilterSpec
 
 from daqpytools.logging.handlerdataclasses import (
     HandlerType,
     LogHandlerConf,
+    _resolve_default_case
 )
 from daqpytools.logging.routing import (
     AllowedHandlersStrategy,
@@ -39,235 +47,7 @@ from daqpytools.logging.routing import (
 from daqpytools.logging.utils import get_width
 
 
-class IssueRecord:
-    """Tracks throttling state for a unique issue (identified by file: line)."""
-    
-    def __init__(self) -> None:
-        """C'tor."""
-        self.reset()
-    
-    def reset(self) -> None:
-        """Reset all counters and timestamps."""
-        self.last_occurrence:  float = 0.0
-        self.last_report: float = 0.0
-        self.initial_counter: int = 0
-        self.threshold:  int = 10
-        self.suppressed_counter: int = 0
-        self.last_occurrence_formatted: str = ""
-
-class BaseHandlerFilter(logging.Filter):
-    """Base filter that hold the logic on choosing if a handler should emit
-    based on what HandlersTypes are supplied to it.
-    """
-    def __init__(
-        self,
-        fallback_handlers: set[HandlerType] | None = None,
-        allowed_handlers_strategy : AllowedHandlersStrategy | None = None,
-    ) -> None:
-        """C'tor."""
-        self.fallback_handlers = set(fallback_handlers) if fallback_handlers is not None else LogHandlerConf.get_base() #! We should check if this is still the case
-
-        self.allowed_handlers_strategy = (
-            allowed_handlers_strategy or 
-            StreamAwareAllowedHandlersStrategy()
-        )
-        super().__init__()
-
-    def get_allowed(self, record: logging.LogRecord) -> set[HandlerType] | None:
-        return self.allowed_handlers_strategy.resolve(record, self.fallback_handlers)
-
-        
-class HandleIDFilter(BaseHandlerFilter):
-    """Filter class that accepts a list of 'allowed' handlers and will only fire
-    if the current handler (defined by the handler_id) is within the set of 
-    allowed handlers.
-    """
-    def __init__(
-        self,
-        handler_id: HandlerType | list[HandlerType],
-        fallback_handlers: set[HandlerType] | None = None,
-        allowed_handlers_strategy: AllowedHandlersStrategy | None = None,
-    ) -> None:
-        """Initialises HandleIDFilter with the handler_id, to identify what
-        kind of handler this filter is.
-        """
-        super().__init__(
-            fallback_handlers = fallback_handlers,
-            allowed_handlers_strategy=allowed_handlers_strategy
-        )
-        
-        # Normalise handler_id to be a set
-        if isinstance(handler_id, list):
-            self.handler_ids = set(handler_id)
-        else:
-            self.handler_ids = {handler_id}
-    
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Identifies when a log message should be transmitted or not."""
-        if not (allowed:= self.get_allowed(record)):
-            return False
-        return bool(self.handler_ids & allowed)
-
-class ThrottleFilter(BaseHandlerFilter):
-    """Advanced logging filter with escalating throttle thresholds.
-    
-    Args:
-        initial_threshold: Number of initial occurrences 
-            to let through immediately (default: 30)
-        time_limit: Time window in seconds for resetting state (default: 30)
-        name: Optional filter name
-    
-    Example:
-        >>> import logging
-        >>> logger = logging.getLogger(__name__)
-        >>> throttle = ThrottleFilter(initial_threshold=30, time_limit=30)
-        >>> logger.addFilter(throttle)
-        >>> handler = logging.StreamHandler()
-        >>> logger.addHandler(handler)
-        >>> logger.setLevel(logging. ERROR)
-        >>> 
-        >>> # First 30 messages go through immediately
-        >>> for i in range(100):
-        ...     logger.error("Repeated error message")
-    """
-    
-    def __init__(
-        self,
-        fallback_handlers: set[HandlerType] | None = None,
-        initial_threshold: int = 30,
-        time_limit: int = 30,
-        allowed_handlers_strategy : AllowedHandlersStrategy | None = None
-    ) -> None:
-        """C'tor."""
-        super().__init__(
-            fallback_handlers = fallback_handlers,
-            allowed_handlers_strategy = allowed_handlers_strategy
-            )
-        self.initial_threshold = initial_threshold
-        self.time_limit = time_limit
-        self.issue_map: dict[str, IssueRecord] = defaultdict(IssueRecord)
-        self.mutex = Lock() # Ensures thread safety
-    
-    def filter(self, record: logging.LogRecord) -> bool:
-        """Determine if a log record should be emitted.
-        
-        Args:
-            record: The log record to filter
-            
-        Returns:
-            True if the record should be logged, False to suppress it
-        """
-        # Check if we want to apply the filter
-        if not (allowed:= self.get_allowed(record)):
-            return False
-        if HandlerType.Throttle not in allowed:
-            return True
-        
-        # Used to bypass the filter to report suppression messages
-        if getattr(record, '_throttle_suppression', False):
-            return True
-        
-        issue_id = f"{record.pathname}:{record.lineno}"
-        with self.mutex:
-            issue_record = self.issue_map[issue_id]
-            return self._throttle(issue_record, record)
-    
-    def _throttle(self, rec: IssueRecord, record:  logging.LogRecord) -> bool:
-        """Apply throttling logic to determine if record should be emitted.
-        
-        Args:
-            rec: The issue record tracking state for this unique issue
-            record: The log record being evaluated
-            
-        Returns:
-            True if record should be emitted, False otherwise
-        """
-        current_time = time.time()
-        reported = False
-        
-        # Step 1: Check if time window expired - reset if so
-        if current_time - rec.last_occurrence > self.time_limit:
-            if rec.suppressed_counter > 0:
-                self._report_suppression(rec, record)
-                reported = True
-            rec.reset()
-        
-        # Step 2: Initial phase - let first N messages through
-        if rec.initial_counter < self.initial_threshold:
-            rec.initial_counter += 1
-            rec.last_report = current_time
-            rec.last_occurrence = current_time
-            rec.last_occurrence_formatted = self._format_timestamp(current_time)
-            
-            # Don't double-report if we just reported suppression
-            return not reported
-        
-        # Step 3: Check if we hit the escalating threshold
-        if rec.suppressed_counter >= rec.threshold:
-            rec.threshold = rec.threshold * 10  # Escalate:  10 -> 100 -> 1000 ... 
-            rec.last_occurrence = current_time
-            rec. last_occurrence_formatted = self._format_timestamp(current_time)
-            self._report_suppression(rec, record)
-            return False  # Don't emit the original record
-        
-        # Step 4: Check if enough time passed since last report
-        if current_time - rec.last_report > self.time_limit:
-            rec.last_occurrence = current_time
-            rec. last_occurrence_formatted = self._format_timestamp(current_time)
-            self._report_suppression(rec, record)
-            return False  # Don't emit the original record
-        
-        # Step 5: Suppress silently
-        rec.suppressed_counter += 1
-        rec.last_occurrence = current_time
-        rec. last_occurrence_formatted = self._format_timestamp(current_time)
-        return False
-    
-    def _report_suppression(self, rec: IssueRecord, record: logging.LogRecord) -> None:
-        """Create and emit a suppression notice.
-        
-        Args:
-            rec: The issue record with suppression count
-            record: The original log record (used as template)
-        """
-        if rec.suppressed_counter == 0:
-            return
-        
-        suppression_record = copy.deepcopy(record)
-        suppression_record._throttle_suppression = True # pass through filter to report
-        
-        # Append suppression information to the message
-        suppression_msg = (
-            f" -- {rec.suppressed_counter} similar messages suppressed, "
-            f"last occurrence was at {rec.last_occurrence_formatted}"
-        )
-        suppression_record.msg = record.getMessage() + suppression_msg
-        suppression_record.args = ()  # Clear args since we already formatted
-        
-        # Emit directly - will pass through filter due to flag
-        logger = logging.getLogger(record.name)
-        logger.handle(suppression_record)
-
-        
-        # Reset suppression tracking
-        rec.last_report = time.time()
-        rec.suppressed_counter = 0
-    
-    @staticmethod
-    def _format_timestamp(timestamp: float) -> str:
-        """Format timestamp in ISO format with microseconds.
-        
-        Args:
-            timestamp: Unix timestamp
-            
-        Returns:
-            Formatted timestamp string
-        """
-        dt = datetime.fromtimestamp(timestamp, tz=TIME_ZONE)
-        padding: int = LOG_RECORD_PADDING.get("time", 25)
-        time_str: str = dt.strftime(DATE_TIME_BASE_FORMAT).ljust(padding)[:padding]
-        return Text(time_str, style="logging.time")
-    
+  
 def logger_has_handler(
     log: logging.Logger,
     handler_type: type[logging.Handler],
@@ -394,7 +174,6 @@ def _build_rich_handler(extras: Mapping[str, Any]) -> logging.Handler:
     width = cast(int,  extras.get("width", get_width()))
     return FormattedRichHandler(width=width)
 
-
 RICH_HANDLER_SPEC = HandlerSpec(
     representative_type = HandlerType.Rich,
     handler_type = FormattedRichHandler,
@@ -402,59 +181,94 @@ RICH_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids = (HandlerType.Rich,), # For HandleIDFilter
 )
 
+
+def _build_stdout_handler(extras: Mapping[str, Any]) -> logging.Handler:
+    del extras #unused
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(LoggingFormatter())
+    return handler
+
+STDOUT_HANDLER_SPEC = HandlerSpec(
+    representative_type = HandlerType.Lstdout,
+    handler_type = logging.StreamHandler,
+    target_stream=cast(io.IOBase, sys.stdout),
+    factory=_build_stdout_handler,
+    filter_handler_ids = (HandlerType.Stream, HandlerType.Lstdout),
+)
+
+
+def _build_stderr_handler(extras: Mapping[str, Any]) -> logging.Handler:
+    del extras #unused
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(LoggingFormatter())
+    handler.setLevel(logging.ERROR)
+    return handler
+
+
+STDERR_HANDLER_SPEC = HandlerSpec(
+    representative_type = HandlerType.Lstderr,
+    handler_type = logging.StreamHandler,
+    target_stream=cast(io.IOBase, sys.stderr),
+    factory=_build_stderr_handler,
+    filter_handler_ids = (HandlerType.Stream, HandlerType.Lstderr),
+)
+
+
+
 HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
     HandlerType.Rich: (RICH_HANDLER_SPEC,),
+    HandlerType.Lstdout: (STDOUT_HANDLER_SPEC,),
+    HandlerType.Lstderr: (STDERR_HANDLER_SPEC,),
+    HandlerType.Stream: (STDOUT_HANDLER_SPEC,STDERR_HANDLER_SPEC),
+    
+    # Try stream next
 }
-
-#! Lets try go tet the add rich handler thing running!
-
 
 def get_handler_specs(handler_type: HandlerType):
     """Get the specs defined in the registry"""
     return HANDLER_SPEC_REGISTRY.get(handler_type, tuple())
 
 
-#! This we should be careful with..
-def _resolve_default_case(
-    default_case: set[HandlerType] | None
-) -> set[HandlerType]:
-    "Return a safe copy of default_case with sensible fallback"
-    if default_case is None:
-        return LogHandlerConf.get_base()
-    return set(default_case)
+
 
 def add_handler(
-    log: logging.logger_has_filter,
-    spec: HandlerSpec,
+    log: logging.Logger,
+    handler_type: HandlerType,
     use_parent_handlers:bool, 
     fallback_handler: set[HandlerType] | None,
     extras: Mapping[str, Any] | None = None,
 ):
-    check_parent_handlers(
-        log,
-        use_parent_handlers,
-        spec.handler_type,
-        target_stream = spec.target_stream
-    )
-
-    handler = spec.factory(extras or {})
-    effective_default_case = _resolve_default_case(fallback_handler)
-
-    handler_ids: HandlerType | list[HandlerType]
-    if len(spec.filter_handler_ids) == 1:
-        handler_ids = cast(HandlerType, spec.filter_handler_ids[0])
-    else: 
-        handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.filter_handler_ids] 
-
-    handler.addFilter(
-        HandleIDFilter(
-            handler_id=handler_ids,
-            fallback_handlers=effective_default_case
+    
+    specs = get_handler_specs(handler_type) 
+    for spec in specs:
+        check_parent_handlers(
+            log,
+            use_parent_handlers,
+            spec.handler_type,
+            target_stream = spec.target_stream
         )
-    )
 
-    log.addHandler(handler)
+        handler = spec.factory(extras or {})
+        effective_default_case = fallback_handler if fallback_handler is not None else spec.filter_handler_ids
 
+        handler_ids: HandlerType | list[HandlerType]
+        if len(spec.filter_handler_ids) == 1:
+            handler_ids = cast(HandlerType, spec.filter_handler_ids[0])
+        else: 
+            handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.filter_handler_ids] 
+ 
+        handler.addFilter(
+            HandleIDFilter(
+                handler_id=handler_ids,
+                fallback_handlers=effective_default_case
+            )
+        )
+
+        log.addHandler(handler)
+
+
+# We want to eventually depreciate this I think..
+# In favour of add_handlers_or_filters
 def add_rich_handler(
     log: logging.Logger,
     use_parent_handlers: bool,
@@ -463,124 +277,46 @@ def add_rich_handler(
     
     add_handler(
         log,
-        RICH_HANDLER_SPEC,
+        HandlerType.Rich,
         use_parent_handlers,
         fallback_handlers
     )
 
 
-def _build_throttle_filter(
-    fallback_handlers: set[HandlerType],
-    extras: Mapping[str, Any],
-) -> logging.Filter:
-    """Build throttle filter from extras"""
-    initial_treshold = cast(int, extras.get("initial_treshold", 30))
-    time_limit = cast(int, extras.get("time_limit", 30))
-    return ThrottleFilter(
-        fallback_handlers=fallback_handlers,
-        initial_threshold=initial_treshold,
-        time_limit=time_limit
-    )
-
-THROTTLE_FILTER_SPEC = FilterSpec(
-    representative_type = HandlerType.Throttle,
-    filter_type = ThrottleFilter,
-    factory=_build_throttle_filter
-)
-
-FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
-    HandlerType.Throttle: THROTTLE_FILTER_SPEC
-
-}
-
-def get_filter_spec(handler_types: HandlerType):
-    return FILTER_SPEC_REGISTRY.get(handler_types)
-
-def add_filter(
+def add_stdout_handler(
     log: logging.Logger,
-    spec: FilterSpec,
-    fallback_handlers : set[HandlerType]| None,
-    extras: Mapping[str,Any] | None = None,
-) -> None:
-    """Add a logger filter according to the spec"""
-    logger_filter = spec.factory(_resolve_default_case(fallback_handlers), extras or {})
-    log.addFilter(logger_filter)
-
-
-def add_throttle_filter(
-    log: logging.Logger,
+    use_parent_handlers: bool,
     fallback_handlers: set[HandlerType] | None = None,
 ) -> None:
-    "Add the Throttle filter to the logger"
-    add_filter(
+    add_handler(
         log,
-        THROTTLE_FILTER_SPEC,
+        HandlerType.Lstdout,
+        use_parent_handlers,
         fallback_handlers
     )
 
 
-# figureo ut how this mattches to the add_handlers bit, this is very important!
-
-
-##################################################################################################
-##################################################################################################
-##################################################################################################
-##################################################################################################
-##################################################################################################
-
-
-def add_throttle_filter(
+def add_stderr_handler(
     log: logging.Logger,
+    use_parent_handlers: bool,
     fallback_handlers: set[HandlerType] | None = None,
 ) -> None:
-    """Add the Throttle filter to the logger.
+    add_handler(
+        log,
+        HandlerType.Lstderr,
+        use_parent_handlers,
+        fallback_handlers
+    )
 
-    Args:
-        log (logging.Logger): Logger to add the rich handler to.
-        fallback_handlers (set[HandlerType] | None): Default handler set used when
-            records do not explicitly include handler routing.
+from daqpytools.logging.filters import add_throttle_filter
 
-    Returns:
-        None
-    """
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.Throttle}
-    log.addFilter(ThrottleFilter(fallback_handlers=fallback_handlers))
-    return
+##################################################################################################
+##################################################################################################
+##################################################################################################
+##################################################################################################
+##################################################################################################
 
-# def add_rich_handler(
-#     log: logging.Logger,
-#     use_parent_handlers: bool,
-#     fallback_handlers: set[HandlerType] | None = None,
-# ) -> None:
-#     """Add a rich handler to the logger.
 
-#     Args:
-#         log (logging.Logger): Logger to add the rich handler to.
-#         use_parent_handlers (bool): Whether to check parent handlers.
-#         fallback_handlers (set[HandlerType] | None): Default handler set used when
-#             records do not explicitly include handler routing.
-
-#     Returns:
-#         None
-
-#     Raises:
-#         LoggerHandlerError: If a parent logger has a rich handler.
-#     """
-#     if fallback_handlers is None:
-#         fallback_handlers = {HandlerType.Rich}
-#     check_parent_handlers(log, use_parent_handlers, FormattedRichHandler)
-#     width: int = get_width()
-#     handler: RichHandler = FormattedRichHandler(width=width)    
-    
-#     handler.addFilter(
-#         HandleIDFilter(
-#             handler_id=HandlerType.Rich,
-#             fallback_handlers=fallback_handlers
-#             )
-#     )
-#     log.addHandler(handler)
-#     return
 
 def add_ers_kafka_handler(
     log: logging.Logger,
@@ -610,87 +346,89 @@ def add_ers_kafka_handler(
     )
     log.addHandler(handler)
 
-def add_stdout_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    """Add a stdout handler to the logger.
+# def add_stdout_handler(
+#     log: logging.Logger,
+#     use_parent_handlers: bool,
+#     fallback_handlers: set[HandlerType] | None = None,
+# ) -> None:
+#     """Add a stdout handler to the logger.
 
-    Args:
-        log (logging.Logger): Logger to add the stdout handler to.
-        use_parent_handlers (bool): Whether to check parent handlers.
-        fallback_handlers (set[HandlerType] | None): Default handler set used when
-            records do not explicitly include handler routing.
+#     Args:
+#         log (logging.Logger): Logger to add the stdout handler to.
+#         use_parent_handlers (bool): Whether to check parent handlers.
+#         fallback_handlers (set[HandlerType] | None): Default handler set used when
+#             records do not explicitly include handler routing.
 
-    Returns:
-        None
+#     Returns:
+#         None
 
-    Raises:
-        LoggerHandlerError: If a parent logger has a stdout handler.
-    """
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.Stream, HandlerType.Lstdout}
-    check_parent_handlers(
-        log,
-        use_parent_handlers,
-        logging.StreamHandler,
-        target_stream=cast(io.IOBase, sys.stdout),
-    )
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    stdout_handler.setFormatter(LoggingFormatter())
+#     Raises:
+#         LoggerHandlerError: If a parent logger has a stdout handler.
+#     """
+#     if fallback_handlers is None:
+#         fallback_handlers = {HandlerType.Stream, HandlerType.Lstdout}
+#     check_parent_handlers(
+#         log,
+#         use_parent_handlers,
+#         logging.StreamHandler,
+#         target_stream=cast(io.IOBase, sys.stdout),
+#     )
+#     stdout_handler = logging.StreamHandler(sys.stdout)
+#     stdout_handler.setFormatter(LoggingFormatter())
     
-    stdout_handler.addFilter(
-        HandleIDFilter(
-            handler_id=[HandlerType.Stream, HandlerType.Lstdout],
-            fallback_handlers=fallback_handlers
-            )
-    )    
-    log.addHandler(stdout_handler)
-    return
+#     stdout_handler.addFilter(
+#         HandleIDFilter(
+#             handler_id=[HandlerType.Stream, HandlerType.Lstdout],
+#             fallback_handlers=fallback_handlers
+#             )
+#     )    
+#     log.addHandler(stdout_handler)
+#     return
 
-def add_stderr_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    """Add a stderr handler to the logger.
+# def add_stderr_handler(
+#     log: logging.Logger,
+#     use_parent_handlers: bool,
+#     fallback_handlers: set[HandlerType] | None = None,
+# ) -> None:
+#     """Add a stderr handler to the logger.
 
-    The error is set to the ERROR level, and will only log messages at that level
-    or higher. This is to avoid duplicate logging of error messages when both stdout
-    and stderr handlers are used.
+#     The error is set to the ERROR level, and will only log messages at that level
+#     or higher. This is to avoid duplicate logging of error messages when both stdout
+#     and stderr handlers are used.
 
-    Args:
-        log (logging.Logger): Logger to add the stderr handler to.
-        use_parent_handlers (bool): Whether to check parent handlers.
-        fallback_handlers (set[HandlerType] | None): Default handler set used when
-            records do not explicitly include handler routing.
+#     Args:
+#         log (logging.Logger): Logger to add the stderr handler to.
+#         use_parent_handlers (bool): Whether to check parent handlers.
+#         fallback_handlers (set[HandlerType] | None): Default handler set used when
+#             records do not explicitly include handler routing.
 
-    Returns:
-        None
+#     Returns:
+#         None
 
-    Raises:
-        LoggerHandlerError: If a parent logger has a stderr handler.
-    """
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.Lstderr, HandlerType.Stream}
-    check_parent_handlers(
-        log,
-        use_parent_handlers,
-        logging.StreamHandler,
-        target_stream=cast(io.IOBase, sys.stderr),
-    )
-    stderr_handler = logging.StreamHandler(sys.stderr)
-    stderr_handler.setFormatter(LoggingFormatter())
-    stderr_handler.addFilter(
-        HandleIDFilter(
-            handler_id=[HandlerType.Stream, HandlerType.Lstderr],
-            fallback_handlers=fallback_handlers
-            )
-    )    
-    stderr_handler.setLevel(logging.ERROR)
-    log.addHandler(stderr_handler)
-    return
+#     Raises:
+#         LoggerHandlerError: If a parent logger has a stderr handler.
+#     """
+#     if fallback_handlers is None:
+#         fallback_handlers = {HandlerType.Lstderr, HandlerType.Stream}
+#     check_parent_handlers(
+#         log,
+#         use_parent_handlers,
+#         logging.StreamHandler,
+#         target_stream=cast(io.IOBase, sys.stderr),
+#     )
+#     stderr_handler = logging.StreamHandler(sys.stderr)
+#     stderr_handler.setFormatter(LoggingFormatter())
+#     stderr_handler.addFilter(
+#         HandleIDFilter(
+#             handler_id=[HandlerType.Stream, HandlerType.Lstderr],
+#             fallback_handlers=fallback_handlers
+#             )
+#     )    
+#     stderr_handler.setLevel(logging.ERROR)
+#     log.addHandler(stderr_handler)
+#     return
+
+
 
 def add_file_handler(
     log: logging.Logger,
@@ -727,6 +465,10 @@ def add_file_handler(
     log.addHandler(file_handler)
     return
 
+
+
+
+# This is the big ol massive function..
 def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],

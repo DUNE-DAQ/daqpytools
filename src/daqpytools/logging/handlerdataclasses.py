@@ -217,3 +217,15 @@ class LogHandlerConf:
         LogHandlerConf._BASE_HANDLERS without having to initialise an instance.
         """
         return set(LogHandlerConf._BASE_HANDLERS)
+    
+
+
+
+#! This we should be careful with..
+def _resolve_default_case(
+    default_case: set[HandlerType] | None
+) -> set[HandlerType]:
+    "Return a safe copy of default_case with sensible fallback"
+    if default_case is None:
+        return LogHandlerConf.get_base()
+    return set(default_case)

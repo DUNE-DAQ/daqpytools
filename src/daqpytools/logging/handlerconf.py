@@ -4,28 +4,16 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from typing import ClassVar
-
-from rich.console import Console, ConsoleRenderable
-from rich.logging import RichHandler
-from rich.text import Text
 
 from daqpytools.logging.exceptions import (
     ERSEnvError,
     ProtobufFormatError,
 )
-from daqpytools.logging.formatter import (
-    CONSOLE_THEME,
-    DATE_TIME_FORMAT,
-    LOG_RECORD_PADDING,
-    TIME_ZONE,
-)
-from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
-from daqpytools.logging.utils import get_width
-
+from daqpytools.logging.levels import level_to_ers_var
 from daqpytools.logging.rich_handler import FormattedRichHandler
+from daqpytools.logging.utils import get_width
 
 # Initialise a logger to catch erstrace + other unknown handlertypes from OKS
 log: logging.Logger = logging.getLogger(__name__)
@@ -219,13 +207,3 @@ class LogHandlerConf:
         return set(LogHandlerConf._BASE_HANDLERS)
     
 
-
-
-#! This we should be careful with..
-def _resolve_default_case(
-    default_case: set[HandlerType] | None
-) -> set[HandlerType]:
-    "Return a safe copy of default_case with sensible fallback"
-    if default_case is None:
-        return LogHandlerConf.get_base()
-    return set(default_case)

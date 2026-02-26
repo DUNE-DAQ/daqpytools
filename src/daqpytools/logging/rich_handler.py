@@ -1,29 +1,20 @@
 from __future__ import annotations
 
 import logging
-import os
-import re
-from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import ClassVar
 
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.text import Text
 
-from daqpytools.logging.exceptions import (
-    ERSEnvError,
-    ProtobufFormatError,
-)
 from daqpytools.logging.formatter import (
     CONSOLE_THEME,
     DATE_TIME_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
 )
-from daqpytools.logging.levels import level_to_ers_var, logging_log_level_to_str
-from daqpytools.logging.utils import get_width
+from daqpytools.logging.levels import logging_log_level_to_str
+
 
 class FormattedRichHandler(RichHandler):
     """RichHandler that formats log messages with time, aligned columns, and styles."""

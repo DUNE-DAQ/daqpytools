@@ -1,42 +1,31 @@
 from __future__ import annotations
 
 import copy
-import io
 import logging
-import sys
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Mapping
 from datetime import datetime
 from threading import Lock
-from typing import cast, Mapping, Any
+from typing import Any, cast
 
-from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
-from rich.logging import RichHandler
 from rich.text import Text
 
-from daqpytools.logging.exceptions import (
-    LoggerHandlerError,
-)
 from daqpytools.logging.formatter import (
     DATE_TIME_BASE_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
-    LoggingFormatter,
 )
-from daqpytools.logging.rich_handler import FormattedRichHandler
-from daqpytools.logging.specs import HandlerSpec, FilterSpec
-
-from daqpytools.logging.handlerdataclasses import (
+from daqpytools.logging.handlerconf import (
     HandlerType,
     LogHandlerConf,
-    _resolve_default_case
+    _resolve_default_case,
 )
 from daqpytools.logging.routing import (
     AllowedHandlersStrategy,
     StreamAwareAllowedHandlersStrategy,
 )
-from daqpytools.logging.utils import get_width
+from daqpytools.logging.specs import FilterSpec
 
 
 class IssueRecord:
@@ -291,7 +280,6 @@ THROTTLE_FILTER_SPEC = FilterSpec(
 
 FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
     HandlerType.Throttle: THROTTLE_FILTER_SPEC
-
 }
 
 def get_filter_spec(handler_types: HandlerType):
@@ -314,7 +302,7 @@ def add_throttle_filter(
     log: logging.Logger,
     fallback_handlers: set[HandlerType] | None = None,
 ) -> None:
-    "Add the Throttle filter to the logger"
+    """Add the Throttle filter to the logger"""
     add_filter(
         log,
         HandlerType.Throttle,

@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
-from daqpytools.logging.handlerdataclasses import StreamType
+from daqpytools.logging.handlerconf import StreamType
 from daqpytools.logging.levels import level_to_ers_var
 
 """

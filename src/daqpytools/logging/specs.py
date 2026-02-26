@@ -1,7 +1,8 @@
-import logging
-from dataclasses import dataclass
 import io
-from typing import Any, Callable, Mapping
+import logging
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from typing import Any
 
 """
  Declarative specification for building and identifying objects

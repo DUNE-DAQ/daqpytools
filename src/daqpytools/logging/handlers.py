@@ -1,53 +1,32 @@
 from __future__ import annotations
 
-import copy
 import io
 import logging
 import sys
-import time
-from collections import defaultdict
-from collections.abc import Callable
-from datetime import datetime
-from threading import Lock
-from typing import cast, Mapping, Any
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
-from rich.logging import RichHandler
-from rich.text import Text
 
 from daqpytools.logging.exceptions import (
     LoggerHandlerError,
 )
-from daqpytools.logging.formatter import (
-    DATE_TIME_BASE_FORMAT,
-    LOG_RECORD_PADDING,
-    TIME_ZONE,
-    LoggingFormatter,
-)
-
 from daqpytools.logging.filters import (
-    IssueRecord,
-    BaseHandlerFilter,
     HandleIDFilter,
     ThrottleFilter,
 )
-
-from daqpytools.logging.rich_handler import FormattedRichHandler
-from daqpytools.logging.specs import HandlerSpec, FilterSpec
-
-from daqpytools.logging.handlerdataclasses import (
+from daqpytools.logging.formatter import (
+    LoggingFormatter,
+)
+from daqpytools.logging.handlerconf import (
     HandlerType,
-    LogHandlerConf,
-    _resolve_default_case
 )
-from daqpytools.logging.routing import (
-    AllowedHandlersStrategy,
-    StreamAwareAllowedHandlersStrategy,
-)
+from daqpytools.logging.rich_handler import FormattedRichHandler
+from daqpytools.logging.specs import HandlerSpec
 from daqpytools.logging.utils import get_width
 
 
-  
+#### Helper functions ####
 def logger_has_handler(
     log: logging.Logger,
     handler_type: type[logging.Handler],
@@ -156,7 +135,6 @@ def check_parent_handlers(
     if ancestors_have_handlers(log, use_parent_handlers, handler_type, target_stream):
         raise LoggerHandlerError(log.name, handler_type)
     
-
 def logger_or_ancestors_have_handler(
     log: logging.Logger,
     use_parent_handlers: bool,
@@ -169,6 +147,8 @@ def logger_or_ancestors_have_handler(
     ) or ancestors_have_handlers(log, use_parent_handlers, handler_type, target_stream)
 
 
+#### Handlers #### 
+
 def _build_rich_handler(extras: Mapping[str, Any]) -> logging.Handler:
     """Building the rich handler with any extras."""
     width = cast(int,  extras.get("width", get_width()))
@@ -180,7 +160,6 @@ RICH_HANDLER_SPEC = HandlerSpec(
     factory=_build_rich_handler,
     filter_handler_ids = (HandlerType.Rich,), # For HandleIDFilter
 )
-
 
 def _build_stdout_handler(extras: Mapping[str, Any]) -> logging.Handler:
     del extras #unused
@@ -196,14 +175,12 @@ STDOUT_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids = (HandlerType.Stream, HandlerType.Lstdout),
 )
 
-
 def _build_stderr_handler(extras: Mapping[str, Any]) -> logging.Handler:
     del extras #unused
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(LoggingFormatter())
     handler.setLevel(logging.ERROR)
     return handler
-
 
 STDERR_HANDLER_SPEC = HandlerSpec(
     representative_type = HandlerType.Lstderr,
@@ -212,8 +189,6 @@ STDERR_HANDLER_SPEC = HandlerSpec(
     factory=_build_stderr_handler,
     filter_handler_ids = (HandlerType.Stream, HandlerType.Lstderr),
 )
-
-
 
 def _build_file_handler(extras: Mapping[str, Any]) -> logging.Handler:
     path = cast(str | None, extras.get("path"))
@@ -232,8 +207,6 @@ FILE_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids=(HandlerType.File,)
 )
 
-
-
 def _build_erskafka_handler(extras: Mapping[str, Any]) -> logging.Handler: 
     session_name = cast( str | None, extras.get("session_name"))
 
@@ -251,8 +224,6 @@ def _build_erskafka_handler(extras: Mapping[str, Any]) -> logging.Handler:
         app_name=app_name
     )
     
-
-
 ERSKAFKA_HANDLER_SPEC = HandlerSpec(
     representative_type=HandlerType.Protobufstream,
     handler_type = ERSKafkaLogHandler,
@@ -275,9 +246,6 @@ HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
 def get_handler_specs(handler_type: HandlerType):
     """Get the specs defined in the registry"""
     return HANDLER_SPEC_REGISTRY.get(handler_type, tuple())
-
-
-
 
 def add_handler(
     log: logging.Logger,
@@ -315,8 +283,8 @@ def add_handler(
         log.addHandler(handler)
 
 
-# We want to eventually depreciate this I think..
-# In favour of add_handlers_or_filters
+#! Backwards compatibility. We should consider retiring these functinos
+
 def add_rich_handler(
     log: logging.Logger,
     use_parent_handlers: bool,
@@ -330,7 +298,6 @@ def add_rich_handler(
         fallback_handlers
     )
 
-
 def add_stdout_handler(
     log: logging.Logger,
     use_parent_handlers: bool,
@@ -342,7 +309,6 @@ def add_stdout_handler(
         use_parent_handlers,
         fallback_handlers
     )
-
 
 def add_stderr_handler(
     log: logging.Logger,
@@ -394,84 +360,10 @@ def add_ers_kafka_handler(
         },
     )
     
-
 from daqpytools.logging.filters import add_throttle_filter
 
-##################################################################################################
-##################################################################################################
-##################################################################################################
-##################################################################################################
-##################################################################################################
 
-
-
-# def add_ers_kafka_handler(
-#     log: logging.Logger,
-#     use_parent_handlers: bool,
-#     session_name: str,
-#     fallback_handlers: set[HandlerType] | None = None,
-#     app_name : str|None =None,
-#     topic: str = "ers_stream",
-#     address: str = "monkafka.cern.ch:30092",
-# ) -> None:
-#     # TODO/future: topic and address are new, propagate to all relevant implementation
-#     """Add an ers protobuf handler to the root logger."""
-#     if fallback_handlers is None:
-#         fallback_handlers = {HandlerType.Protobufstream}
-#     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
-#     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
-#                                                      kafka_address = address, 
-#                                                      kafka_topic = topic,
-#                                                      app_name = app_name,
-#                                                      )
-
-#     handler.addFilter(
-#         HandleIDFilter(
-#             handler_id=HandlerType.Protobufstream,
-#             fallback_handlers=fallback_handlers
-#             )
-#     )
-#     log.addHandler(handler)
-
-# def add_file_handler(
-#     log: logging.Logger,
-#     use_parent_handlers: bool,
-#     path: str,
-#     fallback_handlers: set[HandlerType] | None = None,
-# ) -> None:
-#     """Add a file handler to the root logger.
-
-#     Args:
-#         log (logging.Logger): Logger to add the file handler to.
-#         use_parent_handlers (bool): Whether to check parent handlers.
-#         path (str): Path to the log file.
-#         fallback_handlers (set[HandlerType] | None): Default handler set used when
-#             records do not explicitly include handler routing.
-
-#     Returns:
-#         None
-
-#     Raises:
-#         LoggerHandlerError: If a parent logger has a file handler.
-#     """
-#     if fallback_handlers is None:
-#         fallback_handlers = {HandlerType.File}
-#     check_parent_handlers(log, use_parent_handlers, logging.FileHandler)
-#     file_handler = logging.FileHandler(filename=path)
-#     file_handler.setFormatter(LoggingFormatter())
-#     file_handler.addFilter(
-#         HandleIDFilter(
-#             handler_id=HandlerType.File,
-#             fallback_handlers=fallback_handlers
-#             )
-#     )
-#     log.addHandler(file_handler)
-#     return
-
-
-
-
-# This is the big ol massive function..
+#! This is the big ol massive function.. we should refactor this
 def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],

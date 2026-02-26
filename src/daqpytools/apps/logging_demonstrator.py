@@ -7,9 +7,9 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.formatter import CONTEXT_SETTINGS
+from daqpytools.logging.handlerconf import LogHandlerConf
 from daqpytools.logging.handlers import (
     HandlerType,
-    LogHandlerConf,
     add_stderr_handler,
     add_stdout_handler,
 )

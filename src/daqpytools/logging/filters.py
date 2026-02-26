@@ -19,7 +19,6 @@ from daqpytools.logging.formatter import (
 from daqpytools.logging.handlerconf import (
     HandlerType,
     LogHandlerConf,
-    _resolve_default_case,
 )
 from daqpytools.logging.routing import (
     AllowedHandlersStrategy,
@@ -294,7 +293,10 @@ def add_filter(
     """Add a logger filter according to the spec"""
     spec = get_filter_spec(handler_type)
 
-    logger_filter = spec.factory(_resolve_default_case(fallback_handlers), extras or {})
+    logger_filter = spec.factory(
+        fallback_handlers if fallback_handlers is not None else spec.filter_handler_ids,
+        extras
+    )
     log.addFilter(logger_filter)
 
 

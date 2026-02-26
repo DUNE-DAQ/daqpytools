@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
@@ -13,7 +13,8 @@ from daqpytools.logging.exceptions import (
 )
 from daqpytools.logging.filters import (
     HandleIDFilter,
-    ThrottleFilter,
+    add_filter,
+    get_filter_spec,
 )
 from daqpytools.logging.formatter import (
     LoggingFormatter,
@@ -254,9 +255,18 @@ def add_handler(
     fallback_handler: set[HandlerType] | None,
     extras: Mapping[str, Any] | None = None,
 ):
-    
     specs = get_handler_specs(handler_type) 
     for spec in specs:
+        if logger_or_ancestors_have_handler(
+            log,
+            use_parent_handlers,
+            spec.handler_type,
+            target_stream=spec.target_stream,
+        ):
+            # raise ValueError('HEY THEY ALREADY EXIST')
+            continue
+            
+
         check_parent_handlers(
             log,
             use_parent_handlers,
@@ -360,117 +370,36 @@ def add_ers_kafka_handler(
         },
     )
     
-from daqpytools.logging.filters import add_throttle_filter
-
-
-#! This is the big ol massive function.. we should refactor this
 def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],
     use_parent_handlers: bool,
     fallback_handlers: set[HandlerType],
-    file_name: str | None,
-    ers_kafka_session: str | None,
-    app_name : str|None = None,
+    extras: Mapping[str, Any] | None = None,
 ) -> None:
-    """Add handlers to a logger based on a set of HandlerType values.
+    """Add handlers and filters from a set of HandlerType values.
 
-    This helper intentionally supports only the default options for now:
-    - ``use_parent_handlers`` is always True.
-    - ``HandlerType.File`` is not supported and raises immediately.
-    - ``HandlerType.Protobufstream`` requires ``ers_kafka_session``.
+    Handler types resolve through ``HANDLER_SPEC_REGISTRY`` and are installed
+    using ``add_handler``. Filter types resolve through ``FILTER_SPEC_REGISTRY``
+    and are installed using ``add_filter``.
     """
-    if HandlerType.Protobufstream in handler_types and not ers_kafka_session:
-        err_msg = "ers_kafka_session is required for HandlerType.Protobufstream"
-        raise ValueError(err_msg)
-    
-    if HandlerType.File in handler_types and not file_name:
-        err_msg = "file_name is required for HandlerType.File"
-        raise ValueError(err_msg)
-
-    # Update relevant handler types that was parsed
     effective_handler_types = set(handler_types)
+
     if HandlerType.Stream in effective_handler_types:
-        effective_handler_types.update({HandlerType.Lstdout, HandlerType.Lstderr})
+        effective_handler_types.discard(HandlerType.Lstdout)
+        effective_handler_types.discard(HandlerType.Lstderr)
 
-    # Generate handler configurations based on arguments for auto install
-    handler_configs: dict[
-        HandlerType,
-        tuple[
-            type[logging.Handler] | None, # Handler as seen by Python's Logger
-            io.IOBase | None, # Used for streamhandling
-            type[logging.Filter] | None, # For filters attached to loggers
-            Callable[[], None],  # Installer code
-        ],
-    ] = {
-        HandlerType.Rich: (
-            FormattedRichHandler,
-            None,
-            None,
-            lambda: add_rich_handler(log, use_parent_handlers, fallback_handlers),
-        ),
-        HandlerType.Lstdout: (
-            logging.StreamHandler,
-            cast(io.IOBase, sys.stdout),
-            None,
-            lambda: add_stdout_handler(log, use_parent_handlers, fallback_handlers),
-        ),
-        HandlerType.Lstderr: (
-            logging.StreamHandler,
-            cast(io.IOBase, sys.stderr),
-            None,
-            lambda: add_stderr_handler(log, use_parent_handlers, fallback_handlers),
-        ),
-        HandlerType.Protobufstream: (
-            ERSKafkaLogHandler,
-            None,
-            None,
-            lambda: add_ers_kafka_handler(
-                log, use_parent_handlers, ers_kafka_session, {HandlerType.Unknown},
-                app_name
-                # WE DONT WANT TO TRANSMIT BY DEFAULT
-            ),
-        ),
-        HandlerType.Throttle: (
-            None,
-            None,
-            ThrottleFilter,
-            lambda: add_throttle_filter(log, fallback_handlers),
-        ),
-        HandlerType.File: (
-            logging.FileHandler,
-            None,
-            None,
-            lambda: add_file_handler(
-                log, use_parent_handlers, file_name, fallback_handlers
-            ),
-        ),
-    }
-
-
-    for handler_type, (
-        handler_class,
-        target_stream,
-        filter_type,
-        installer,
-    ) in handler_configs.items():
-        
-        # Skips if it encounters an unrequested handler
-        if handler_type not in effective_handler_types:
-            continue
-        
-        # Skips if handler/filter exists in either the logger or any of its ancestors
-        handler_exists = (
-            handler_class is not None
-            and logger_or_ancestors_have_handler(
+    for handler_type in effective_handler_types:
+        if get_handler_specs(handler_type):
+            add_handler(
                 log,
+                handler_type,
                 use_parent_handlers,
-                handler_class,
-                target_stream=target_stream,
+                fallback_handlers,
+                extras,
             )
-        ) or (filter_type is not None and logger_has_filter(log, filter_type))
-        
-        if handler_exists:
             continue
-        
-        installer()
+
+        filter_spec = get_filter_spec(handler_type)
+        if filter_spec and not logger_has_filter(log, filter_spec.filter_type):
+            add_filter(log, handler_type, fallback_handlers, extras)

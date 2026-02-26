@@ -234,10 +234,31 @@ FILE_HANDLER_SPEC = HandlerSpec(
 
 
 
+def _build_erskafka_handler(extras: Mapping[str, Any]) -> logging.Handler: 
+    session_name = cast( str | None, extras.get("session_name"))
+
+    if not session_name:
+        err_msg = "'session_name' is required for erskafka handler"
+        raise ValueError(err_msg)
+
+    topic = cast(str, extras.get("topic", "ers_stream"))
+    address = cast(str, extras.get("address", "monkafka.cern.ch:30092"))
+    app_name = cast(str, extras.get("app_name", None))
+    return ERSKafkaLogHandler(
+        session = session_name,
+        kafka_address=address,
+        kafka_topic = topic,
+        app_name=app_name
+    )
+    
 
 
-
-
+ERSKAFKA_HANDLER_SPEC = HandlerSpec(
+    representative_type=HandlerType.Protobufstream,
+    handler_type = ERSKafkaLogHandler,
+    factory = _build_erskafka_handler,
+    filter_handler_ids=[HandlerType.Protobufstream],
+)
 
 
 
@@ -247,7 +268,8 @@ HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
     HandlerType.Lstdout: (STDOUT_HANDLER_SPEC,),
     HandlerType.Lstderr: (STDERR_HANDLER_SPEC,),
     HandlerType.Stream: (STDOUT_HANDLER_SPEC,STDERR_HANDLER_SPEC),
-    HandlerType.File: (FILE_HANDLER_SPEC,)
+    HandlerType.File: (FILE_HANDLER_SPEC,),
+    HandlerType.Protobufstream: (ERSKAFKA_HANDLER_SPEC,)
 }
 
 def get_handler_specs(handler_type: HandlerType):
@@ -349,6 +371,28 @@ def add_file_handler(
             "path" : path
         }
     )
+
+def add_ers_kafka_handler(
+    log: logging.Logger,
+    use_parent_handlers: bool,
+    session_name: str,
+    fallback_handlers: set[HandlerType] | None = None,
+    app_name : str|None =None,
+    topic: str = "ers_stream",
+    address: str = "monkafka.cern.ch:30092",
+) -> None:
+    add_handler(
+        log,
+        HandlerType.Protobufstream,
+        use_parent_handlers,
+        fallback_handlers,
+        extras={
+            "session_name": session_name,
+            "topic": topic,
+            "address": address,
+            "app_name": app_name,
+        },
+    )
     
 
 from daqpytools.logging.filters import add_throttle_filter
@@ -361,33 +405,33 @@ from daqpytools.logging.filters import add_throttle_filter
 
 
 
-def add_ers_kafka_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    session_name: str,
-    fallback_handlers: set[HandlerType] | None = None,
-    app_name : str|None =None,
-    topic: str = "ers_stream",
-    address: str = "monkafka.cern.ch:30092",
-) -> None:
-    # TODO/future: topic and address are new, propagate to all relevant implementation
-    """Add an ers protobuf handler to the root logger."""
-    if fallback_handlers is None:
-        fallback_handlers = {HandlerType.Protobufstream}
-    check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
-    handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
-                                                     kafka_address = address, 
-                                                     kafka_topic = topic,
-                                                     app_name = app_name,
-                                                     )
+# def add_ers_kafka_handler(
+#     log: logging.Logger,
+#     use_parent_handlers: bool,
+#     session_name: str,
+#     fallback_handlers: set[HandlerType] | None = None,
+#     app_name : str|None =None,
+#     topic: str = "ers_stream",
+#     address: str = "monkafka.cern.ch:30092",
+# ) -> None:
+#     # TODO/future: topic and address are new, propagate to all relevant implementation
+#     """Add an ers protobuf handler to the root logger."""
+#     if fallback_handlers is None:
+#         fallback_handlers = {HandlerType.Protobufstream}
+#     check_parent_handlers(log, use_parent_handlers, ERSKafkaLogHandler)
+#     handler: ERSKafkaLogHandler = ERSKafkaLogHandler(session=session_name, 
+#                                                      kafka_address = address, 
+#                                                      kafka_topic = topic,
+#                                                      app_name = app_name,
+#                                                      )
 
-    handler.addFilter(
-        HandleIDFilter(
-            handler_id=HandlerType.Protobufstream,
-            fallback_handlers=fallback_handlers
-            )
-    )
-    log.addHandler(handler)
+#     handler.addFilter(
+#         HandleIDFilter(
+#             handler_id=HandlerType.Protobufstream,
+#             fallback_handlers=fallback_handlers
+#             )
+#     )
+#     log.addHandler(handler)
 
 # def add_file_handler(
 #     log: logging.Logger,

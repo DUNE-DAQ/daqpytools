@@ -468,6 +468,60 @@ def add_rich_handler(
         fallback_handlers
     )
 
+
+def _build_throttle_filter(
+    fallback_handlers: set[HandlerType],
+    extras: Mapping[str, Any],
+) -> logging.Filter:
+    """Build throttle filter from extras"""
+    initial_treshold = cast(int, extras.get("initial_treshold", 30))
+    time_limit = cast(int, extras.get("time_limit", 30))
+    return ThrottleFilter(
+        fallback_handlers=fallback_handlers,
+        initial_threshold=initial_treshold,
+        time_limit=time_limit
+    )
+
+THROTTLE_FILTER_SPEC = FilterSpec(
+    representative_type = HandlerType.Throttle,
+    filter_type = ThrottleFilter,
+    factory=_build_throttle_filter
+)
+
+FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
+    HandlerType.Throttle: THROTTLE_FILTER_SPEC
+
+}
+
+def get_filter_spec(handler_types: HandlerType):
+    return FILTER_SPEC_REGISTRY.get(handler_types)
+
+def add_filter(
+    log: logging.Logger,
+    spec: FilterSpec,
+    fallback_handlers : set[HandlerType]| None,
+    extras: Mapping[str,Any] | None = None,
+) -> None:
+    """Add a logger filter according to the spec"""
+    logger_filter = spec.factory(_resolve_default_case(fallback_handlers), extras or {})
+    log.addFilter(logger_filter)
+
+
+def add_throttle_filter(
+    log: logging.Logger,
+    fallback_handlers: set[HandlerType] | None = None,
+) -> None:
+    "Add the Throttle filter to the logger"
+    add_filter(
+        log,
+        THROTTLE_FILTER_SPEC,
+        fallback_handlers
+    )
+
+
+# figureo ut how this mattches to the add_handlers bit, this is very important!
+
+
 ##################################################################################################
 ##################################################################################################
 ##################################################################################################

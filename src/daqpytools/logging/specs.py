@@ -13,7 +13,7 @@ from typing import Any
 class HandlerSpec:
     representative_type: Any
     handler_type: type[logging.Handler]
-    factory: Callable[[Mapping[str, Any]], logging.Handler]
+    factory: Callable[..., logging.Handler]
     filter_handler_ids: tuple[Any, ...] # For HandleIDFilter
     target_stream: io.IOBase| None = None
 

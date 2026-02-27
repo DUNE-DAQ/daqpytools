@@ -9,6 +9,7 @@ from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 
 from daqpytools.logging.exceptions import (
     LoggerHandlerError,
+    ERSInitError
 )
 from daqpytools.logging.filters import (
     HandleIDFilter,
@@ -210,13 +211,17 @@ def _build_erskafka_handler(
         address : str = "monkafka.cern.ch:30092",
         ers_app_name : str | None = None,
         **_) -> logging.Handler: 
+    
+    try:
+        return ERSKafkaLogHandler(
+            session = session_name,
+            kafka_address=address,
+            kafka_topic = topic,
+            app_name=ers_app_name
+        )
+    except:
+        raise ERSInitError(address, topic)
 
-    return ERSKafkaLogHandler(
-        session = session_name,
-        kafka_address=address,
-        kafka_topic = topic,
-        app_name=ers_app_name
-    )
     
 ERSKAFKA_HANDLER_SPEC = HandlerSpec(
     representative_type=HandlerType.Protobufstream,

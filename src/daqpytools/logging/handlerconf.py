@@ -26,7 +26,7 @@ class StreamType(Enum):
     OPMON="opmon"
     ERS="ers"
 
-@dataclass 
+@dataclass(frozen=True)
 class ProtobufConf:
     """Dataclass to hold Protobuf Configuration."""
     url:str= "monkafka.cern.ch"
@@ -59,7 +59,7 @@ class HandlerType(Enum):
             log.warning(msg)
             return None
 
-@dataclass
+@dataclass(frozen=True)
 class ERSPyLogHandlerConf:
     """Dataclass that holds the relevant ERS configuration from OKS.
 
@@ -181,17 +181,28 @@ class LogHandlerConf:
     @staticmethod
     def _make_ers_handler_conf(ers_log_level :str) -> ERSPyLogHandlerConf:
         """Generates the ERSPyLogHandlerConf from reading an environment variable."""
-        erspyloghandlerconf = ERSPyLogHandlerConf()
         envvalue = os.getenv(ers_log_level)
         if envvalue is None:
             raise ERSEnvError(ers_log_level)
         
-        for h in envvalue.split(","):
-            handlertype, kafkaconf = LogHandlerConf._convert_str_to_handlertype(h)
-            erspyloghandlerconf.handlers.append(handlertype)
-            if kafkaconf:
-                erspyloghandlerconf.protobufconf = kafkaconf 
-        return erspyloghandlerconf
+        ers_handlers: list[HandlerType] = []
+        protobufconf: ProtobufConf | None = None
+
+        for raw_handler in envvalue.split(","):
+            handlertype, parsed_protobufconf = LogHandlerConf._convert_str_to_handlertype(
+                raw_handler.strip()
+            )
+
+            if handlertype is not None:
+                ers_handlers.append(handlertype)
+
+            if parsed_protobufconf is not None:
+                protobufconf = parsed_protobufconf
+        
+        return ERSPyLogHandlerConf(
+            handlers = ers_handlers,
+            protobufconf = protobufconf
+        )
 
     @staticmethod
     def _get_oks_conf() -> dict:

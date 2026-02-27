@@ -187,18 +187,42 @@ def setup_daq_ers_logger(
     Returns:
         None
     """
+    oks_conf = LogHandlerConf._get_oks_conf()
+
+    protobuf_configs = {
+        handler_conf.protobufconf
+        for handler_conf in oks_conf.values()
+        if handler_conf.protobufconf is not None
+    }
+
+    if len(protobuf_configs) > 1:
+        err_msg = (
+            "Multiple protobufstream(url:port) configurations are not supported "
+            "in Python ERS logger setup"
+        )
+        raise ValueError(err_msg)
+
+    protobuf_config = next(iter(protobuf_configs), None)
+    kafka_address = protobuf_config.get_string() if protobuf_config else None
+
     all_handlers = {
         handler
-        for handler_conf in LogHandlerConf._get_oks_conf().values()
+        for handler_conf in oks_conf.values()
         for handler in handler_conf.handlers
+        if handler is not None
     }
+
+    add_ers_kwargs = {
+        "session_name": ers_kafka_session,
+        "ers_app_name": ers_app_name,
+    }
+    if kafka_address is not None:
+        add_ers_kwargs["address"] = kafka_address
 
     add_handlers_from_types(
         logger,
         all_handlers,
         use_parent_handlers=True,
         fallback_handlers={HandlerType.Unknown},
-        session_name=ers_kafka_session,
-        app_name = ers_app_name
+        **add_ers_kwargs,
     )
-

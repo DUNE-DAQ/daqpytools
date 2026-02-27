@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import logging
 import sys
-from collections.abc import Mapping
 from typing import Any, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
@@ -150,10 +149,10 @@ def logger_or_ancestors_have_handler(
 
 #### Handlers #### 
 
-def _build_rich_handler(extras: Mapping[str, Any]) -> logging.Handler:
+def _build_rich_handler(width: int | None = None, **_: Any) -> logging.Handler:
     """Building the rich handler with any extras."""
-    width = cast(int,  extras.get("width", get_width()))
-    return FormattedRichHandler(width=width)
+    real_width = width if width is not None else get_width()
+    return FormattedRichHandler(width=real_width)
 
 RICH_HANDLER_SPEC = HandlerSpec(
     representative_type = HandlerType.Rich,
@@ -162,8 +161,7 @@ RICH_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids = (HandlerType.Rich,), # For HandleIDFilter
 )
 
-def _build_stdout_handler(extras: Mapping[str, Any]) -> logging.Handler:
-    del extras #unused
+def _build_stdout_handler(**_: Any) -> logging.Handler:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(LoggingFormatter())
     return handler
@@ -176,8 +174,7 @@ STDOUT_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids = (HandlerType.Stream, HandlerType.Lstdout),
 )
 
-def _build_stderr_handler(extras: Mapping[str, Any]) -> logging.Handler:
-    del extras #unused
+def _build_stderr_handler(**_: Any) -> logging.Handler:
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(LoggingFormatter())
     handler.setLevel(logging.ERROR)
@@ -191,10 +188,9 @@ STDERR_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids = (HandlerType.Stream, HandlerType.Lstderr),
 )
 
-def _build_file_handler(extras: Mapping[str, Any]) -> logging.Handler:
-    path = cast(str | None, extras.get("path"))
+def _build_file_handler(path: str | None = None, **_: Any) -> logging.Handler:
     if not path:
-        err_msg = "path is requiired for file handler"
+        err_msg = "path is required for file handler"
         raise ValueError(err_msg)
     handler = logging.FileHandler(filename=path)
     handler.setFormatter(LoggingFormatter())
@@ -208,21 +204,18 @@ FILE_HANDLER_SPEC = HandlerSpec(
     filter_handler_ids=(HandlerType.File,)
 )
 
-def _build_erskafka_handler(extras: Mapping[str, Any]) -> logging.Handler: 
-    session_name = cast( str | None, extras.get("session_name"))
+def _build_erskafka_handler(
+        session_name : str,
+        topic : str = "ers_stream",
+        address : str = "monkafka.cern.ch:30092",
+        ers_app_name : str | None = None,
+        **_) -> logging.Handler: 
 
-    if not session_name:
-        err_msg = "'session_name' is required for erskafka handler"
-        raise ValueError(err_msg)
-
-    topic = cast(str, extras.get("topic", "ers_stream"))
-    address = cast(str, extras.get("address", "monkafka.cern.ch:30092"))
-    app_name = cast(str, extras.get("app_name", None))
     return ERSKafkaLogHandler(
         session = session_name,
         kafka_address=address,
         kafka_topic = topic,
-        app_name=app_name
+        app_name=ers_app_name
     )
     
 ERSKAFKA_HANDLER_SPEC = HandlerSpec(
@@ -253,7 +246,7 @@ def add_handler(
     handler_type: HandlerType | str, 
     use_parent_handlers:bool, 
     fallback_handler: set[HandlerType] | None = None,
-    extras: Mapping[str, Any] | None = None,
+    **extras: Any
 ):    
     ht = HandlerType.from_string(handler_type) if isinstance(handler_type, str) else handler_type
     specs = get_handler_specs(ht) 
@@ -265,7 +258,6 @@ def add_handler(
             spec.handler_type,
             target_stream=spec.target_stream,
         ):
-            # raise ValueError('HEY THEY ALREADY EXIST')
             continue
             
 
@@ -276,7 +268,7 @@ def add_handler(
             target_stream = spec.target_stream
         )
 
-        handler = spec.factory(extras or {})
+        handler = spec.factory(**extras)
         effective_default_case = fallback_handler if fallback_handler is not None else spec.filter_handler_ids
 
         handler_ids: HandlerType | list[HandlerType]
@@ -291,7 +283,6 @@ def add_handler(
                 fallback_handlers=effective_default_case
             )
         )
-
         log.addHandler(handler)
 
 
@@ -301,7 +292,7 @@ def add_handlers_from_types(
     handler_types: set[HandlerType],
     use_parent_handlers: bool,
     fallback_handlers: set[HandlerType],
-    extras: Mapping[str, Any] | None = None,
+    **extras: Any,
 ) -> None:
     """Add handlers and filters from a set of HandlerType values.
 
@@ -322,10 +313,10 @@ def add_handlers_from_types(
                 handler_type,
                 use_parent_handlers,
                 fallback_handlers,
-                extras,
+                **extras,
             )
             continue
 
         filter_spec = get_filter_spec(handler_type)
         if filter_spec and not logger_has_filter(log, filter_spec.filter_type):
-            add_filter(log, handler_type, fallback_handlers, extras)
+            add_filter(log, handler_type, fallback_handlers, **extras)

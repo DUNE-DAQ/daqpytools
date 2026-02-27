@@ -4,10 +4,9 @@ import copy
 import logging
 import time
 from collections import defaultdict
-from collections.abc import Mapping
 from datetime import datetime
 from threading import Lock
-from typing import Any, cast
+from typing import Any
 
 from rich.text import Text
 
@@ -260,11 +259,12 @@ class ThrottleFilter(BaseHandlerFilter):
 
 def _build_throttle_filter(
     fallback_handlers: set[HandlerType],
-    extras: Mapping[str, Any],
+    initial_treshold : int = 30,
+    time_limit: int = 30,
+    **extras: Any,
 ) -> logging.Filter:
     """Build throttle filter from extras"""
-    initial_treshold = cast(int, extras.get("initial_treshold", 30))
-    time_limit = cast(int, extras.get("time_limit", 30))
+    del extras
     return ThrottleFilter(
         fallback_handlers=fallback_handlers,
         initial_threshold=initial_treshold,
@@ -288,14 +288,14 @@ def add_filter(
     log: logging.Logger,
     handler_type:HandlerType,
     fallback_handlers : set[HandlerType]| None,
-    extras: Mapping[str,Any] | None = None,
+    **extras: Any,
 ) -> None:
     """Add a logger filter according to the spec"""
     spec = get_filter_spec(handler_type)
 
     logger_filter = spec.factory(
         fallback_handlers if fallback_handlers is not None else spec.filter_handler_ids,
-        extras
+        **extras
     )
     log.addFilter(logger_filter)
 

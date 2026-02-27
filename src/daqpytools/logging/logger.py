@@ -7,12 +7,10 @@ import sh
 from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.handlerconf import HandlerType, LogHandlerConf
 from daqpytools.logging.handlers import (
     add_handlers_from_types,
 )
-
-from daqpytools.logging.handlerconf import LogHandlerConf, HandlerType
-
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
 
@@ -70,8 +68,8 @@ def get_daq_logger(
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
     ers_kafka_session: str | None = None,
-    ers_app_name: str | None = None,
     throttle: bool = False,
+    **extras
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -158,11 +156,9 @@ def get_daq_logger(
         fallback_handlers,
         use_parent_handlers,
         fallback_handlers,
-        {
-            "path": file_handler_path,
-            "session_name": ers_kafka_session,
-            "app_name": ers_app_name,
-        },
+        path=file_handler_path,
+        session_name=ers_kafka_session,
+        **extras
     )
 
     # Set log level for all handlers if requested
@@ -202,9 +198,7 @@ def setup_daq_ers_logger(
         all_handlers,
         use_parent_handlers=True,
         fallback_handlers={HandlerType.Unknown},
-        extras={
-            "session_name": ers_kafka_session,
-            "app_name": ers_app_name,
-        },
+        session_name=ers_kafka_session,
+        app_name = ers_app_name
     )
 

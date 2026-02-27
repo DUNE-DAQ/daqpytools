@@ -272,9 +272,10 @@ def _build_throttle_filter(
     )
 
 THROTTLE_FILTER_SPEC = FilterSpec(
-    representative_type = HandlerType.Throttle,
-    filter_type = ThrottleFilter,
-    factory=_build_throttle_filter
+    alias = HandlerType.Throttle,
+    filter_class = ThrottleFilter,
+    factory=_build_throttle_filter,
+    fallback_types=(HandlerType.Throttle,),
 )
 
 FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
@@ -294,7 +295,7 @@ def add_filter(
     spec = get_filter_spec(handler_type)
 
     logger_filter = spec.factory(
-        fallback_handlers if fallback_handlers is not None else spec.filter_handler_ids,
+        fallback_handlers if fallback_handlers is not None else set(spec.fallback_types),
         **extras
     )
     log.addFilter(logger_filter)

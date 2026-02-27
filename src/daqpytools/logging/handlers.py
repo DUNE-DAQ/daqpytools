@@ -7,10 +7,7 @@ from typing import Any, cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 
-from daqpytools.logging.exceptions import (
-    LoggerHandlerError,
-    ERSInitError
-)
+from daqpytools.logging.exceptions import ERSInitError, LoggerHandlerError
 from daqpytools.logging.filters import (
     HandleIDFilter,
     add_filter,
@@ -156,10 +153,10 @@ def _build_rich_handler(width: int | None = None, **_: Any) -> logging.Handler:
     return FormattedRichHandler(width=real_width)
 
 RICH_HANDLER_SPEC = HandlerSpec(
-    representative_type = HandlerType.Rich,
-    handler_type = FormattedRichHandler,
+    alias = HandlerType.Rich,
+    handler_class = FormattedRichHandler,
     factory=_build_rich_handler,
-    filter_handler_ids = (HandlerType.Rich,), # For HandleIDFilter
+    fallback_types = (HandlerType.Rich,), # For HandleIDFilter
 )
 
 def _build_stdout_handler(**_: Any) -> logging.Handler:
@@ -168,11 +165,11 @@ def _build_stdout_handler(**_: Any) -> logging.Handler:
     return handler
 
 STDOUT_HANDLER_SPEC = HandlerSpec(
-    representative_type = HandlerType.Lstdout,
-    handler_type = logging.StreamHandler,
+    alias = HandlerType.Lstdout,
+    handler_class = logging.StreamHandler,
     target_stream=cast(io.IOBase, sys.stdout),
     factory=_build_stdout_handler,
-    filter_handler_ids = (HandlerType.Stream, HandlerType.Lstdout),
+    fallback_types = (HandlerType.Stream, HandlerType.Lstdout),
 )
 
 def _build_stderr_handler(**_: Any) -> logging.Handler:
@@ -182,11 +179,11 @@ def _build_stderr_handler(**_: Any) -> logging.Handler:
     return handler
 
 STDERR_HANDLER_SPEC = HandlerSpec(
-    representative_type = HandlerType.Lstderr,
-    handler_type = logging.StreamHandler,
+    alias = HandlerType.Lstderr,
+    handler_class = logging.StreamHandler,
     target_stream=cast(io.IOBase, sys.stderr),
     factory=_build_stderr_handler,
-    filter_handler_ids = (HandlerType.Stream, HandlerType.Lstderr),
+    fallback_types = (HandlerType.Stream, HandlerType.Lstderr),
 )
 
 def _build_file_handler(path: str | None = None, **_: Any) -> logging.Handler:
@@ -199,10 +196,10 @@ def _build_file_handler(path: str | None = None, **_: Any) -> logging.Handler:
     return handler
 
 FILE_HANDLER_SPEC = HandlerSpec(
-    representative_type=HandlerType.File,
-    handler_type = logging.FileHandler,
+    alias=HandlerType.File,
+    handler_class = logging.FileHandler,
     factory = _build_file_handler,
-    filter_handler_ids=(HandlerType.File,)
+    fallback_types=(HandlerType.File,)
 )
 
 def _build_erskafka_handler(
@@ -224,10 +221,10 @@ def _build_erskafka_handler(
 
     
 ERSKAFKA_HANDLER_SPEC = HandlerSpec(
-    representative_type=HandlerType.Protobufstream,
-    handler_type = ERSKafkaLogHandler,
+    alias=HandlerType.Protobufstream,
+    handler_class = ERSKafkaLogHandler,
     factory = _build_erskafka_handler,
-    filter_handler_ids=[HandlerType.Protobufstream],
+    fallback_types=(HandlerType.Protobufstream,),
 )
 
 
@@ -260,7 +257,7 @@ def add_handler(
         if logger_or_ancestors_have_handler(
             log,
             use_parent_handlers,
-            spec.handler_type,
+            spec.handler_class,
             target_stream=spec.target_stream,
         ):
             continue
@@ -269,18 +266,18 @@ def add_handler(
         check_parent_handlers(
             log,
             use_parent_handlers,
-            spec.handler_type,
+            spec.handler_class,
             target_stream = spec.target_stream
         )
 
         handler = spec.factory(**extras)
-        effective_default_case = fallback_handler if fallback_handler is not None else spec.filter_handler_ids
+        effective_default_case = fallback_handler if fallback_handler is not None else spec.fallback_types
 
         handler_ids: HandlerType | list[HandlerType]
-        if len(spec.filter_handler_ids) == 1:
-            handler_ids = cast(HandlerType, spec.filter_handler_ids[0])
+        if len(spec.fallback_types) == 1:
+            handler_ids = cast(HandlerType, spec.fallback_types[0])
         else: 
-            handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.filter_handler_ids] 
+            handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.fallback_types] 
  
         handler.addFilter(
             HandleIDFilter(
@@ -323,5 +320,5 @@ def add_handlers_from_types(
             continue
 
         filter_spec = get_filter_spec(handler_type)
-        if filter_spec and not logger_has_filter(log, filter_spec.filter_type):
+        if filter_spec and not logger_has_filter(log, filter_spec.filter_class):
             add_filter(log, handler_type, fallback_handlers, **extras)

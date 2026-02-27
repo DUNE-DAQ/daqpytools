@@ -10,8 +10,7 @@ from daqpytools.logging.formatter import CONTEXT_SETTINGS
 from daqpytools.logging.handlerconf import LogHandlerConf
 from daqpytools.logging.handlers import (
     HandlerType,
-    add_stderr_handler,
-    add_stdout_handler,
+    add_handler,
 )
 from daqpytools.logging.levels import logging_log_level_keys
 from daqpytools.logging.logger import get_daq_logger, setup_daq_ers_logger
@@ -165,7 +164,7 @@ def test_handlertypes(main_logger: logging.Logger) -> None:
         main_logger (logging.Logger): A logger to print messages with
     """
     #* Test choosing which handler to use individually
-    main_logger.debug("Default go to tty / rich / file when added")
+    main_logger.debug("Default go to whatever handlers were initialised with")
     main_logger.critical("Should only go to tty", 
         extra={"handlers": [HandlerType.Rich]}
     )
@@ -246,9 +245,19 @@ def test_fallback_handlers(log_level: str) -> None:
 
     fallback_log.info("Rich Only")
     
-    add_stdout_handler(fallback_log, True)
-    add_stderr_handler(fallback_log, True, {HandlerType.Unknown})
+    add_handler(
+        fallback_log,
+        HandlerType.Lstdout,
+        True
+    )
 
+    add_handler(
+        fallback_log,
+        HandlerType.Lstderr,
+        True,
+        fallback_handler = {HandlerType.Unknown}
+    )
+    
     fallback_log.critical("Rich + stdout only")
     fallback_log.critical(
         "Rich + stdout + stderr",
@@ -266,8 +275,8 @@ def test_ers_handler_configuration(log_level: str) -> None:
         None
     """
     # Injecting specific 
-    os.environ["DUNEDAQ_ERS_WARNING"] = "lstdout"
-    os.environ["DUNEDAQ_ERS_INFO"] = "rich"
+    os.environ["DUNEDAQ_ERS_WARNING"] = "rich"
+    os.environ["DUNEDAQ_ERS_INFO"] = "lstdout"
     os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr,rich"
     os.environ["DUNEDAQ_ERS_ERROR"] = "rich"
 
@@ -284,7 +293,7 @@ def test_ers_handler_configuration(log_level: str) -> None:
     ers_logger.info("ERS configured, but should still only be rich")
     
     ers_hc = LogHandlerConf(init_ers=True)
-    ers_logger.info("ERS Info rich ", extra=ers_hc.ERS)
+    ers_logger.info("ERS Info lstdout ", extra=ers_hc.ERS)
     ers_logger.warning("ERS error lstdout", extra=ers_hc.ERS)
     ers_logger.critical("ERS critical lstderr + rich", extra=ers_hc.ERS)
 

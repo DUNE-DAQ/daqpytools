@@ -250,12 +250,14 @@ def get_handler_specs(handler_type: HandlerType):
 
 def add_handler(
     log: logging.Logger,
-    handler_type: HandlerType,
+    handler_type: HandlerType | str, 
     use_parent_handlers:bool, 
-    fallback_handler: set[HandlerType] | None,
+    fallback_handler: set[HandlerType] | None = None,
     extras: Mapping[str, Any] | None = None,
-):
-    specs = get_handler_specs(handler_type) 
+):    
+    ht = HandlerType.from_string(handler_type) if isinstance(handler_type, str) else handler_type
+    specs = get_handler_specs(ht) 
+    
     for spec in specs:
         if logger_or_ancestors_have_handler(
             log,
@@ -293,83 +295,7 @@ def add_handler(
         log.addHandler(handler)
 
 
-#! Backwards compatibility. We should consider retiring these functinos
 
-def add_rich_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    
-    add_handler(
-        log,
-        HandlerType.Rich,
-        use_parent_handlers,
-        fallback_handlers
-    )
-
-def add_stdout_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    add_handler(
-        log,
-        HandlerType.Lstdout,
-        use_parent_handlers,
-        fallback_handlers
-    )
-
-def add_stderr_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    add_handler(
-        log,
-        HandlerType.Lstderr,
-        use_parent_handlers,
-        fallback_handlers
-    )
-
-def add_file_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    path: str,
-    fallback_handlers: set[HandlerType] | None = None,
-) -> None:
-    add_handler(
-        log,
-        HandlerType.File,
-        use_parent_handlers,
-        fallback_handlers,
-        extras = {
-            "path" : path
-        }
-    )
-
-def add_ers_kafka_handler(
-    log: logging.Logger,
-    use_parent_handlers: bool,
-    session_name: str,
-    fallback_handlers: set[HandlerType] | None = None,
-    app_name : str|None =None,
-    topic: str = "ers_stream",
-    address: str = "monkafka.cern.ch:30092",
-) -> None:
-    add_handler(
-        log,
-        HandlerType.Protobufstream,
-        use_parent_handlers,
-        fallback_handlers,
-        extras={
-            "session_name": session_name,
-            "topic": topic,
-            "address": address,
-            "app_name": app_name,
-        },
-    )
-    
 def add_handlers_from_types(
     log: logging.Logger,
     handler_types: set[HandlerType],

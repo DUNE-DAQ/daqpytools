@@ -48,4 +48,4 @@ class FilterSpec:
     alias: Any
     filter_class: type[logging.Filter]
     factory: Callable[[set[Any], Mapping[str, Any]], logging.Filter]
-    fallback_types: tuple[Any, ...] = tuple()
+    fallback_types: tuple[Any, ...] = ()

@@ -189,8 +189,10 @@ class LogHandlerConf:
         protobufconf: ProtobufConf | None = None
 
         for raw_handler in envvalue.split(","):
-            handlertype, parsed_protobufconf = LogHandlerConf._convert_str_to_handlertype(
+            handlertype, parsed_protobufconf = (
+                LogHandlerConf._convert_str_to_handlertype(
                 raw_handler.strip()
+                )
             )
 
             if handlertype is not None:

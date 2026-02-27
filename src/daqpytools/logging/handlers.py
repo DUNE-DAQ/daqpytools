@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 import sys
-from typing import Any, cast
+from typing import cast
 
 from erskafka.ERSKafkaLogHandler import ERSKafkaLogHandler
 
@@ -147,7 +147,7 @@ def logger_or_ancestors_have_handler(
 
 #### Handlers #### 
 
-def _build_rich_handler(width: int | None = None, **_: Any) -> logging.Handler:
+def _build_rich_handler(width: int | None = None, **_: object) -> logging.Handler:
     """Building the rich handler with any extras."""
     real_width = width if width is not None else get_width()
     return FormattedRichHandler(width=real_width)
@@ -159,7 +159,7 @@ RICH_HANDLER_SPEC = HandlerSpec(
     fallback_types = (HandlerType.Rich,), # For HandleIDFilter
 )
 
-def _build_stdout_handler(**_: Any) -> logging.Handler:
+def _build_stdout_handler(**_: object) -> logging.Handler:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(LoggingFormatter())
     return handler
@@ -172,7 +172,7 @@ STDOUT_HANDLER_SPEC = HandlerSpec(
     fallback_types = (HandlerType.Stream, HandlerType.Lstdout),
 )
 
-def _build_stderr_handler(**_: Any) -> logging.Handler:
+def _build_stderr_handler(**_: object) -> logging.Handler:
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(LoggingFormatter())
     handler.setLevel(logging.ERROR)
@@ -186,7 +186,7 @@ STDERR_HANDLER_SPEC = HandlerSpec(
     fallback_types = (HandlerType.Stream, HandlerType.Lstderr),
 )
 
-def _build_file_handler(path: str | None = None, **_: Any) -> logging.Handler:
+def _build_file_handler(path: str | None = None, **_: object) -> logging.Handler:
     if not path:
         err_msg = "path is required for file handler"
         raise ValueError(err_msg)
@@ -207,7 +207,7 @@ def _build_erskafka_handler(
         topic : str = "ers_stream",
         address : str = "monkafka.cern.ch:30092",
         ers_app_name : str | None = None,
-        **_) -> logging.Handler: 
+    **_: object) -> logging.Handler: 
     
     try:
         return ERSKafkaLogHandler(
@@ -216,8 +216,8 @@ def _build_erskafka_handler(
             kafka_topic = topic,
             app_name=ers_app_name
         )
-    except:
-        raise ERSInitError(address, topic)
+    except Exception as err:
+        raise ERSInitError(address, topic) from err
 
     
 ERSKAFKA_HANDLER_SPEC = HandlerSpec(
@@ -239,18 +239,23 @@ HANDLER_SPEC_REGISTRY : dict[HandlerType, tuple[HandlerSpec, ...]] = {
     HandlerType.Protobufstream: (ERSKAFKA_HANDLER_SPEC,)
 }
 
-def get_handler_specs(handler_type: HandlerType):
-    """Get the specs defined in the registry"""
-    return HANDLER_SPEC_REGISTRY.get(handler_type, tuple())
+def get_handler_specs(handler_type: HandlerType) -> tuple[HandlerSpec, ...]:
+    """Get the specs defined in the registry."""
+    return HANDLER_SPEC_REGISTRY.get(handler_type, ())
 
 def add_handler(
     log: logging.Logger,
     handler_type: HandlerType | str, 
     use_parent_handlers:bool, 
     fallback_handler: set[HandlerType] | None = None,
-    **extras: Any
-):    
-    ht = HandlerType.from_string(handler_type) if isinstance(handler_type, str) else handler_type
+    **extras: object
+ ) -> None:
+    """Add a handler to the logger from the handler spec registry."""
+    ht = (
+        HandlerType.from_string(handler_type)
+        if isinstance(handler_type, str)
+        else handler_type
+    )
     specs = get_handler_specs(ht) 
     
     for spec in specs:
@@ -271,13 +276,20 @@ def add_handler(
         )
 
         handler = spec.factory(**extras)
-        effective_default_case = fallback_handler if fallback_handler is not None else spec.fallback_types
+        effective_default_case = (
+            fallback_handler
+            if fallback_handler is not None
+            else spec.fallback_types
+        )
 
         handler_ids: HandlerType | list[HandlerType]
         if len(spec.fallback_types) == 1:
             handler_ids = cast(HandlerType, spec.fallback_types[0])
         else: 
-            handler_ids = [cast(HandlerType, handler_id) for handler_id in spec.fallback_types] 
+            handler_ids = [
+                cast(HandlerType, handler_id)
+                for handler_id in spec.fallback_types
+            ] 
  
         handler.addFilter(
             HandleIDFilter(
@@ -294,7 +306,7 @@ def add_handlers_from_types(
     handler_types: set[HandlerType],
     use_parent_handlers: bool,
     fallback_handlers: set[HandlerType],
-    **extras: Any,
+    **extras: object,
 ) -> None:
     """Add handlers and filters from a set of HandlerType values.
 

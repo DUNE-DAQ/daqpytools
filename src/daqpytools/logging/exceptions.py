@@ -49,7 +49,10 @@ class ERSInitError(Exception):
 
     def __init__(self, address:str, topic:str) -> None:
         """C'tor."""
-        err_msg = f"The Kafka broker cannot be initialised using {address=} and {topic=}"
+        err_msg = (
+            "The Kafka broker cannot be initialised using "
+            f"{address=} and {topic=}"
+        )
         super().__init__(err_msg)
 
 

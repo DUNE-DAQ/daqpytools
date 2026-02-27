@@ -69,7 +69,7 @@ def get_daq_logger(
     stream_handlers: bool = False,
     ers_kafka_session: str | None = None,
     throttle: bool = False,
-    **extras
+    **extras: object
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -85,6 +85,7 @@ def get_daq_logger(
             protobuf handler. If None, no ERS protobuf handler is added.
         throttle (bool): Whether to add the throttle filter or not. Note, does not mean
             outputs are filtered by default! See ThrottleFilter for details.
+        **extras (object): Extra keyword arguments forwarded to handler builders.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -183,6 +184,7 @@ def setup_daq_ers_logger(
     Args:
         logger (logging.Logger): Logger to configure.
         ers_kafka_session (str): ERS session name used for protobufstream handler.
+        ers_app_name (str | None): Optional ERS application name for kafka handler.
 
     Returns:
         None

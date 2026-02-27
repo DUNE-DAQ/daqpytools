@@ -6,7 +6,6 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from threading import Lock
-from typing import Any
 
 from rich.text import Text
 
@@ -52,7 +51,11 @@ class BaseHandlerFilter(logging.Filter):
         allowed_handlers_strategy : AllowedHandlersStrategy | None = None,
     ) -> None:
         """C'tor."""
-        self.fallback_handlers = set(fallback_handlers) if fallback_handlers is not None else LogHandlerConf.get_base() #! We should check if this is still the case
+        self.fallback_handlers = (
+            set(fallback_handlers)
+            if fallback_handlers is not None
+            else LogHandlerConf.get_base()
+        )
 
         self.allowed_handlers_strategy = (
             allowed_handlers_strategy or 
@@ -61,6 +64,7 @@ class BaseHandlerFilter(logging.Filter):
         super().__init__()
 
     def get_allowed(self, record: logging.LogRecord) -> set[HandlerType] | None:
+        """Resolve the allowed handlers for a record."""
         return self.allowed_handlers_strategy.resolve(record, self.fallback_handlers)
 
         
@@ -261,9 +265,9 @@ def _build_throttle_filter(
     fallback_handlers: set[HandlerType],
     initial_treshold : int = 30,
     time_limit: int = 30,
-    **extras: Any,
+    **extras: object,
 ) -> logging.Filter:
-    """Build throttle filter from extras"""
+    """Build a throttle filter from extras."""
     del extras
     return ThrottleFilter(
         fallback_handlers=fallback_handlers,
@@ -282,20 +286,26 @@ FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
     HandlerType.Throttle: THROTTLE_FILTER_SPEC
 }
 
-def get_filter_spec(handler_types: HandlerType):
+def get_filter_spec(handler_types: HandlerType) -> FilterSpec | None:
+    """Return the filter specification for a handler type."""
     return FILTER_SPEC_REGISTRY.get(handler_types)
 
 def add_filter(
     log: logging.Logger,
     handler_type:HandlerType,
     fallback_handlers : set[HandlerType]| None,
-    **extras: Any,
+    **extras: object,
 ) -> None:
-    """Add a logger filter according to the spec"""
+    """Add a logger filter according to the spec."""
     spec = get_filter_spec(handler_type)
 
+    effective_fallback_handlers = (
+        fallback_handlers
+        if fallback_handlers is not None
+        else set(spec.fallback_types)
+    )
     logger_filter = spec.factory(
-        fallback_handlers if fallback_handlers is not None else set(spec.fallback_types),
+        effective_fallback_handlers,
         **extras
     )
     log.addFilter(logger_filter)
@@ -305,7 +315,7 @@ def add_throttle_filter(
     log: logging.Logger,
     fallback_handlers: set[HandlerType] | None = None,
 ) -> None:
-    """Add the Throttle filter to the logger"""
+    """Add the Throttle filter to the logger."""
     add_filter(
         log,
         HandlerType.Throttle,

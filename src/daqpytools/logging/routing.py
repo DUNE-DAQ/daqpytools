@@ -6,12 +6,13 @@ from daqpytools.logging.handlerconf import StreamType
 from daqpytools.logging.levels import level_to_ers_var
 
 """
-So this file basically allows us to define the set of handlers that the logger should send to 
+This module defines strategies that decide which handlers a logger should emit
+to for each record.
 """
 
 
 class AllowedHandlersStrategy(ABC):
-    """Strategy for resolving allowed handler types for a log record"""
+    """Strategy for resolving allowed handler types for a log record."""
 
     @abstractmethod
     def resolve(
@@ -22,18 +23,20 @@ class AllowedHandlersStrategy(ABC):
         """Resolve allowd handlers for a given record."""
 
     def safe_return_set(self, raw_set : set[Any]) -> set[Any] | None:
+        """Return a set without `None` values, or `None` if empty."""
         return {obj for obj in raw_set if obj is not None}
 
 
 
 class DefaultAllowedHandlerStrategy(AllowedHandlersStrategy):
-    """Resolve allowed handlers from record.handlers, or a fallback case"""
+    """Resolve allowed handlers from `record.handlers` or a fallback set."""
 
     def resolve(
         self,
         record: logging.LogRecord,
         fallback_handlers : set[Any]
     ) -> set[Any] | None:
+        """Resolve handlers from the record or fallback handlers."""
         allowed = getattr(record, "handlers", fallback_handlers)
         if allowed is None:
             return None
@@ -47,7 +50,7 @@ class ERSAllowedHandlersStrategy(AllowedHandlersStrategy):
         record: logging.LogRecord,
         fallback_handlers : set[Any] 
     ) -> set[Any] | None:
-        
+        """Resolve handlers from ERS metadata attached to the record."""
         del fallback_handlers # unused
 
         # Chain None checks using walrus operator
@@ -66,13 +69,14 @@ class ERSAllowedHandlersStrategy(AllowedHandlersStrategy):
 
 
 class StreamAwareAllowedHandlersStrategy(AllowedHandlersStrategy):
-    """A dispatcher, chooses specific strategies based on record.stream"""
+    """Dispatch to a strategy based on `record.stream`."""
 
     def __init__(
         self,
         default_strategy : AllowedHandlersStrategy | None = None,
         ers_strategy: AllowedHandlersStrategy | None = None,
     ) -> None: 
+        """Initialize strategy dispatchers for default and ERS streams."""
         self.default_strategy =  default_strategy or DefaultAllowedHandlerStrategy()
         self.ers_strategy = ers_strategy or ERSAllowedHandlersStrategy()
 
@@ -81,7 +85,7 @@ class StreamAwareAllowedHandlersStrategy(AllowedHandlersStrategy):
         record: logging.LogRecord,
         fallback_handlers : set[Any],
         ) -> set[Any] | None:
-
+        """Resolve handlers using stream-aware strategy selection."""
         if getattr(record, "stream", None) == StreamType.ERS:
             return self.ers_strategy.resolve(record, fallback_handlers)
         return self.default_strategy.resolve(record, fallback_handlers)

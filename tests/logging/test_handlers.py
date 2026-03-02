@@ -1,662 +1,471 @@
-"""Comprehensive tests for the logging filters in handlers.py.
-
-Tests cover:
-- BaseHandlerFilter: Handler selection logic for both ERS and non-ERS paths
-- HandleIDFilter: Filter that accepts only specific handler types
-- ThrottleFilter: Advanced throttling with escalating thresholds and time windows
-- Integration: Real logger usage with filters and handlers
-"""
-
-import copy
-import io
 import logging
-import time
-from threading import Thread
-from unittest.mock import MagicMock
+import uuid
+from collections.abc import Iterator
+from unittest.mock import MagicMock, call
 
 import pytest
 
-from daqpytools.logging.handlers import (
-    BaseHandlerFilter,
-    ERSPyLogHandlerConf,
-    HandleIDFilter,
-    HandlerType,
-    IssueRecord,
-    ProtobufConf,
-    StreamType,
-    ThrottleFilter,
-)
-from daqpytools.logging.levels import level_to_ers_var
-
-# ============================================================================
-# FIXTURES
-# ============================================================================
+from daqpytools.apps import logging_demonstrator as demo
+from daqpytools.logging.exceptions import ERSInitError, LoggerHandlerError
+from daqpytools.logging.filters import HandleIDFilter
+from daqpytools.logging.formatter import LoggingFormatter
+from daqpytools.logging.handlerconf import HandlerType
+from daqpytools.logging.rich_handler import FormattedRichHandler
+from daqpytools.logging import handlers as handlers_mod
 
 
 @pytest.fixture
-def clean_logger():
-    """Provide a clean logger with no handlers or filters."""
-    logger = logging.getLogger("test_logger_handlers")
+def clean_logger() -> Iterator[logging.Logger]:
+    name = f"test.handlers.{uuid.uuid4()}"
+    logger = logging.getLogger(name)
     logger.handlers = []
     logger.filters = []
+    logger.propagate = False
     logger.setLevel(logging.DEBUG)
-    return logger
+    yield logger
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:
+            pass
+    logger.filters = []
+    logging.root.manager.loggerDict.pop(name, None)
 
 
 @pytest.fixture
-def log_record() -> logging.LogRecord:
-    """Provide a basic log record for testing."""
-    return logging.LogRecord(
-        name="test.module",
-        level=logging.ERROR,
-        pathname="/path/to/test.py",
-        lineno=42,
-        msg="Test message",
-        args=(),
-        exc_info=None,
+def parent_child_loggers() -> Iterator[tuple[logging.Logger, logging.Logger]]:
+    parent_name = f"test.handlers.parent.{uuid.uuid4()}"
+    child_name = f"{parent_name}.child"
+
+    parent = logging.getLogger(parent_name)
+    child = logging.getLogger(child_name)
+
+    parent.handlers = []
+    parent.filters = []
+    parent.propagate = False
+    parent.setLevel(logging.DEBUG)
+
+    child.handlers = []
+    child.filters = []
+    child.propagate = True
+    child.setLevel(logging.DEBUG)
+
+    yield parent, child
+
+    for logger in [child, parent]:
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            try:
+                handler.close()
+            except Exception:
+                pass
+        logger.filters = []
+        logging.root.manager.loggerDict.pop(logger.name, None)
+
+
+def test_logger_has_handler_non_logger_returns_false() -> None:
+    assert handlers_mod.logger_has_handler(MagicMock(), logging.StreamHandler) is False
+
+
+def test_logger_has_handler_matches_non_stream_type(clean_logger: logging.Logger) -> None:
+    handler = logging.NullHandler()
+    clean_logger.addHandler(handler)
+    assert handlers_mod.logger_has_handler(clean_logger, logging.NullHandler) is True
+
+
+def test_logger_has_handler_matches_stream_by_target_stream(
+    clean_logger: logging.Logger,
+) -> None:
+    stdout_handler = logging.StreamHandler(handlers_mod.STDOUT_HANDLER_SPEC.target_stream)
+    clean_logger.addHandler(stdout_handler)
+
+    assert (
+        handlers_mod.logger_has_handler(
+            clean_logger,
+            logging.StreamHandler,
+            target_stream=handlers_mod.STDOUT_HANDLER_SPEC.target_stream,
+        )
+        is True
+    )
+    assert (
+        handlers_mod.logger_has_handler(
+            clean_logger,
+            logging.StreamHandler,
+            target_stream=handlers_mod.STDERR_HANDLER_SPEC.target_stream,
+        )
+        is False
     )
 
 
-@pytest.fixture
-def ers_log_record():
-    """Provide a log record configured for ERS streaming."""
-    record = logging.LogRecord(
-        name="test.module",
-        level=logging.ERROR,
-        pathname="/path/to/test.py",
-        lineno=67,
-        msg="ERS message",
-        args=(),
-        exc_info=None,
+def test_logger_has_filter_detects_filter_type(clean_logger: logging.Logger) -> None:
+    clean_logger.addFilter(logging.Filter("named.filter"))
+    assert handlers_mod.logger_has_filter(clean_logger, logging.Filter) is True
+
+
+def test_ancestors_have_handlers_returns_false_when_disabled(
+    parent_child_loggers: tuple[logging.Logger, logging.Logger],
+) -> None:
+    _, child = parent_child_loggers
+    assert handlers_mod.ancestors_have_handlers(child, False, logging.NullHandler) is False
+
+
+def test_ancestors_have_handlers_rejects_root_logger() -> None:
+    with pytest.raises(ValueError, match="root logger"):
+        handlers_mod.ancestors_have_handlers(
+            logging.getLogger(),
+            True,
+            logging.NullHandler,
+        )
+
+
+def test_ancestors_have_handlers_requires_target_for_streamhandler(
+    clean_logger: logging.Logger,
+) -> None:
+    with pytest.raises(ValueError, match="target_stream must be specified"):
+        handlers_mod.ancestors_have_handlers(
+            clean_logger,
+            True,
+            logging.StreamHandler,
+        )
+
+
+def test_ancestors_have_handlers_rejects_target_for_non_stream(
+    clean_logger: logging.Logger,
+) -> None:
+    with pytest.raises(ValueError, match="target_stream can only be specified"):
+        handlers_mod.ancestors_have_handlers(
+            clean_logger,
+            True,
+            logging.NullHandler,
+            target_stream=handlers_mod.STDOUT_HANDLER_SPEC.target_stream,
+        )
+
+
+def test_ancestors_have_handlers_detects_parent_handler(
+    parent_child_loggers: tuple[logging.Logger, logging.Logger],
+) -> None:
+    parent, child = parent_child_loggers
+    parent.addHandler(logging.NullHandler())
+
+    assert handlers_mod.ancestors_have_handlers(child, True, logging.NullHandler) is True
+
+
+def test_check_parent_handlers_raises_loggerhandlererror(
+    parent_child_loggers: tuple[logging.Logger, logging.Logger],
+) -> None:
+    parent, child = parent_child_loggers
+    parent.addHandler(logging.NullHandler())
+
+    with pytest.raises(LoggerHandlerError):
+        handlers_mod.check_parent_handlers(child, True, logging.NullHandler)
+
+
+def test_logger_or_ancestors_have_handler_checks_local_then_parent(
+    parent_child_loggers: tuple[logging.Logger, logging.Logger],
+) -> None:
+    parent, child = parent_child_loggers
+    assert handlers_mod.logger_or_ancestors_have_handler(child, True, logging.NullHandler) is False
+
+    parent.addHandler(logging.NullHandler())
+    assert handlers_mod.logger_or_ancestors_have_handler(child, True, logging.NullHandler) is True
+
+
+def test_get_handler_specs_returns_expected_specs() -> None:
+    assert len(handlers_mod.get_handler_specs(HandlerType.Rich)) == 1
+    assert len(handlers_mod.get_handler_specs(HandlerType.Lstdout)) == 1
+    assert len(handlers_mod.get_handler_specs(HandlerType.Lstderr)) == 1
+    assert len(handlers_mod.get_handler_specs(HandlerType.Stream)) == 2
+    assert len(handlers_mod.get_handler_specs(HandlerType.File)) == 1
+    assert len(handlers_mod.get_handler_specs(HandlerType.Protobufstream)) == 1
+
+
+def test_build_rich_handler_uses_get_width_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(handlers_mod, "get_width", lambda: 111)
+    handler = handlers_mod._build_rich_handler()
+    assert isinstance(handler, FormattedRichHandler)
+    assert handler.console.width == 111
+
+
+def test_build_stdout_handler_sets_formatter() -> None:
+    handler = handlers_mod._build_stdout_handler()
+    assert isinstance(handler, logging.StreamHandler)
+    assert handler.stream is handlers_mod.STDOUT_HANDLER_SPEC.target_stream
+    assert isinstance(handler.formatter, LoggingFormatter)
+
+
+def test_build_stderr_handler_sets_level_and_formatter() -> None:
+    handler = handlers_mod._build_stderr_handler()
+    assert isinstance(handler, logging.StreamHandler)
+    assert handler.stream is handlers_mod.STDERR_HANDLER_SPEC.target_stream
+    assert handler.level == logging.ERROR
+    assert isinstance(handler.formatter, LoggingFormatter)
+
+
+def test_build_file_handler_requires_path() -> None:
+    with pytest.raises(ValueError, match="path is required"):
+        handlers_mod._build_file_handler()
+
+
+def test_build_file_handler_creates_handler_with_formatter(tmp_path: pytest.TempPathFactory) -> None:
+    file_path = tmp_path / "test.log"
+    handler = handlers_mod._build_file_handler(path=str(file_path))
+    assert isinstance(handler, logging.FileHandler)
+    assert isinstance(handler.formatter, LoggingFormatter)
+    handler.close()
+
+
+def test_build_erskafka_handler_wraps_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(handlers_mod, "ERSKafkaLogHandler", _raise)
+    with pytest.raises(ERSInitError):
+        handlers_mod._build_erskafka_handler(session_name="s1")
+
+
+def test_build_erskafka_handler_success_passes_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeKafkaHandler:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    monkeypatch.setattr(handlers_mod, "ERSKafkaLogHandler", FakeKafkaHandler)
+    handler = handlers_mod._build_erskafka_handler(
+        session_name="session_x",
+        topic="topic_x",
+        address="addr_x",
+        ers_app_name="app_x",
     )
-    record.stream = StreamType.ERS
-    return record
 
+    assert isinstance(handler, FakeKafkaHandler)
+    assert handler.kwargs["session"] == "session_x"
+    assert handler.kwargs["kafka_address"] == "addr_x"
+    assert handler.kwargs["kafka_topic"] == "topic_x"
+    assert handler.kwargs["app_name"] == "app_x"
+
+
+def test_add_handler_adds_single_spec_and_handleidfilter(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
+
+    assert len(clean_logger.handlers) == 1
+    assert isinstance(clean_logger.handlers[0], FormattedRichHandler)
+    assert any(
+        isinstance(logger_filter, HandleIDFilter)
+        for logger_filter in clean_logger.handlers[0].filters
+    )
+
+
+def test_add_handler_skips_when_matching_handler_exists(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
+    handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
+    assert len(clean_logger.handlers) == 1
 
-@pytest.fixture
-def mock_ers_handlers():
-    """Provide mock ERS handler configuration for testing."""
-    handlers_config = {}
-    for level_var in level_to_ers_var.values():
-        conf = ERSPyLogHandlerConf(
-            handlers=[HandlerType.Throttle, HandlerType.Protobufstream],
-            protobufconf=ProtobufConf(url="monkafka.cern.ch", port=30092),
-        )
-        handlers_config[level_var] = conf
-    return handlers_config
 
+def test_add_handler_skips_when_parent_has_handler(
+    parent_child_loggers: tuple[logging.Logger, logging.Logger],
+) -> None:
+    parent, child = parent_child_loggers
+    handlers_mod.add_handler(parent, HandlerType.Rich, use_parent_handlers=True)
+    handlers_mod.add_handler(child, HandlerType.Rich, use_parent_handlers=True)
 
-# ============================================================================
-# BaseHandlerFilter Tests
-# ============================================================================
+    assert len(parent.handlers) == 1
+    assert len(child.handlers) == 0
 
 
-class TestBaseHandlerFilter:
-    """Tests for BaseHandlerFilter.get_allowed() logic."""
+def test_add_handler_accepts_string_type(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handler(clean_logger, "rich", use_parent_handlers=True)
+    assert len(clean_logger.handlers) == 1
 
-    def test_non_ers_uses_record_handlers_attribute(
-        self, log_record: logging.LogRecord
-    ):
-        """Test get_allowed() uses 'handlers' attribute from record for non-ERS."""
-        log_record.handlers = [HandlerType.Rich, HandlerType.File]
-        filter_obj = BaseHandlerFilter()
 
-        allowed = filter_obj.get_allowed(log_record)
+def test_add_handler_unknown_string_does_nothing(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handler(clean_logger, "unknown_type", use_parent_handlers=True)
+    assert len(clean_logger.handlers) == 0
 
-        assert allowed == [HandlerType.Rich, HandlerType.File]
-
-    def test_non_ers_defaults_to_base_handlers(
-        self, log_record: logging.LogRecord
-    ):
-        """Test get_allowed() falls back to default handlers when attribute missing."""
-        # log_record has no 'handlers' attribute
-        filter_obj = BaseHandlerFilter()
-
-        allowed = filter_obj.get_allowed(log_record)
-
-        # Should return the base handlers from LogHandlerConf
-        assert allowed is not None
-        expected_handlers = {HandlerType.Stream, HandlerType.Rich, HandlerType.File}
-        assert expected_handlers.issubset(set(allowed))
-
-    def test_ers_path_valid_configuration(
-        self, ers_log_record: logging.LogRecord, mock_ers_handlers: dict
-    ):
-        """Test get_allowed() extracts ERS handlers correctly with valid config."""
-        ers_log_record.ers_handlers = mock_ers_handlers
-        filter_obj = BaseHandlerFilter()
-
-        allowed = filter_obj.get_allowed(ers_log_record)
-
-        assert allowed == [HandlerType.Throttle, HandlerType.Protobufstream]
-
-    def test_ers_path_no_matching_level_variable(
-        self, ers_log_record: logging.LogRecord, mock_ers_handlers: dict
-    ):
-        """Test get_allowed() returns None when log level has no ERS mapping."""
-        # Set a log level that does not have an ERS equivalent
-        ers_log_record.levelno = 25  # Between INFO and WARNING
-        ers_log_record.ers_handlers = mock_ers_handlers
-        filter_obj = BaseHandlerFilter()
-
-        allowed = filter_obj.get_allowed(ers_log_record)
-        assert allowed is None
-
-
-# ============================================================================
-# HandleIDFilter Tests
-# ============================================================================
-
-
-class TestHandleIDFilter:
-    """Tests for HandleIDFilter.filter() logic."""
-
-    def test_single_handler_id_normalized_to_set(self):
-        """Test that single handler_id is normalized to a set."""
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-
-        assert isinstance(filter_obj.handler_ids, set)
-        assert HandlerType.Rich in filter_obj.handler_ids
-
-    def test_list_handler_ids_converted_to_set(self):
-        """Test that list of handler_ids is converted to a set."""
-        handlers = [HandlerType.Rich, HandlerType.File]
-        filter_obj = HandleIDFilter(handlers)
-
-        assert isinstance(filter_obj.handler_ids, set)
-        assert filter_obj.handler_ids == {HandlerType.Rich, HandlerType.File}
-
-    def test_filter_returns_true_when_handler_in_allowed(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns True when handler_id is in allowed list."""
-        log_record.handlers = [HandlerType.Rich, HandlerType.File, HandlerType.Stream]
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-
-        result = filter_obj.filter(log_record)
-
-        assert result is True
-
-    def test_filter_returns_false_when_handler_not_in_allowed(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns False when handler_id not in allowed."""
-        log_record.handlers = [HandlerType.File, HandlerType.Stream]
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-
-        result = filter_obj.filter(log_record)
-
-        assert result is False
-
-    def test_filter_returns_false_when_get_allowed_returns_none(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns False when get_allowed() returns None."""
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-        filter_obj.get_allowed = MagicMock(return_value=None)
-
-        result = filter_obj.filter(log_record)
-
-        assert result is False
-
-    def test_filter_with_multiple_handler_ids(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() with multiple handler_ids checks intersection."""
-        log_record.handlers = [HandlerType.Rich, HandlerType.File]
-        filter_obj = HandleIDFilter([HandlerType.Rich, HandlerType.Stream])
-
-        result = filter_obj.filter(log_record)
-
-        # Should return True because Rich is in both sets
-        assert result is True
-
-    def test_filter_no_intersection_with_multiple_ids(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns False when no intersection with multiple ids."""
-        log_record.handlers = [HandlerType.File]
-        filter_obj = HandleIDFilter([HandlerType.Rich, HandlerType.Stream])
-
-        result = filter_obj.filter(log_record)
-
-        assert result is False
-
-
-# ============================================================================
-# ThrottleFilter Tests
-# ============================================================================
-
-
-class TestThrottleFilter:
-    """Tests for ThrottleFilter throttling and suppression logic."""
-
-    def test_initial_phase_lets_through_first_n_messages(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that first N messages pass through without suppression."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=3, time_limit=10)
-
-        # First 3 messages should pass
-        assert filter_obj.filter(log_record) is True
-        assert filter_obj.filter(log_record) is True
-        assert filter_obj.filter(log_record) is True
-
-    def test_after_initial_threshold_suppresses(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that messages are suppressed after initial_threshold."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=2, time_limit=10)
-
-        # First 2 pass
-        assert filter_obj.filter(log_record) is True
-        assert filter_obj.filter(log_record) is True
-
-        # 3rd should be suppressed
-        assert filter_obj.filter(log_record) is False
-
-    def test_escalating_threshold_doubles_on_report(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that threshold escalates (10->100->1000) when reporting."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=1, time_limit=100)
-
-        issue_id = f"{log_record.pathname}:{log_record.lineno}"
-        issue_record = filter_obj.issue_map[issue_id]
-
-        # First is emitted
-        # Next 10 are suppressed
-        # needs 1 more to trigger update
-        for _ in range(12):
-            filter_obj._throttle(issue_record, log_record)
-        
-
-        assert issue_record.threshold == 100  # Escalated from 10
-
-    def test_time_window_reset_resets_counters(
-        self, log_record: logging.LogRecord, monkeypatch: pytest.MonkeyPatch
-    ):
-        """Test that state resets after time_limit expires."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=1, time_limit=1)
-
-        times = iter([1000.0, 1002.5])
-        monkeypatch.setattr(time, "time", lambda: next(times))
-
-        # First message passes
-        assert filter_obj.filter(log_record) is True
-
-        # Time advances beyond time_limit with no suppression, reset should allow pass
-        assert filter_obj.filter(log_record) is True
-
-    def test_suppressed_counter_increments(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that suppressed_counter increments for each suppressed message."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=0, time_limit=100)
-
-        issue_id = f"{log_record.pathname}:{log_record.lineno}"
-        issue_record = filter_obj.issue_map[issue_id]
-
-        # Send 5 messages
-        for i in range(5):
-            filter_obj.filter(log_record)
-            # After initial messages handled, counter should increment
-            if i > 0:
-                assert issue_record.suppressed_counter >= 0
-
-    def test_throttle_suppression_flag_bypasses_filter(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that _throttle_suppression flag allows suppression messages through."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=0, time_limit=100)
-
-        # Normal message is suppressed
-        assert filter_obj.filter(log_record) is False
-
-        # Same message with suppression flag bypasses filter
-        log_record._throttle_suppression = True
-        assert filter_obj.filter(log_record) is True
-
-    def test_get_allowed_returns_none_skips_throttle(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns True if get_allowed() returns None."""
-        filter_obj = ThrottleFilter()
-        filter_obj.get_allowed = MagicMock(return_value=None)
-
-        # Should return False because allowed is None
-        result = filter_obj.filter(log_record)
-        assert result is False
-
-    def test_throttle_not_in_allowed_returns_true(
-        self, log_record: logging.LogRecord
-    ):
-        """Test filter() returns True if Throttle not in allowed handlers."""
-        log_record.handlers = [HandlerType.Rich, HandlerType.File]
-        filter_obj = ThrottleFilter(initial_threshold=0, time_limit=10)
-
-        # Throttle not in allowed, so should return True
-        assert filter_obj.filter(log_record) is True
-
-    def test_timestamp_formatting(self):
-        """Test that timestamp formatting produces valid ISO format."""
-        filter_obj = ThrottleFilter()
-        timestamp = time.time()
-
-        formatted = filter_obj._format_timestamp(timestamp)
-
-        # Should be ISO format with microseconds
-        assert len(formatted) == 26  # YYYY-MM-DD HH:MM:SS.ffffff
-        assert formatted.count("-") == 2  # Two dashes for date
-        assert formatted.count(":") == 2  # Two colons for time
-
-    def test_different_issues_tracked_separately(
-        self, log_record: logging.LogRecord
-    ):
-        """Test that different file:line combinations track state separately."""
-        filter_obj = ThrottleFilter(initial_threshold=2, time_limit=10)
-
-        # First issue
-        record1 = copy.deepcopy(log_record)
-        record1.pathname = "/path1.py"
-        record1.lineno = 10
-        record1.handlers = [HandlerType.Throttle]
-
-        # Second issue
-        record2 = copy.deepcopy(log_record)
-        record2.pathname = "/path2.py"
-        record2.lineno = 20
-        record2.handlers = [HandlerType.Throttle]
-
-        # Both pass initial threshold
-        assert filter_obj.filter(record1) is True
-        assert filter_obj.filter(record2) is True
-
-        # Issue 1: passes again
-        assert filter_obj.filter(record1) is True
-
-        # Issue 2: passes again (separate tracking)
-        assert filter_obj.filter(record2) is True
-
-        # Issue 1: suppressed
-        assert filter_obj.filter(record1) is False
-
-        # Issue 2: suppressed (independent)
-        assert filter_obj.filter(record2) is False
-
-    def test_thread_safety_concurrent_issues(
-        self, log_record: logging.LogRecord
-    ):
-        """Test ThrottleFilter is thread-safe with concurrent logging."""
-        filter_obj = ThrottleFilter(initial_threshold=5, time_limit=10)
-        log_record.handlers = [HandlerType.Throttle]
-        results = []
-
-        def log_messages(record: logging.LogRecord, num_messages: int) -> None:
-            """Log from a thread."""
-            for _ in range(num_messages):
-                result = filter_obj.filter(record)
-                results.append(result)
-
-        # Create threads logging to same issue
-        threads = []
-        for _ in range(3):
-            thread = Thread(target=log_messages, args=(log_record, 10))
-            threads.append(thread)
-            thread.start()
-
-        # Wait for all threads
-        for thread in threads:
-            thread.join()
-
-        # Should have completed without deadlock
-        assert len(results) == 30
-        # First 5 should pass (initial threshold)
-        assert results[:5].count(True) >= 3  # At least some early ones pass
-
-
-# ============================================================================
-# IssueRecord Tests
-# ============================================================================
-
-
-class TestIssueRecord:
-    """Tests for IssueRecord state tracking."""
-
-    def test_init_sets_defaults(self):
-        """Test that __init__ sets proper default values."""
-        record = IssueRecord()
-
-        assert record.last_occurrence == 0.0
-        assert record.last_report == 0.0
-        assert record.initial_counter == 0
-        assert record.threshold == 10
-        assert record.suppressed_counter == 0
-        assert record.last_occurrence_formatted == ""
-
-    def test_reset_clears_all_state(self):
-        """Test that reset() clears all counters and timestamps."""
-        record = IssueRecord()
-        record.last_occurrence = 100.0
-        record.initial_counter = 5
-        record.suppressed_counter = 20
-        record.threshold = 100
-        record.last_occurrence_formatted = "2025-01-01 12:00:00.000000"
-
-        record.reset()
-
-        assert record.last_occurrence == 0.0
-        assert record.last_report == 0.0
-        assert record.initial_counter == 0
-        assert record.threshold == 10
-        assert record.suppressed_counter == 0
-        assert record.last_occurrence_formatted == ""
-
-
-# ============================================================================
-# Integration Tests
-# ============================================================================
-
-
-class TestFiltersIntegration:
-    """Integration tests with real logger setup."""
-
-    def test_logger_with_handle_id_filter(self, clean_logger: logging.Logger):
-        """Test logger with HandleIDFilter allows only specific handlers."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.addFilter(HandleIDFilter(HandlerType.Stream))
-
-        clean_logger.addHandler(handler)
-
-        # Log with matching handler type
-        record = logging.LogRecord(
-            name=clean_logger.name,
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=1,
-            msg="Test message",
-            args=(),
-            exc_info=None,
-        )
-        record.handlers = [HandlerType.Stream, HandlerType.Rich]
-
-        clean_logger.handle(record)
-
-        # Message should appear because Stream is in allowed
-        assert "Test message" in stream.getvalue()
-
-    def test_logger_with_throttle_filter(self, clean_logger: logging.Logger):
-        """Test logger correctly suppresses messages with ThrottleFilter."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        filter_obj = ThrottleFilter(initial_threshold=2, time_limit=10)
-        handler.addFilter(filter_obj)
-
-        clean_logger.addHandler(handler)
-        clean_logger.setLevel(logging.INFO)
-
-        record = logging.LogRecord(
-            name=clean_logger.name,
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=10,
-            msg="Repeated message",
-            args=(),
-            exc_info=None,
-        )
-        record.handlers = [HandlerType.Throttle]
-
-        # Log 5 times
-        for _ in range(5):
-            clean_logger.handle(record)
-
-        output = stream.getvalue()
-
-        # First 2 should appear, then suppression message
-        assert output.count("Repeated message") >= 2
-
-    def test_chained_filters(self, clean_logger: logging.Logger):
-        """Test stacking HandleIDFilter and ThrottleFilter."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.setFormatter(logging.Formatter("%(message)s"))
-
-        # Add both filters
-        handler.addFilter(HandleIDFilter(HandlerType.Throttle))
-        handler.addFilter(ThrottleFilter(initial_threshold=1, time_limit=10))
-
-        clean_logger.addHandler(handler)
-        clean_logger.setLevel(logging.INFO)
-
-        record = logging.LogRecord(
-            name=clean_logger.name,
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=10,
-            msg="Chained filters test",
-            args=(),
-            exc_info=None,
-        )
-        record.handlers = [HandlerType.Throttle]
-
-        # Log message
-        clean_logger.handle(record)
-
-        # Should appear in output
-        output = stream.getvalue()
-        assert "Chained filters test" in output
-
-
-# ============================================================================
-# Edge Cases and Error Handling
-# ============================================================================
-
-
-class TestEdgeCases:
-    """Tests for edge cases and boundary conditions."""
-
-    def test_empty_handlers_list(self, log_record: logging.LogRecord):
-        """Test filter behavior with empty handlers list."""
-        log_record.handlers = []
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-
-        result = filter_obj.filter(log_record)
-
-        assert result is False
-
-    def test_none_handlers_attribute(self, log_record: logging.LogRecord):
-        """Test filter when record.handlers is None."""
-        log_record.handlers = None
-        filter_obj = HandleIDFilter(HandlerType.Rich)
-
-        # get_allowed should handle None gracefully
-        result = filter_obj.filter(log_record)
-        assert result is False
-
-    def test_throttle_with_zero_initial_threshold(
-        self, log_record: logging.LogRecord
-    ):
-        """Test ThrottleFilter with initial_threshold=0."""
-        log_record.handlers = [HandlerType.Throttle]
-        filter_obj = ThrottleFilter(initial_threshold=0, time_limit=10)
-
-        # All messages should be suppressed after first
-        assert filter_obj.filter(log_record) is False
-
-    def test_issue_record_key_format(self, log_record: logging.LogRecord):
-        """Test that issue_record key is formatted correctly."""
-        filter_obj = ThrottleFilter()
-
-        issue_id = f"{log_record.pathname}:{log_record.lineno}"
-        record = filter_obj.issue_map[issue_id]
-
-        assert isinstance(record, IssueRecord)
-
-    def test_multiple_handler_types_intersection(
-        self, log_record: logging.LogRecord
-    ):
-        """Test set intersection with multiple handler types."""
-        log_record.handlers = [
-            HandlerType.Rich,
-            HandlerType.File,
-            HandlerType.Stream,
+
+def test_add_handler_uses_explicit_fallback_override(clean_logger: logging.Logger) -> None:
+    override = {HandlerType.Unknown}
+    handlers_mod.add_handler(
+        clean_logger,
+        HandlerType.Rich,
+        use_parent_handlers=True,
+        fallback_handler=override,
+    )
+
+    handler_filter = next(
+        logger_filter
+        for logger_filter in clean_logger.handlers[0].filters
+        if isinstance(logger_filter, HandleIDFilter)
+    )
+    assert handler_filter.fallback_handlers == override
+
+
+def test_add_handler_for_stream_adds_stdout_and_stderr(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handler(clean_logger, HandlerType.Stream, use_parent_handlers=True)
+    stream_handlers = [
+        handler for handler in clean_logger.handlers if isinstance(handler, logging.StreamHandler)
+    ]
+    assert len(stream_handlers) == 2
+
+
+def test_add_handlers_from_types_stream_deduplicates(clean_logger: logging.Logger) -> None:
+    handlers_mod.add_handlers_from_types(
+        clean_logger,
+        {HandlerType.Stream, HandlerType.Lstdout, HandlerType.Lstderr},
+        use_parent_handlers=True,
+        fallback_handlers={HandlerType.Stream},
+    )
+    stream_handlers = [
+        handler for handler in clean_logger.handlers if isinstance(handler, logging.StreamHandler)
+    ]
+    assert len(stream_handlers) == 2
+
+
+def test_add_handlers_from_types_routes_to_filter_spec(
+    clean_logger: logging.Logger,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    add_filter_mock = MagicMock()
+    monkeypatch.setattr(handlers_mod, "add_filter", add_filter_mock)
+
+    handlers_mod.add_handlers_from_types(
+        clean_logger,
+        {HandlerType.Throttle},
+        use_parent_handlers=True,
+        fallback_handlers={HandlerType.Throttle},
+    )
+
+    add_filter_mock.assert_called_once()
+
+
+def test_add_handlers_from_types_no_duplicate_filter(
+    clean_logger: logging.Logger,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clean_logger.addFilter(MagicMock(spec=handlers_mod.get_filter_spec(HandlerType.Throttle).filter_class))
+    add_filter_mock = MagicMock()
+    monkeypatch.setattr(handlers_mod, "add_filter", add_filter_mock)
+
+    handlers_mod.add_handlers_from_types(
+        clean_logger,
+        {HandlerType.Throttle},
+        use_parent_handlers=True,
+        fallback_handlers={HandlerType.Throttle},
+    )
+
+    add_filter_mock.assert_not_called()
+
+
+# demonstrator test_* parity integrated into handlers tests
+
+def test_demo_test_main_functions_emits_expected_levels() -> None:
+    logger = MagicMock(spec=logging.Logger)
+
+    demo.test_main_functions(logger)
+
+    logger.debug.assert_called_once()
+    assert logger.info.call_count >= 2
+    assert logger.warning.call_count >= 2
+    logger.error.assert_called_once()
+    logger.critical.assert_called_once()
+
+
+def test_demo_test_child_logger_builds_child_and_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    child_logger = MagicMock(spec=logging.Logger)
+    get_logger_mock = MagicMock(return_value=child_logger)
+    monkeypatch.setattr(demo, "get_daq_logger", get_logger_mock)
+
+    demo.test_child_logger(
+        logger_name="parent.logger",
+        log_level="INFO",
+        disable_logger_inheritance=True,
+        rich_handler=True,
+        file_handler_path="/tmp/demo.log",
+        stream_handlers=True,
+    )
+
+    get_logger_mock.assert_called_once_with(
+        logger_name="parent.logger.child",
+        log_level="INFO",
+        use_parent_handlers=False,
+        rich_handler=True,
+        file_handler_path="/tmp/demo.log",
+        stream_handlers=True,
+    )
+    child_logger.debug.assert_called_once()
+    child_logger.info.assert_called()
+    child_logger.warning.assert_called()
+    child_logger.error.assert_called_once()
+    child_logger.critical.assert_called_once()
+
+
+def test_demo_test_throttle_uses_throttle_extra_and_sleep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logger = MagicMock(spec=logging.Logger)
+    sleep_mock = MagicMock()
+    monkeypatch.setattr(demo.time, "sleep", sleep_mock)
+
+    demo.test_throttle(logger)
+
+    sleep_mock.assert_called_once_with(31)
+    logger.warning.assert_called_once_with("Sleeping for 30 seconds")
+    assert logger.info.call_count == 1050
+
+    first_call_kwargs = logger.info.call_args_list[0].kwargs
+    assert first_call_kwargs["extra"]["handlers"] == [
+        HandlerType.Rich,
+        HandlerType.Throttle,
+    ]
+
+
+def test_demo_test_handlertypes_routes_expected_extras() -> None:
+    logger = MagicMock(spec=logging.Logger)
+
+    demo.test_handlertypes(logger)
+
+    critical_calls = logger.critical.call_args_list
+    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Rich] for c in critical_calls)
+    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.File] for c in critical_calls)
+    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Lstdout] for c in critical_calls)
+    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Throttle] for c in critical_calls)
+    assert any(
+        c.kwargs.get("extra", {}).get("handlers")
+        == [HandlerType.Rich, HandlerType.Protobufstream]
+        for c in critical_calls
+    )
+
+
+def test_demo_test_fallback_handlers_calls_add_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logger = MagicMock(spec=logging.Logger)
+    get_logger_mock = MagicMock(return_value=logger)
+    add_handler_mock = MagicMock()
+
+    monkeypatch.setattr(demo, "get_daq_logger", get_logger_mock)
+    monkeypatch.setattr(demo, "add_handler", add_handler_mock)
+
+    demo.test_fallback_handlers("DEBUG")
+
+    get_logger_mock.assert_called_once_with(
+        logger_name="fallback_logger",
+        log_level="DEBUG",
+        stream_handlers=False,
+        rich_handler=True,
+    )
+    add_handler_mock.assert_has_calls(
+        [
+            call(logger, HandlerType.Lstdout, True),
+            call(
+                logger,
+                HandlerType.Lstderr,
+                True,
+                fallback_handler={HandlerType.Unknown},
+            ),
         ]
-        filter_obj = HandleIDFilter([HandlerType.Rich, HandlerType.Lstdout])
-
-        # Rich is in the intersection
-        result = filter_obj.filter(log_record)
-        assert result is True
-
-    def test_protobuf_conf_in_ers_handlers(
-        self, ers_log_record: logging.LogRecord, mock_ers_handlers: dict
-    ):
-        """Test that ProtobufConf is properly included in ERS configuration."""
-        ers_log_record.ers_handlers = mock_ers_handlers
-        filter_obj = BaseHandlerFilter()
-
-        allowed = filter_obj.get_allowed(ers_log_record)
-
-        assert HandlerType.Protobufstream in allowed
-
-    def test_suppression_message_includes_count(
-        self, clean_logger: logging.Logger
-    ):
-        """Test that suppression message includes suppressed count."""
-        stream = io.StringIO()
-        handler = logging.StreamHandler(stream)
-        handler.setFormatter(logging.Formatter("%(message)s"))
-
-        # Create a throttle filter that will suppress quickly
-        throttle_filter = ThrottleFilter(initial_threshold=1, time_limit=10)
-        handler.addFilter(throttle_filter)
-
-        clean_logger.addHandler(handler)
-        clean_logger.setLevel(logging.INFO)
-
-        record = logging.LogRecord(
-            name=clean_logger.name,
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=10,
-            msg="Test",
-            args=(),
-            exc_info=None,
-        )
-        record.handlers = [HandlerType.Throttle]
-
-        # Send messages to trigger suppression
-        for _ in range(15):
-            clean_logger.handle(copy.deepcopy(record))
-
-        output = stream.getvalue()
-
-        # Should contain suppression message with count
-        assert "suppressed" in output.lower()
+    )

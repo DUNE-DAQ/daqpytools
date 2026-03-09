@@ -4,6 +4,84 @@ This page documents the internal logging architecture in `daqpytools.logging` fo
 
 ---
 
+## Core philosophy (read this first)
+
+Before looking at module-by-module details, treat the logging system as a routing engine whose core job is to answer one question for every record:
+
+`Should this specific handler transmit this specific record right now?`
+
+Everything else exists to make that answer deterministic, configurable, and easy to extend.
+
+### Why this design exists
+
+The code intentionally avoids embedding destination rules inside handler implementations. Handlers should only know *how* to emit (terminal, file, kafka, etc.), not *when* they are eligible to emit. Eligibility is computed from metadata attached to each record, plus a well-defined fallback policy.
+
+This gives three major properties:
+
+- routing behavior can be changed per message via `extra`, without reconfiguring logger objects
+- global defaults remain stable through fallback sets when metadata is absent
+- new handlers/filters can be added without rewriting decision logic in every existing handler
+
+### The mental model: capability set vs requested set
+
+Each installed handler has a capability identity represented as one or more `HandlerType` values (via its attached `HandleIDFilter`).
+
+Each record has a requested destination set, resolved by strategy:
+
+- explicit set from record metadata (`extra["handlers"]`) when present
+- otherwise fallback handlers configured during logger setup
+- stream-specific overrides (for example ERS severity maps) when applicable
+
+Transmission is then a pure set operation:
+
+`transmit <=> handler_ids ∩ allowed_handlers is non-empty`
+
+If the intersection is empty, that handler drops the record. If non-empty, it emits.
+
+This is the key concept to keep in mind when reading or changing this code.
+
+### Fallback handlers are not a backup feature, they are default policy
+
+A common misunderstanding is to treat fallback handlers as a rare "if all else fails" path. In this architecture, fallback is the normal baseline policy for records that do not carry explicit routing metadata.
+
+In practice:
+
+- no `extra["handlers"]` means "route by default policy"
+- default policy is the composed `fallback_handlers` set from setup/specs
+- `HandleIDFilter` still enforces per-handler identity checks against that default set
+
+So fallback behavior is central to system correctness, not an edge case.
+
+### Where filtering responsibility lives
+
+Filtering is intentionally split into two layers with different responsibilities:
+
+- logger-level filters decide whether a record should continue to fan out at all (for example throttling concerns)
+- handler-level `HandleIDFilter` decides whether a particular handler is allowed to transmit that record
+
+This split prevents business routing logic from leaking into output classes and keeps global policies independent from destination policies.
+
+### Why `HandlerType` is the routing contract
+
+`HandlerType` is the shared language across parser, strategy, specs, setup, and filters. It is the stable contract that ties together:
+
+- configuration tokens (including ERS/env parsing)
+- declared handler/filter capabilities in registries
+- per-record requested destinations
+- per-handler identity checks
+
+Because the same token model is used end-to-end, the pipeline remains composable and predictable.
+
+### Practical rule for developers
+
+When behavior looks wrong, debug in this order:
+
+1. what allowed set was resolved for the record (explicit vs fallback vs stream strategy)
+2. what `handler_ids` are attached to each handler's `HandleIDFilter`
+3. whether intersection logic should pass or fail for each destination
+
+Most "missing log" or "unexpected log" issues reduce to one of those three points.
+
 ## 1. Scope and architecture map
 
 At runtime, logging follows a two-stage filter model:

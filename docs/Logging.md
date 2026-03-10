@@ -3,7 +3,7 @@
 This should entirely focus on the user side. How logigng works, and then how to use the stuff in daqptyools
 
 ---
-Updates as of mid February
+Updates as of 5.6.0
 
 # Logging for Python in DUNE-DAQ
 
@@ -107,12 +107,12 @@ and view the help string to learn more, and view the script itself in the reposi
 
 
 
-### Initialising a handler
+### Initialising a logger 
 
-Initialising a handler is simple:
+Initialising a logger instance is simple:
 
 ```python
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging import get_daq_logger
 test_logger = get_daq_logger(
     logger_name = "test_logger",
     log_level = "INFO",
@@ -131,6 +131,8 @@ The core philosophy of the logging framework in daqpytools is that each logger s
 
 
 Please refer to the docstrings for the most up to date definitions on the options and what handlers may or may not be included. There are some exceptions which are clearly labelled in the document. Choosing which handler to trigger on a per-message instance is an advanced feature of logging in DUNE-DAQ, so please refer to the advanced section of this guide. 
+
+Alternatively, it is possible to add handlers to an existing DAQ logger instance. Please also refer to the advanced section of this guide.
 
 
 ### Walkthrough of existing handlers and filters 
@@ -169,8 +171,7 @@ The ERS Kafka handler is used to transmit ERS messages via Kafka, which is incre
 This handler is not included in the default list of handlers to emit. An extra configuration must be used to properly transmit this message; eg. 
 
 ```python
-from daqpytools.logging.handlers import HandlerType
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging import HandlerType, get_daq_logger
 
 main_logger: logging.Logger = get_daq_logger(
     logger_name="daqpytools_logging_demonstrator",
@@ -223,8 +224,7 @@ An example is as follows:
 ```python
 import time
 
-from daqpytools.logging.handlers import HandlerType
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging import HandlerType, get_daq_logger
 
 main_logger: logging.Logger = get_daq_logger(
     logger_name="daqpytools_logging_demonstrator",
@@ -291,6 +291,136 @@ setup will fail.
 
 The above walkthrough should be sufficient for the vast majority of logging. However, there are a few advanced features in daqpytools that would benefit the user. These mainly are targetted towards a high degree of customisability for the user, including the ability to choose which of the attached handlers will transmit a given message, and automatic routing of messages to certain handlers.
 
+#### Advanced ways to initialise handlers on an existing logger
+
+You can configure handlers in two phases:
+
+1. Build a logger first with `get_daq_logger(...)`.
+2. Add more handlers/filters later, based on runtime context.
+
+This is useful in long-running services where extra outputs (for example ERS Kafka)
+should only be attached after additional configuration becomes available.
+
+##### Add one handler at a time with `add_handler`
+
+Use `add_handler` if you want to attach a single handler type to an existing logger.
+
+```python
+import logging
+
+from daqpytools.logging import HandlerType, add_handler, get_daq_logger
+
+log = get_daq_logger(
+    logger_name="existing_logger",
+    rich_handler=True,
+    stream_handlers=False,
+)
+
+# Add stdout stream handler later
+add_handler(log, HandlerType.Lstdout, use_parent_handlers=True)
+
+log.info("Now routes to rich + stdout by default")
+```
+
+##### Suppress by default with `fallback_handlers={HandlerType.Unknown}`
+
+You can make newly-added handlers opt-in only by setting fallback handlers to
+`HandlerType.Unknown`. This means records without explicit `extra["handlers"]`
+will not be emitted by those handlers.
+
+```python
+import logging
+
+from daqpytools.logging import HandlerType, add_handler, get_daq_logger
+
+log = get_daq_logger("fallback_demo", rich_handler=True, stream_handlers=False)
+
+# Add stderr handler, but suppress it by default
+add_handler(
+    log,
+    HandlerType.Lstderr,
+    use_parent_handlers=True,
+    fallback_handler={HandlerType.Unknown},
+)
+
+log.critical("Only rich by default")
+
+# Explicitly target stderr when needed
+log.critical(
+    "Rich + stderr when explicitly requested",
+    extra={"handlers": [HandlerType.Rich, HandlerType.Lstderr]},
+)
+```
+
+##### Configure ERS handlers on an existing logger with `setup_daq_ers_logger`
+
+If you already have a logger instance, `setup_daq_ers_logger` can attach handlers
+based on ERS environment configuration. This function name is `setup_daq_ers_logger`
+in code (sometimes referred to informally as `setup_ers_daq_logger`).
+
+```python
+import logging
+
+from daqpytools.logging import LogHandlerConf, get_daq_logger, setup_daq_ers_logger
+
+log = get_daq_logger(
+    logger_name="ers_existing_logger",
+    rich_handler=True,
+    stream_handlers=False,
+)
+
+# Attach ERS-derived handlers (for example lstdout/protobufstream) to this logger
+setup_daq_ers_logger(log, ers_kafka_session="session_temp")
+
+ers_conf = LogHandlerConf(init_ers=True)
+log.info("ERS Info routing", extra=ers_conf.ERS)
+log.warning("ERS Warning routing", extra=ers_conf.ERS)
+log.error("ERS Error routing", extra=ers_conf.ERS)
+```
+
+##### How `**kwargs` are propagated
+
+Advanced setup functions accept extra keyword arguments and pass them to the relevant
+handler/filter factories.
+
+- `get_daq_logger(..., **extras)` forwards extras to handler/filter construction.
+- `add_handler(..., **extras)` forwards extras to that handler factory.
+
+Common examples:
+
+- file handler: `path="mylog.log"`
+- ERS Kafka handler: `ers_kafka_session=...` via `get_daq_logger(...)` or
+    `setup_daq_ers_logger(...)`
+- throttle filter: `initial_treshold=...`, `time_limit=...`
+- rich handler: `width=...`
+
+Example with explicit extras:
+
+```python
+from daqpytools.logging import HandlerType, add_handler, get_daq_logger
+
+log = get_daq_logger("extras_demo", rich_handler=False)
+
+# pass file-specific kwargs to file handler
+add_handler(
+        log,
+        HandlerType.File,
+        use_parent_handlers=True,
+    path="extras_demo.log",
+)
+
+# pass rich-specific kwargs to rich handler
+add_handler(
+        log,
+        HandlerType.Rich,
+        use_parent_handlers=True,
+    width=120,
+)
+
+# ERS-specific kwargs are supplied through setup/get APIs
+# setup_daq_ers_logger(log, ers_kafka_session="session_tester")
+```
+
 #### Choosing handlers with HandlerTypes 
 
 Lets say you have a logger with an attached Rich handler and File handler as below, and that there are two messages you want to log. However, one of them should only be sent to the file, and the other one should be sent to the terminal via the rich handler. 
@@ -304,7 +434,7 @@ These can be done by using the `HandlerTypes` enum. The loggers defined here hav
 There is a very specific syntax that must be followed involving the `extra` kwarg:
 
 ```
-from daqpytools.logging.handlers import HandlerType
+from daqpytools.logging import HandlerType
 
 log.info("This will only be sent to the Rich", extra={"handlers": [HandlerType.Rich]})
 log.info("This will only be sent to the File", extra={"handlers": [HandlerType.File]})

@@ -86,6 +86,28 @@ This split prevents business routing logic from leaking into output classes and 
 
 Because the same token model is used end-to-end, the pipeline remains composable and predictable.
 
+### Useful diagrams
+
+Note: raw diagrams are found in the diagrams folder as a .drawio file. 
+
+#### Class diagrams of the relevant objects in this framework
+
+![Filtering](img/Filter_class.png)
+
+![LogHandlerConf](img/LHC_class.png)
+
+![Specs](img/Specs_class.png)
+
+#### Activity diagram of how LogHandlerConf resolves which handlers to present based on the stream
+
+![LogHandlerConf](img/LHC_activity.png)
+
+#### Activity diagram of how the filtering logic works, and who has responsibility for the logic
+
+![Filtering](img/Filter_activity.png)
+
+
+
 ### Practical rule for developers
 
 When behavior looks wrong, debug in this order:

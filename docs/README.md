@@ -10,18 +10,20 @@ This provides a set of tools that are used in python applications, along with th
  - logging - [code](https://github.com/DUNE-DAQ/daqpytools/tree/develop/src/daqpytools/logging)
 
 ## Start here
-- Users: `docs/Logging.md`
-- Developers and extenders: `docs/dev_docs.md`
+- Users (quickstart): `docs/Logging.md`
+- Users (advanced): `docs/Logging_advanced.md`
+- Developers (architecture): `docs/dev_docs.md`
+- Developers (extension workflow): `docs/dev_docs_extension.md`
 - Demonstrator CLI entrypoint: `daqpytools-logging-demonstrator`
 - Historical/extra material: [wiki](https://github.com/DUNE-DAQ/daqpytools/wiki/Logging)
 
-## Indended use case
-This repo will serve as the indended source of distribution standard tooling. Any python tool that is used by multiple repositories should be defined here.
+## Intended use case
+This repo serves as the intended source of distribution-standard tooling. Any Python tool used by multiple repositories should be defined here.
 
 ## Setup instructions
 For general users, no setup is required - when developing your python applications, it is sufficient to include e.g.
 ```python
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging import get_daq_logger
 log = get_daq_logger(...)
 ```
-For developers, start with `docs/dev_docs.md` and use the wiki as supplemental context.
+For developers, start with `docs/dev_docs.md`, then continue to `docs/dev_docs_extension.md` for extension workflows.

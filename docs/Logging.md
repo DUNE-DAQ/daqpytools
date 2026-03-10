@@ -1,25 +1,21 @@
-# Logging (user facing)
-
-This should entirely focus on the user side. How logigng works, and then how to use the stuff in daqptyools
-
----
-Updates as of 5.6.0
-
 # Logging for Python in DUNE-DAQ
+Updated as of 5.6.0
 
-Welcome, fellow beavers! This page provides a user's guide to how logging is done in Python in the context of DUNE-DAQ. 
+Welcome, fellow beavers! This page provides a user guide to logging in Python in the context of DUNE-DAQ.
+
+For advanced routing and expert configuration patterns, see `docs/Logging_advanced.md`.
 
 ## Basics
 
-The bulk of the loggign functionality in drunc and other Python applications is built off the cool [Python logging framework](https://docs.python.org/3/library/logging.html), with its mission defined below:
+The bulk of the logging functionality in drunc and other Python applications is built on the [Python logging framework](https://docs.python.org/3/library/logging.html), with its mission defined below:
 
 > This module defines functions and classes which implement a flexible event logging system for applications and libraries.
 
-It is worth a read to understand how logging works in Python, however the salient points are covered below.
+It is worth reading to understand how logging works in Python; the salient points are covered below.
 
-In general, the built in logging module allows for producing severity-classified diagnostic events, which can be filtered, formatted, or routed as necessary. These logs automatically contain useful information including the timestamp, module, and context of the message. 
+In general, the built-in logging module allows producing severity-classified diagnostic events, which can be filtered, formatted, or routed as necessary. These logs automatically contain useful information including timestamp, module, and message context.
 
-The core object of the logging functionality in Python is the logger. A logging instance, `log`, can be initialised as follows. The phrase "Hello, World!" is used as an input to the logger, with this message being bundled up by other useful information, including the severity level, to form whats known as a LogRecord. This record will then be transmitted as required. 
+The core object in Python logging is the logger. A logging instance, `log`, can be initialized as follows. The phrase "Hello, World!" is bundled with other useful metadata, including severity level, to form a `LogRecord`, which is then emitted as required.
 
 ```python
 import logging
@@ -51,9 +47,9 @@ log.warning("This will print")
 
 ### Handlers
 
-Handlers are a key concept of logging in Python, as they control how the records are processed and formatted. There are several default one that the DAQ uses, and there are also several ones that are custom defined for the purposes of the DAQ. 
+Handlers are a key concept in Python logging, since they control how records are processed and formatted. DAQ uses several standard handlers as well as custom handlers.
 
-The example below shows an example of a file handler, a stream handler, and a webhook handler. As can be seen, each of the records are processed and formatted by each of the handlers and transmitted in each of their respective ways.
+The image below shows a file handler, a stream handler, and a webhook handler. Each record is processed and formatted by each handler and then transmitted through that destination.
 
 ![drunc_overview](img/handlers.png)
 
@@ -62,17 +58,17 @@ Importantly, each handler can have its own associated severity level! In the exa
 
 
 ### Filters
-A sidegrade and important add on for the loggers is the filters, whos primary purpose is to decide if an error should be transmitted or not. Filters can be attached to both the logger instance as well as any handlers attached to the logger instance itself. 
+Filters are an important add-on for loggers, and their primary purpose is to decide whether a record should be transmitted. Filters can be attached to both a logger instance and its handlers.
 
-When a log record arrives, it will first be processed by the filters attached to the loggers first. Should they pass, the record is then passed onto each handler as shown before, where they are then further processed by each handler's attached filters. Only when they pass will a log be record be transmitted.
+When a log record arrives, it is first processed by filters attached to the logger. If it passes, the record is then passed to each handler and processed again by that handler's filters. A record is emitted only if those checks pass.
 
 ![filters](img/filters.png)
 
 ### Inheritance
 
-Another key part of logging in Python is the inheritance feature. Loggers are organised in a heirarchical fashion and so it is possible to initialise descendant loggers by chaining the names together with a period, such as "root.parent.child". 
+Another key part of Python logging is inheritance. Loggers are organized hierarchically, so you can initialize descendant loggers by chaining names with periods, such as "root.parent.child".
 
-By default, loggers will inheret certain properties of the parent:
+By default, loggers inherit certain properties from the parent:
 - severity level of the logger 
 - handlers (and all attached properties, including severity level and filters on handlers)
 
@@ -80,14 +76,14 @@ By default, loggers will inheret certain properties of the parent:
 
 
 
-Note that a particular exceptoin is that they _don't_ inheret any filters attached to the logger itself. 
+Note one exception: they _do not_ inherit filters attached directly to the parent logger itself.
 
-A useful diagram to peruse is the [logging flow in the official docs](https://docs.python.org/2/howto/logging.html#logging-flow).
+A useful diagram is the [logging flow in the official Python 3 docs](https://docs.python.org/3/howto/logging.html#logging-flow).
 
 
 ## Using logging with daqpytools
 
-The [daqpytools](https://github.com/DUNE-DAQ/daqpytools) contains several quality of life improvements to DAQ pytools, the most relevant to this document of which being the logging tools.
+The [daqpytools](https://github.com/DUNE-DAQ/daqpytools) package contains several quality-of-life improvements for DAQ Python tooling, including logging utilities.
 
 These include:
 - standardised ways of initialising top-level 'root' loggers
@@ -107,9 +103,9 @@ and view the help string to learn more, and view the script itself in the reposi
 
 
 
-### Initialising a logger 
+### Initializing a logger
 
-Initialising a logger instance is simple:
+Initializing a logger instance is simple:
 
 ```python
 from daqpytools.logging import get_daq_logger
@@ -124,7 +120,7 @@ test_logger = get_daq_logger(
 test_logger.warning("Hello, world!")
 ```
 
-As shown above, initialising a logging instance with a specific handler is as easy as modifying a flag in the constructor.
+As shown above, initializing a logger with specific handlers is as easy as changing constructor flags.
 
 
 The core philosophy of the logging framework in daqpytools is that each logger should only have _one_ instance of a specific type of logger. This means that while a single logger can have both a Rich and a Stream handler, a single logger cannot have _two_ Rich handlers to prevent duplicating messages.
@@ -135,9 +131,9 @@ Please refer to the docstrings for the most up to date definitions on the option
 Alternatively, it is possible to add handlers to an existing DAQ logger instance. Please also refer to the advanced section of this guide.
 
 
-### Walkthrough of existing handlers and filters 
+### Walkthrough of existing handlers and filters
 
-As seen in the previous section, there are several handlers and filters that are present in the daqpytools that may readily be used. What follows will be a brief description of each handlers as well as a quick example,  but for more complete docs please refer to the docstrings and the logging demonstrator.
+As seen in the previous section, there are several handlers and filters available in daqpytools. What follows is a short description of each, with quick examples. For complete details, refer to docstrings and the logging demonstrator.
 
 Remember that by default, any messages received by the logger will be transmitted to _all_ available handlers that are attached to the logger. 
 
@@ -160,7 +156,7 @@ As the name suggests, the file handler is used to transmit messages directly to 
 
 Stream handlers are used to transmit messages directly to the terminal without any color formatting. This is of great use for the logs of the controllers in drunc, which has its own method of capturing logs via a capture of the terminal output and a pipe to the relevant log file. 
 
-Note that the stream handlers consist of two handlers, one which outputs do `stdout` and another to `stderr`. The latter will only transmit if the record severity level is Error or higher.
+Note that stream handling consists of two handlers, one writing to `stdout` and one to `stderr`. The `stderr` stream emits only for records at `ERROR` or above.
 
 ![streams_demo](img/demo_streams.png)
 
@@ -168,9 +164,11 @@ Note that the stream handlers consist of two handlers, one which outputs do `std
 
 The ERS Kafka handler is used to transmit ERS messages via Kafka, which is incredibly useful to show on the dashboards messages as they happen. 
 
-This handler is not included in the default list of handlers to emit. An extra configuration must be used to properly transmit this message; eg. 
+This handler is not included in the default emit set. Extra configuration is required; for example:
 
 ```python
+import logging
+
 from daqpytools.logging import HandlerType, get_daq_logger
 
 main_logger: logging.Logger = get_daq_logger(
@@ -203,8 +201,8 @@ There are times when an application decides to send a huge amount of logs of a s
 
 The throttle filter replicates the same logic that exists in the ERS C++ implementation, which dynamically limits how many messages get transmitted. The filter is by default attached to the _logger_ instance, with no support for this filter being attached to a specific handler just yet. 
 
-Initialising the filter takes in two argument:
- - `initial_treshold`: number of initial occurences to let through immediately
+Initializing the filter takes two arguments:
+ - `initial_treshold`: number of initial occurrences to let through immediately
  - `time_limit`: time window in seconds for resetting state
 
 The basic logic is as follows. 
@@ -212,7 +210,7 @@ The basic logic is as follows.
 1. The first N messages will instantly get transmitted, up to `initial_treshold`
 2. The next 10 messages will be suppressed, with the next single message reported at the end
 3. The next 100 messages will be suppressed, with the next single message reported at the end
-4. This continues, with the treshold increaseing by 10x everytime
+4. This continues, with the threshold increasing by 10x each time
 5. After `time_limit` seconds after the last message, the filter gets reset, allowing messages to be sent once more
 
 
@@ -250,7 +248,7 @@ Which will behave as expected.
 ![throttle_demo](img/demo_throttle.png) 
 
 **Note**
-By default, throttle filters obtained via `get_daq_logger` will be initialised with an `initial_treshold` of 30 and a `time_limit` of 30. 
+By default, throttle filters obtained via `get_daq_logger` are initialized with an `initial_treshold` of 30 and a `time_limit` of 30.
 
 **Note**
 Similarly to the ERS Kafka handler, this filter is not enabled by default, hence requiring the use of HandlerTypes. See the Advanced section for more info.
@@ -289,141 +287,20 @@ setup will fail.
 
 ### Advanced logging
 
-The above walkthrough should be sufficient for the vast majority of logging. However, there are a few advanced features in daqpytools that would benefit the user. These mainly are targetted towards a high degree of customisability for the user, including the ability to choose which of the attached handlers will transmit a given message, and automatic routing of messages to certain handlers.
+The walkthrough above is sufficient for most usage.
 
-#### Advanced ways to initialise handlers on an existing logger
+For advanced topics, including:
 
-You can configure handlers in two phases:
+- initializing handlers on an existing logger
+- suppress-by-default fallback behavior with `HandlerType.Unknown`
+- configuring ERS handlers with `setup_daq_ers_logger`
+- `**kwargs` propagation to handler/filter factories
 
-1. Build a logger first with `get_daq_logger(...)`.
-2. Add more handlers/filters later, based on runtime context.
-
-This is useful in long-running services where extra outputs (for example ERS Kafka)
-should only be attached after additional configuration becomes available.
-
-##### Add one handler at a time with `add_handler`
-
-Use `add_handler` if you want to attach a single handler type to an existing logger.
-
-```python
-import logging
-
-from daqpytools.logging import HandlerType, add_handler, get_daq_logger
-
-log = get_daq_logger(
-    logger_name="existing_logger",
-    rich_handler=True,
-    stream_handlers=False,
-)
-
-# Add stdout stream handler later
-add_handler(log, HandlerType.Lstdout, use_parent_handlers=True)
-
-log.info("Now routes to rich + stdout by default")
-```
-
-##### Suppress by default with `fallback_handlers={HandlerType.Unknown}`
-
-You can make newly-added handlers opt-in only by setting fallback handlers to
-`HandlerType.Unknown`. This means records without explicit `extra["handlers"]`
-will not be emitted by those handlers.
-
-```python
-import logging
-
-from daqpytools.logging import HandlerType, add_handler, get_daq_logger
-
-log = get_daq_logger("fallback_demo", rich_handler=True, stream_handlers=False)
-
-# Add stderr handler, but suppress it by default
-add_handler(
-    log,
-    HandlerType.Lstderr,
-    use_parent_handlers=True,
-    fallback_handler={HandlerType.Unknown},
-)
-
-log.critical("Only rich by default")
-
-# Explicitly target stderr when needed
-log.critical(
-    "Rich + stderr when explicitly requested",
-    extra={"handlers": [HandlerType.Rich, HandlerType.Lstderr]},
-)
-```
-
-##### Configure ERS handlers on an existing logger with `setup_daq_ers_logger`
-
-If you already have a logger instance, `setup_daq_ers_logger` can attach handlers
-based on ERS environment configuration. This function name is `setup_daq_ers_logger`
-in code (sometimes referred to informally as `setup_ers_daq_logger`).
-
-```python
-import logging
-
-from daqpytools.logging import LogHandlerConf, get_daq_logger, setup_daq_ers_logger
-
-log = get_daq_logger(
-    logger_name="ers_existing_logger",
-    rich_handler=True,
-    stream_handlers=False,
-)
-
-# Attach ERS-derived handlers (for example lstdout/protobufstream) to this logger
-setup_daq_ers_logger(log, ers_kafka_session="session_temp")
-
-ers_conf = LogHandlerConf(init_ers=True)
-log.info("ERS Info routing", extra=ers_conf.ERS)
-log.warning("ERS Warning routing", extra=ers_conf.ERS)
-log.error("ERS Error routing", extra=ers_conf.ERS)
-```
-
-##### How `**kwargs` are propagated
-
-Advanced setup functions accept extra keyword arguments and pass them to the relevant
-handler/filter factories.
-
-- `get_daq_logger(..., **extras)` forwards extras to handler/filter construction.
-- `add_handler(..., **extras)` forwards extras to that handler factory.
-
-Common examples:
-
-- file handler: `path="mylog.log"`
-- ERS Kafka handler: `ers_kafka_session=...` via `get_daq_logger(...)` or
-    `setup_daq_ers_logger(...)`
-- throttle filter: `initial_treshold=...`, `time_limit=...`
-- rich handler: `width=...`
-
-Example with explicit extras:
-
-```python
-from daqpytools.logging import HandlerType, add_handler, get_daq_logger
-
-log = get_daq_logger("extras_demo", rich_handler=False)
-
-# pass file-specific kwargs to file handler
-add_handler(
-        log,
-        HandlerType.File,
-        use_parent_handlers=True,
-    path="extras_demo.log",
-)
-
-# pass rich-specific kwargs to rich handler
-add_handler(
-        log,
-        HandlerType.Rich,
-        use_parent_handlers=True,
-    width=120,
-)
-
-# ERS-specific kwargs are supplied through setup/get APIs
-# setup_daq_ers_logger(log, ers_kafka_session="session_tester")
-```
+see `docs/Logging_advanced.md`.
 
 #### Choosing handlers with HandlerTypes 
 
-Lets say you have a logger with an attached Rich handler and File handler as below, and that there are two messages you want to log. However, one of them should only be sent to the file, and the other one should be sent to the terminal via the rich handler. 
+Let's say you have a logger with an attached Rich handler and File handler, and two messages to log. One should only go to file, and the other should only go to terminal via rich.
 
 ```
 log = get_daq_logger("example", rich_handler=True, file_handler_path="logging.log")
@@ -441,7 +318,7 @@ log.info("This will only be sent to the File", extra={"handlers": [HandlerType.F
 log.info("You can even send to both", extra={"handlers": [HandlerType.Rich, HandlerType.File]})
 ```
 
-Naturally, if tell the logger to transmit a message where the associated Handler is not attached will cause it to do nothing. For example above, using HandlerTypes.Stream will do nothing. 
+Naturally, asking the logger to emit to a handler type that is not attached is a no-op. In the example above, using `HandlerType.Stream` would do nothing.
 
 
 
@@ -451,7 +328,7 @@ Within the DUNE DAQ ecosystem, there are several other configurations that inter
 
 ![streams](img/streams.png)
 
-The native implemention in drunc and most applications is referred to as the 'Base' stream, which will only require interactions with the Rich, File, and Stream handlers. **This is why the ERS Kafka Handler and the Throttle filter need to be 'activated' with HandlerTypes**.
+The native implementation in drunc and most applications is referred to as the Base stream, which interacts with Rich, File, and Stream handlers. **This is why the ERS Kafka handler and the Throttle filter need to be activated with HandlerTypes**.
 
 The ERS configuration is defined in OKS, [for example here](https://github.com/DUNE-DAQ/daqsystemtest/blob/974965be6e96aff969c69a380ed34aa96705e802/config/daqsystemtest/ccm.data.xml#L189), and are automatically parsed by daqpytools as they get used. A special feature of the ERS configuration is that the relevant Handlers are severity-level dependent; ERS Fatal and ERS info may have a different set of handler requirements
 

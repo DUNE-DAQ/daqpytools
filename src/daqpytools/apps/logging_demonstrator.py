@@ -181,34 +181,6 @@ def test_handlertypes(main_logger: logging.Logger) -> None:
         extra={"handlers": [HandlerType.Rich, HandlerType.Protobufstream]}
     )
 
-ers_envs = {
-    "DUNEDAQ_ERS_WARNING" : "erstrace,throttle,lstdout",
-    "DUNEDAQ_ERdS_INFO" : "erstrace,throttle,lstdout",
-    "DUNEDAQ_ERS_FATAL" : "erstrace,lstdout",
-    "DUNEDAQ_ERS_ERROR" : (
-            "erstrace,"
-            "throttle,"
-            "lstdout,"
-            "protobufstream(monkafka.cern.ch:30092)"
-        )
-}
-
-def obtain_original_envs(envs: dict) -> dict:
-    return {
-        key: os.environ.get(key)
-        for key in envs
-    }
-
-
-
-def restore_original_envs(original:dict) -> None:
-    for var_name, original_value in original.items():
-        if original_value is None:
-            os.environ.pop(var_name, None)
-        else:
-            os.environ[var_name] = original_value
-
-
 
 def test_handlerconf(main_logger: logging.Logger) -> None:
     """Demonstrates the main functionality of the handlerconf. With ERS support.
@@ -222,12 +194,15 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
     #* Interlude: Inject sample environment variables
-    # Save envs from current shell before we rewrite
-    saved_envs = obtain_original_envs(ers_envs)
-
-    for key, value in ers_envs.items():
-        # Inject ERS envs into the python shell
-        os.environ[key] = value
+    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
+    os.environ["DUNEDAQ_ERS_ERROR"] = (
+        "erstrace,"
+        "throttle,"
+        "lstdout,"
+        "protobufstream(monkafka.cern.ch:30092)"
+    )
         
     info_out = f"{os.getenv('DUNEDAQ_ERS_ERROR')=}"
     main_logger.info(info_out)
@@ -239,33 +214,17 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     # HandlerConf will require that these variables are defined!
     # They come from the OKS, so whatever tools you have should have this up
     # You can also initialise via handlerconf = LogHandlerConf(init_ers=True)
-    try:
-        handlerconf.init_ers_stream()
-        
-        #* Test ERS Streams
-        main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
-        main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)
-        main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
-        main_logger.debug("ERS Debug none", extra=handlerconf.ERS)
-        main_logger.error("ERS Error erstrace,throttle,lstdout,"
-            "protobufstream(monkafka.cern.ch:30092)", 
-            extra=handlerconf.ERS
-    ) 
-    except Exception as e:
-        main_logger.error(f"UHhhh not sure what happened here {e}")
-    finally:
-        
-        # Restore original environment variables
-        ## Note that in https://dagster.io/blog/
-        ##   python-environment-variables#modifying-and-adding-environment-variables
-        ## It looks like os.environ only affects the local python shell, and doesn't 
-        ## "leak" out into the bash envs. 
-        ## However, for best practices this is still done
-        
-        restore_original_envs(saved_envs)
+    handlerconf.init_ers_stream()
     
-    
-    
+    #* Test ERS Streams
+    main_logger.warning("ERS Warning erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.info("ERS Info erstrace,throttle,lstdout", extra=handlerconf.ERS)
+    main_logger.critical("ERS Fatal erstrace,lstdout", extra=handlerconf.ERS)
+    main_logger.debug("ERS Debug none", extra=handlerconf.ERS)
+    main_logger.error("ERS Error erstrace,throttle,lstdout,"
+        "protobufstream(monkafka.cern.ch:30092)", 
+        extra=handlerconf.ERS
+    )     
 
 
 def test_fallback_handlers(log_level: str) -> None:

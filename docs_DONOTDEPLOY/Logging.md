@@ -175,6 +175,10 @@ As seen in the previous section, there are several handlers and filters availabl
 
 Remember that by default, any messages received by the logger will be transmitted to _all_ available handlers that are attached to the logger. 
 
+**For now, please view both `get_daq_logger` and the relevant builders in `handlers.py` and `filters.py` to see what options exist on how to initialise them.**
+
+**In the future, this will be automatically generated from the docstrings**
+
 
 #### Rich handler
 
@@ -322,95 +326,3 @@ configuration errors.
 6. Only one protobuf endpoint is supported in Python ERS setup.
 If ERS env parsing yields multiple distinct `protobufstream(url:port)` endpoints,
 setup will fail.
-
-### Advanced logging
-
-The walkthrough above is sufficient for most usage.
-
-For advanced topics, including:
-
-- initializing handlers on an existing logger
-- suppress-by-default fallback behavior with `HandlerType.Unknown`
-- configuring ERS handlers with `setup_daq_ers_logger`
-- `**kwargs` propagation to handler/filter factories
-
-see `docs/Logging_advanced.md`.
-
-#### Choosing handlers with HandlerTypes 
-
-Let's say you have a logger with an attached Rich handler and File handler, and two messages to log. One should only go to file, and the other should only go to terminal via rich.
-
-```
-log = get_daq_logger("example", rich_handler=True, file_handler_path="logging.log")
-```
-
-These can be done by using the `HandlerTypes` enum. The loggers defined here have a special ability to read which HandlerTypes are supplied and to only transmit to the required handlers. 
-
-There is a very specific syntax that must be followed involving the `extra` kwarg:
-
-```
-from daqpytools.logging import HandlerType
-
-log.info("This will only be sent to the Rich", extra={"handlers": [HandlerType.Rich]})
-log.info("This will only be sent to the File", extra={"handlers": [HandlerType.File]})
-log.info("You can even send to both", extra={"handlers": [HandlerType.Rich, HandlerType.File]})
-```
-
-Naturally, asking the logger to emit to a handler type that is not attached is a no-op. In the example above, using `HandlerType.Stream` would do nothing.
-
-
-
-#### The need for handler streams
-
-Within the DUNE DAQ ecosystem, there are several other configurations that interplay. These include the OpMon and ERS, which require several handlers for each configuration. These can be best thought of as 'streams' which interact with several other handlers, as shown in an example below.
-
-![streams](img/streams.png)
-
-The native implementation in drunc and most applications is referred to as the Base stream, which interacts with Rich, File, and Stream handlers. **This is why the ERS Kafka handler and the Throttle filter need to be activated with HandlerTypes**.
-
-The ERS configuration is defined in OKS, [for example here](https://github.com/DUNE-DAQ/daqsystemtest/blob/974965be6e96aff969c69a380ed34aa96705e802/config/daqsystemtest/ccm.data.xml#L189), and are automatically parsed by daqpytools as they get used. A special feature of the ERS configuration is that the relevant Handlers are severity-level dependent; ERS Fatal and ERS info may have a different set of handler requirements
-
-#### Log Handler Conf
-
-
-To deal with the constraints set above, a handler configuration dataclass called `LogHandlerConf` is constructed to define the relevant configurations and a system of filters is initialised with every handler. When passing a log record that needs to be processed via a specific stream, the log record and the handler configuration is passed to the relevant logger, after which it is processed. 
-
-An example of which is shown in the logging demonstrator, copied here.
-
-```python
-handlerconf = LogHandlerConf()
-
-main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
-main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
-```
-
-
-#### Using ERS
-By default, the LogHandlerConf does not initialise the ERS stream because it requires the ERS environment variables to be defined. Should these variables exists, there are two ways to initialise the ERS stream with the LogHandlerConf. 
-
-```python
-# By default init_ers is false
-# When this is the case, ERS Streams are _not_ defined. Will survive without ERS envs being defined
-LHC_no_init = LogHandlerConf()  # equivalent to LogHandlerConf(init_ers=False)
-
-print(LHC_no_init.Base) # Success
-print(LHC_no_init.ERS) # Throws ERS stream not initialised. Call init_ers_stream() first
-
-# Later on, when ERS envs are defined, can be initialised
-LHC_no_init.init_ers_stream()
-print(LHC_no_init.ERS) # Success
-
-```
-
-### Troubleshooting
-
-| Symptom | Likely cause | What to check | Fix |
-|---|---|---|---|
-| `Logger ... already exists with different handler configuration` | Same logger name reused with different constructor flags | Logger name and previous initialization path | Reuse same config for that name, or choose a new logger name |
-| `Root logger ... already has handlers configured` | `setup_root_logger` called after handlers were already attached | Existing handlers on the named root logger | Use a fresh logger name or clear handlers before setup |
-| Throttle filter appears to do nothing | `HandlerType.Throttle` is not in resolved allowed handlers for that record | `extra={"handlers": ...}` and stream metadata | Add `HandlerType.Throttle` to routing metadata for the messages you want throttled |
-| ERS stream access raises `ERS stream not initialised` | `LogHandlerConf` created with `init_ers=False` and ERS not initialized yet | Whether `init_ers_stream()` was called | Call `init_ers_stream()` after ERS env vars are present |
-| ERS setup fails due to missing env | One or more required `DUNEDAQ_ERS_*` variables are unset/empty | Environment before ERS init/setup | Export required ERS variables before initializing ERS |
-| ERS setup fails with multiple protobuf endpoints | ERS env vars define different `protobufstream(url:port)` targets by severity | Parsed ERS vars across severities | Use one shared endpoint in Python setup path |
-| Message not emitted to expected handler | Requested handler not attached or filtered out by routing | Attached handlers and `extra["handlers"]` values | Attach the handler at logger setup and include the right `HandlerType` on the record |
-

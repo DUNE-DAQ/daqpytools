@@ -7,13 +7,9 @@ import sh
 from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.handlerconf import HandlerType, LogHandlerConf
 from daqpytools.logging.handlers import (
-    ThrottleFilter,
-    add_ers_kafka_handler,
-    add_file_handler,
-    add_rich_handler,
-    add_stderr_handler,
-    add_stdout_handler,
+    add_handlers_from_types,
 )
 from daqpytools.logging.levels import logging_log_level_to_int
 from daqpytools.logging.utils import get_width
@@ -71,8 +67,9 @@ def get_daq_logger(
     rich_handler: bool = False,
     file_handler_path: str | None = None,
     stream_handlers: bool = False,
-    ers_kafka_handler: bool = False,
-    throttle: bool = False
+    ers_kafka_session: str | None = None,
+    throttle: bool = False,
+    **extras: object
 ) -> logging.Logger:
     """C'tor for the default logging instances.
 
@@ -84,9 +81,11 @@ def get_daq_logger(
         file_handler_path (str | None): Path to the file handler log file. If None, no
             file handler is added.
         stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_kafka_handler (bool): Whether to add an ERS protobuf handler.
-        throttle (bool): Whether to add the throttle filter or not. Note, does not mean 
+        ers_kafka_session (str | None): ERS session name used to add an ERS
+            protobuf handler. If None, no ERS protobuf handler is added.
+        throttle (bool): Whether to add the throttle filter or not. Note, does not mean
             outputs are filtered by default! See ThrottleFilter for details.
+        **extras (object): Extra keyword arguments forwarded to handler builders.
 
     Returns:
         logging.Logger: Configured logger instance.
@@ -141,20 +140,27 @@ def get_daq_logger(
         logger.setLevel(log_level)
     logger.propagate = use_parent_handlers
 
-    # Add requested handlers
+    fallback_handlers: set[HandlerType] = set()
     if rich_handler:
-        add_rich_handler(logger, use_parent_handlers)
+        fallback_handlers.add(HandlerType.Rich)
     if file_handler_path:
-        add_file_handler(logger, use_parent_handlers, file_handler_path)
+        fallback_handlers.add(HandlerType.File)
     if stream_handlers:
-        add_stdout_handler(logger, use_parent_handlers)
-        add_stderr_handler(logger, use_parent_handlers)
-    if ers_kafka_handler: 
-        add_ers_kafka_handler(logger, use_parent_handlers, "session_tester")
-
+        fallback_handlers.add(HandlerType.Stream)
+    if ers_kafka_session:
+        fallback_handlers.add(HandlerType.Protobufstream)
     if throttle:
-        # Note: Default parameters used. No functionality on customisability yet
-        logger.addFilter(ThrottleFilter())
+        fallback_handlers.add(HandlerType.Throttle)
+
+    add_handlers_from_types(
+        logger,
+        fallback_handlers,
+        use_parent_handlers,
+        fallback_handlers,
+        path=file_handler_path,
+        session_name=ers_kafka_session,
+        **extras
+    )
 
     # Set log level for all handlers if requested
     if log_level is not logging.NOTSET:
@@ -166,3 +172,59 @@ def get_daq_logger(
             handler.setLevel(log_level)
 
     return logger
+
+
+def setup_daq_ers_logger(
+    logger: logging.Logger,
+    ers_kafka_session: str,
+    ers_app_name : str | None = None
+) -> None:
+    """Configure logger handlers from ERS environment-derived configuration.
+
+    Args:
+        logger (logging.Logger): Logger to configure.
+        ers_kafka_session (str): ERS session name used for protobufstream handler.
+        ers_app_name (str | None): Optional ERS application name for kafka handler.
+
+    Returns:
+        None
+    """
+    oks_conf = LogHandlerConf._get_oks_conf()
+
+    protobuf_configs = {
+        handler_conf.protobufconf
+        for handler_conf in oks_conf.values()
+        if handler_conf.protobufconf is not None
+    }
+
+    if len(protobuf_configs) > 1:
+        err_msg = (
+            "Multiple protobufstream(url:port) configurations are not supported "
+            "in Python ERS logger setup"
+        )
+        raise ValueError(err_msg)
+
+    protobuf_config = next(iter(protobuf_configs), None)
+    kafka_address = protobuf_config.get_string() if protobuf_config else None
+
+    all_handlers = {
+        handler
+        for handler_conf in oks_conf.values()
+        for handler in handler_conf.handlers
+        if handler is not None
+    }
+
+    add_ers_kwargs = {
+        "session_name": ers_kafka_session,
+        "ers_app_name": ers_app_name,
+    }
+    if kafka_address is not None:
+        add_ers_kwargs["address"] = kafka_address
+
+    add_handlers_from_types(
+        logger,
+        all_handlers,
+        use_parent_handlers=True,
+        fallback_handlers={HandlerType.Unknown},
+        **add_ers_kwargs,
+    )

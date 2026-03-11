@@ -61,3 +61,23 @@ def test_formatter_level_format():
 def test_formatter_message_content():
     """Validate the message content is included in the formatted message."""
     assert "Test message" in formatted_message
+
+
+def test_formatter_does_not_mutate_original_record_message():
+    """Ensure formatting does not mutate the original record message."""
+    markup_msg = "[bold red]Colorful[/bold red] text"
+    local_record = logging.LogRecord(
+        name=test_logger_name,
+        level=logging.INFO,
+        pathname="test_path.py",
+        lineno=test_line_no,
+        msg=markup_msg,
+        args=None,
+        exc_info=None,
+    )
+
+    formatter = LoggingFormatter()
+    formatted_output = formatter.format(local_record)
+
+    assert "Colorful text" in formatted_output
+    assert local_record.msg == markup_msg

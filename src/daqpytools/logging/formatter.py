@@ -2,6 +2,7 @@ import configparser
 import logging
 import os
 import re
+from copy import copy
 from datetime import datetime, tzinfo
 from pathlib import Path
 
@@ -107,18 +108,26 @@ class LoggingFormatter(logging.Formatter):
         * Component widths.
         * Removes markdown-style comments from the message.
         """
-        if isinstance(record.msg, str):
-            record.msg = re.sub(r"\[/?[^\]]+\]", "", record.msg)
+        formatted_record = copy(record)
 
-        record.asctime = self.formatTime(record, self.datefmt)
+        if isinstance(formatted_record.msg, str):
+            formatted_record.msg = re.sub(
+                r"\[/?[^\]]+\]", "", formatted_record.msg
+            )
+
+        formatted_record.asctime = self.formatTime(formatted_record, self.datefmt)
 
         padding = LOG_RECORD_PADDING.get("level", 10)
-        record.levelname = record.levelname.ljust(padding)[:padding]
+        formatted_record.levelname = formatted_record.levelname.ljust(padding)[:padding]
 
         padding = LOG_RECORD_PADDING.get("file_and_line", 40)
-        record.filename = f"{record.filename}:{record.lineno}".ljust(padding)[:padding]
+        formatted_record.filename = (
+            f"{formatted_record.filename}:{formatted_record.lineno}".ljust(padding)[
+                :padding
+            ]
+        )
 
         padding = LOG_RECORD_PADDING.get("logger_name", 40)
-        record.name = f"{record.name}".ljust(padding)[:padding]
+        formatted_record.name = f"{formatted_record.name}".ljust(padding)[:padding]
 
-        return super().format(record)
+        return super().format(formatted_record)

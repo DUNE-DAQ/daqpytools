@@ -1,9 +1,11 @@
 import logging
 import tempfile
+from unittest.mock import MagicMock
 
 import pytest
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.handlers import logger_or_ancestors_have_handler
 from daqpytools.logging.logger import get_daq_logger, setup_root_logger
 
 test_logger_name = "test_logger"
@@ -209,3 +211,17 @@ def test_get_daq_logger(caplog: pytest.LogCaptureFixture):
 
     # Shutdown logging to reset any internal state
     logging.shutdown()
+
+
+def test_logger_parent_walk_handles_mock_logger_cycle():
+    """Ensure parent traversal does not hang on mock logger-like objects."""
+    fake_logger = MagicMock()
+    fake_parent = MagicMock()
+
+    fake_logger.parent = fake_parent
+    fake_parent.parent = fake_parent
+
+    assert (
+        logger_or_ancestors_have_handler(fake_logger, True, logging.NullHandler)
+        is False
+    )

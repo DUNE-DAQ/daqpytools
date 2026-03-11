@@ -44,6 +44,18 @@ class ERSEnvError(Exception):
         super().__init__(err_msg)
 
 
+class ERSInitError(Exception):
+    """Custom error for ERS Init."""
+
+    def __init__(self, address:str, topic:str) -> None:
+        """C'tor."""
+        err_msg = (
+            "The Kafka broker cannot be initialised using "
+            f"{address=} and {topic=}"
+        )
+        super().__init__(err_msg)
+
+
 
 class ProtobufFormatError(Exception):
     """Custom error for Protobuf URL formatting issues."""

@@ -7,12 +7,13 @@ from rich.traceback import install as rich_traceback_install
 
 from daqpytools.logging.exceptions import LoggerSetupError
 from daqpytools.logging.formatter import CONTEXT_SETTINGS
+from daqpytools.logging.handlerconf import LogHandlerConf
 from daqpytools.logging.handlers import (
     HandlerType,
-    LogHandlerConf,
+    add_handler,
 )
 from daqpytools.logging.levels import logging_log_level_keys
-from daqpytools.logging.logger import get_daq_logger
+from daqpytools.logging.logger import get_daq_logger, setup_daq_ers_logger
 from daqpytools.logging.utils import get_width
 
 
@@ -163,7 +164,7 @@ def test_handlertypes(main_logger: logging.Logger) -> None:
         main_logger (logging.Logger): A logger to print messages with
     """
     #* Test choosing which handler to use individually
-    main_logger.debug("Default go to tty / rich / file when added")
+    main_logger.debug("Default go to whatever handlers were initialised with")
     main_logger.critical("Should only go to tty", 
         extra={"handlers": [HandlerType.Rich]}
     )
@@ -224,6 +225,78 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         "protobufstream(monkafka.cern.ch:30092)", 
         extra=handlerconf.ERS
     )     
+
+
+def test_fallback_handlers(log_level: str) -> None:
+    """Demonstrate fallback handler behavior for a logger.
+
+    Args:
+        log_level (str): Log level used to initialize the demo logger.
+
+    Returns:
+        None
+    """
+    fallback_log: logging.Logger = get_daq_logger(
+        logger_name="fallback_logger",
+        log_level=log_level,
+        stream_handlers=False,
+        rich_handler=True,
+    )
+
+    fallback_log.info("Rich Only")
+    
+    add_handler(
+        fallback_log,
+        HandlerType.Lstdout,
+        True
+    )
+
+    add_handler(
+        fallback_log,
+        HandlerType.Lstderr,
+        True,
+        fallback_handler = {HandlerType.Unknown}
+    )
+    
+    fallback_log.critical("Rich + stdout only")
+    fallback_log.critical(
+        "Rich + stdout + stderr",
+        extra={"handlers": [HandlerType.Rich, HandlerType.Stream]},
+    )
+
+    
+def test_ers_handler_configuration(log_level: str) -> None:
+    """Demonstrate ERS-driven handler configuration for a logger.
+
+    Args:
+        log_level (str): Log level used to initialize the demo logger.
+
+    Returns:
+        None
+    """
+    # Injecting specific 
+    os.environ["DUNEDAQ_ERS_WARNING"] = "rich"
+    os.environ["DUNEDAQ_ERS_INFO"] = "lstdout"
+    os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr,rich"
+    os.environ["DUNEDAQ_ERS_ERROR"] = "rich"
+
+    ers_logger: logging.Logger = get_daq_logger(
+        logger_name="ers_logger",
+        log_level=log_level,
+        stream_handlers=False,
+        rich_handler=True,
+    )
+    ers_logger.info("Just rich is added")
+   
+    # Sets up the logger with all the relevant handlers
+    setup_daq_ers_logger(ers_logger, "session_temp")
+    ers_logger.info("ERS configured, but should still only be rich")
+    
+    ers_hc = LogHandlerConf(init_ers=True)
+    ers_logger.info("ERS Info lstdout ", extra=ers_hc.ERS)
+    ers_logger.warning("ERS error lstdout", extra=ers_hc.ERS)
+    ers_logger.critical("ERS critical lstderr + rich", extra=ers_hc.ERS)
+
 
 class AllOptionsCommand(click.Command):
     """Parse the arguments passed and validate they are acceptable, otherwise print the
@@ -294,11 +367,19 @@ class AllOptionsCommand(click.Command):
     ),
 )
 @click.option(
-    "-e",
+    "-ep",
     "--ersprotobufstream", 
-    is_flag=True, 
+    type=str,
     help=(
-        "Set up an ERS handler, and publish to ERS"
+        "Set up an ERS protobuf handler, and publish to ERS via protobuf."
+        )
+    )
+@click.option(
+    "-eh",
+    "--ershandlers",
+    is_flag=True,
+    help=(
+        "Demonstrate automatic logger configuration with ers variables."
         )
     )
 @click.option(
@@ -357,6 +438,14 @@ class AllOptionsCommand(click.Command):
         "logger handlers assigned to the given logger instance"
     ),
 )
+@click.option(
+    "-fh",
+    "--fallback-handlers",
+    is_flag=True,
+    help=(
+        "If true, demonstrates the use of fallback handlers."
+    ),
+)
 def main(
     log_level: str,
     rich_handler: bool,
@@ -364,11 +453,14 @@ def main(
     stream_handlers: bool,
     child_logger: bool,
     disable_logger_inheritance: bool,
-    ersprotobufstream: bool,
+    ersprotobufstream: str,
     handlertypes:bool,
     handlerconf:bool,
     throttle: bool,
-    suppress_basic: bool
+    suppress_basic: bool,
+    fallback_handlers: bool,
+    ershandlers: bool,
+
 ) -> None:
     """Demonstrate use of the daq_logging class with daqpyutils_logging_demonstrator.
     Note - if you are seeing output logs without any explicit handlers assigned, this is
@@ -384,7 +476,8 @@ def main(
         disable_logger_inheritance (bool): If true, disable logger inheritance so each
             logger instance only uses the logger handlers assigned to the given logger
             instance.
-        ersprotobufstream (bool): If true, sets up an ERS protobuf handler. Error msg
+        ersprotobufstream (str): Sets up an ERS protobuf handler with supplied
+            session name. Error msg
             are demonstrated in the HandlerType demonstration, requiring handlerconf
             to be set to true. The topic for these tests is session_tester.
         handlertypes (bool): If true, demonstrates the advanced feature of HandlerTypes.
@@ -393,6 +486,8 @@ def main(
         throttle (bool): If true, demonstrates the throttling feature. Requires Rich.
         suppress_basic (bool): If true, supresses basic functionality. 
             Useful to only test the advanced features of logging
+        fallback_handlers (bool): If true, demonstrates fallback handler behavior.
+        ershandlers (bool): If true, demonstrates ERS-based handler setup.
 
     Returns:
         None
@@ -408,7 +503,8 @@ def main(
         rich_handler=rich_handler,
         file_handler_path=file_handler_path,
         stream_handlers=stream_handlers,
-        ers_kafka_handler=ersprotobufstream,
+        ers_kafka_session=ersprotobufstream,
+        ers_app_name="Custom App Name", # Can be none!
         throttle=throttle
     )
 
@@ -431,7 +527,10 @@ def main(
         test_handlertypes(main_logger)
     if handlerconf:
         test_handlerconf(main_logger)
-
+    if fallback_handlers:
+        test_fallback_handlers(log_level)
+    if ershandlers:
+        test_ers_handler_configuration(log_level)
 
 if __name__ == "__main__":
     main()

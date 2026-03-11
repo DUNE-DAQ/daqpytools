@@ -2,6 +2,12 @@
 
 This page walks through how daqpytools logging actually works under the hood. It's meant for folks adding new handlers, filters, or debugging routing issues.
 
+## Contents
+
+- **The core idea** — Set-based routing model and general framework
+- **Code walkthrough** — Details on all core components (HandlerTypes, Specs, Filters, Routing strategies, etc.)
+- **Interactions** — How logger initialization and record flow work
+
 If you're just using the logging API, check out:
 - `docs/Logging.md` (user quickstart)
 - `docs/Logging_advanced.md` (advanced patterns)

@@ -3,6 +3,16 @@ Updated as of 5.6.0
 
 Welcome, fellow beavers! This page provides a user guide to logging in Python in the context of DUNE-DAQ.
 
+## Contents
+
+- **TL;DR** — Quick setup and basic usage
+- **Basics** — Core _Python_ logging concepts (severity levels, handlers, filters, inheritance)
+- **Using logging with daqpytools** — How to initialize and use loggers with the framework defined in daqpytools
+
+If you are introducing logging to your Python repo, or are in the process of upgrading your logging implementation , **please** read the logging best practices! These will give you useful tips and tricks on how the logging framework should be implemented and will prevent future heartache. See `docs/Logging_best_practices.md`. 
+
+
+
 For advanced routing and expert configuration patterns, see `docs/Logging_advanced.md`.
 
 ## TL;DR

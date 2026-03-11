@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, call
 import pytest
 
 from daqpytools.apps import logging_demonstrator as demo
+from daqpytools.logging import handlers as handlers_mod
 from daqpytools.logging.exceptions import ERSInitError, LoggerHandlerError
 from daqpytools.logging.filters import HandleIDFilter
 from daqpytools.logging.formatter import LoggingFormatter
 from daqpytools.logging.handlerconf import HandlerType
 from daqpytools.logging.rich_handler import FormattedRichHandler
-from daqpytools.logging import handlers as handlers_mod
 
 
 @pytest.fixture
@@ -27,8 +27,9 @@ def clean_logger() -> Iterator[logging.Logger]:
         logger.removeHandler(handler)
         try:
             handler.close()
-        except Exception:
-            pass
+        except Exception as e:
+            # Handler already closed or does not support close
+            del e
     logger.filters = []
     logging.root.manager.loggerDict.pop(name, None)
 
@@ -58,8 +59,9 @@ def parent_child_loggers() -> Iterator[tuple[logging.Logger, logging.Logger]]:
             logger.removeHandler(handler)
             try:
                 handler.close()
-            except Exception:
-                pass
+            except Exception as e:
+                # Handler already closed or does not support close
+                del e
         logger.filters = []
         logging.root.manager.loggerDict.pop(logger.name, None)
 
@@ -68,16 +70,23 @@ def test_logger_has_handler_non_logger_returns_false() -> None:
     assert handlers_mod.logger_has_handler(MagicMock(), logging.StreamHandler) is False
 
 
-def test_logger_has_handler_matches_non_stream_type(clean_logger: logging.Logger) -> None:
+def test_logger_has_handler_matches_non_stream_type(
+    clean_logger: logging.Logger,
+) -> None:
     handler = logging.NullHandler()
     clean_logger.addHandler(handler)
-    assert handlers_mod.logger_has_handler(clean_logger, logging.NullHandler) is True
+    assert (
+        handlers_mod.logger_has_handler(clean_logger, logging.NullHandler)
+        is True
+    )
 
 
 def test_logger_has_handler_matches_stream_by_target_stream(
     clean_logger: logging.Logger,
 ) -> None:
-    stdout_handler = logging.StreamHandler(handlers_mod.STDOUT_HANDLER_SPEC.target_stream)
+    stdout_handler = logging.StreamHandler(
+        handlers_mod.STDOUT_HANDLER_SPEC.target_stream
+    )
     clean_logger.addHandler(stdout_handler)
 
     assert (
@@ -107,7 +116,10 @@ def test_ancestors_have_handlers_returns_false_when_disabled(
     parent_child_loggers: tuple[logging.Logger, logging.Logger],
 ) -> None:
     _, child = parent_child_loggers
-    assert handlers_mod.ancestors_have_handlers(child, False, logging.NullHandler) is False
+    assert (
+        handlers_mod.ancestors_have_handlers(child, False, logging.NullHandler)
+        is False
+    )
 
 
 def test_ancestors_have_handlers_rejects_root_logger() -> None:
@@ -148,7 +160,10 @@ def test_ancestors_have_handlers_detects_parent_handler(
     parent, child = parent_child_loggers
     parent.addHandler(logging.NullHandler())
 
-    assert handlers_mod.ancestors_have_handlers(child, True, logging.NullHandler) is True
+    assert (
+        handlers_mod.ancestors_have_handlers(child, True, logging.NullHandler)
+        is True
+    )
 
 
 def test_check_parent_handlers_raises_loggerhandlererror(
@@ -165,10 +180,20 @@ def test_logger_or_ancestors_have_handler_checks_local_then_parent(
     parent_child_loggers: tuple[logging.Logger, logging.Logger],
 ) -> None:
     parent, child = parent_child_loggers
-    assert handlers_mod.logger_or_ancestors_have_handler(child, True, logging.NullHandler) is False
+    assert (
+        handlers_mod.logger_or_ancestors_have_handler(
+            child, True, logging.NullHandler
+        )
+        is False
+    )
 
     parent.addHandler(logging.NullHandler())
-    assert handlers_mod.logger_or_ancestors_have_handler(child, True, logging.NullHandler) is True
+    assert (
+        handlers_mod.logger_or_ancestors_have_handler(
+            child, True, logging.NullHandler
+        )
+        is True
+    )
 
 
 def test_get_handler_specs_returns_expected_specs() -> None:
@@ -180,7 +205,9 @@ def test_get_handler_specs_returns_expected_specs() -> None:
     assert len(handlers_mod.get_handler_specs(HandlerType.Protobufstream)) == 1
 
 
-def test_build_rich_handler_uses_get_width_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_rich_handler_uses_get_width_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(handlers_mod, "get_width", lambda: 111)
     handler = handlers_mod._build_rich_handler()
     assert isinstance(handler, FormattedRichHandler)
@@ -207,7 +234,9 @@ def test_build_file_handler_requires_path() -> None:
         handlers_mod._build_file_handler()
 
 
-def test_build_file_handler_creates_handler_with_formatter(tmp_path: pytest.TempPathFactory) -> None:
+def test_build_file_handler_creates_handler_with_formatter(
+    tmp_path: pytest.TempPathFactory,
+) -> None:
     file_path = tmp_path / "test.log"
     handler = handlers_mod._build_file_handler(path=str(file_path))
     assert isinstance(handler, logging.FileHandler)
@@ -215,7 +244,9 @@ def test_build_file_handler_creates_handler_with_formatter(tmp_path: pytest.Temp
     handler.close()
 
 
-def test_build_erskafka_handler_wraps_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_erskafka_handler_wraps_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def _raise(*args: object, **kwargs: object) -> None:
         del args, kwargs
         raise RuntimeError("boom")
@@ -247,7 +278,9 @@ def test_build_erskafka_handler_success_passes_arguments(
     assert handler.kwargs["app_name"] == "app_x"
 
 
-def test_add_handler_adds_single_spec_and_handleidfilter(clean_logger: logging.Logger) -> None:
+def test_add_handler_adds_single_spec_and_handleidfilter(
+    clean_logger: logging.Logger,
+) -> None:
     handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
 
     assert len(clean_logger.handlers) == 1
@@ -258,7 +291,9 @@ def test_add_handler_adds_single_spec_and_handleidfilter(clean_logger: logging.L
     )
 
 
-def test_add_handler_skips_when_matching_handler_exists(clean_logger: logging.Logger) -> None:
+def test_add_handler_skips_when_matching_handler_exists(
+    clean_logger: logging.Logger,
+) -> None:
     handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
     handlers_mod.add_handler(clean_logger, HandlerType.Rich, use_parent_handlers=True)
     assert len(clean_logger.handlers) == 1
@@ -285,7 +320,9 @@ def test_add_handler_unknown_string_does_nothing(clean_logger: logging.Logger) -
     assert len(clean_logger.handlers) == 0
 
 
-def test_add_handler_uses_explicit_fallback_override(clean_logger: logging.Logger) -> None:
+def test_add_handler_uses_explicit_fallback_override(
+    clean_logger: logging.Logger,
+) -> None:
     override = {HandlerType.Unknown}
     handlers_mod.add_handler(
         clean_logger,
@@ -302,15 +339,21 @@ def test_add_handler_uses_explicit_fallback_override(clean_logger: logging.Logge
     assert handler_filter.fallback_handlers == override
 
 
-def test_add_handler_for_stream_adds_stdout_and_stderr(clean_logger: logging.Logger) -> None:
+def test_add_handler_for_stream_adds_stdout_and_stderr(
+    clean_logger: logging.Logger,
+) -> None:
     handlers_mod.add_handler(clean_logger, HandlerType.Stream, use_parent_handlers=True)
     stream_handlers = [
-        handler for handler in clean_logger.handlers if isinstance(handler, logging.StreamHandler)
+        handler
+        for handler in clean_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
     ]
     assert len(stream_handlers) == 2
 
 
-def test_add_handlers_from_types_stream_deduplicates(clean_logger: logging.Logger) -> None:
+def test_add_handlers_from_types_stream_deduplicates(
+    clean_logger: logging.Logger,
+) -> None:
     handlers_mod.add_handlers_from_types(
         clean_logger,
         {HandlerType.Stream, HandlerType.Lstdout, HandlerType.Lstderr},
@@ -318,7 +361,9 @@ def test_add_handlers_from_types_stream_deduplicates(clean_logger: logging.Logge
         fallback_handlers={HandlerType.Stream},
     )
     stream_handlers = [
-        handler for handler in clean_logger.handlers if isinstance(handler, logging.StreamHandler)
+        handler
+        for handler in clean_logger.handlers
+        if isinstance(handler, logging.StreamHandler)
     ]
     assert len(stream_handlers) == 2
 
@@ -374,6 +419,7 @@ def test_demo_test_main_functions_emits_expected_levels() -> None:
 
 def test_demo_test_child_logger_builds_child_and_logs(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: pytest.TempPathFactory,
 ) -> None:
     child_logger = MagicMock(spec=logging.Logger)
     get_logger_mock = MagicMock(return_value=child_logger)
@@ -384,7 +430,7 @@ def test_demo_test_child_logger_builds_child_and_logs(
         log_level="INFO",
         disable_logger_inheritance=True,
         rich_handler=True,
-        file_handler_path="/tmp/demo.log",
+        file_handler_path=str(tmp_path / "demo.log"),
         stream_handlers=True,
     )
 
@@ -393,7 +439,7 @@ def test_demo_test_child_logger_builds_child_and_logs(
         log_level="INFO",
         use_parent_handlers=False,
         rich_handler=True,
-        file_handler_path="/tmp/demo.log",
+        file_handler_path=str(tmp_path / "demo.log"),
         stream_handlers=True,
     )
     child_logger.debug.assert_called_once()
@@ -429,10 +475,22 @@ def test_demo_test_handlertypes_routes_expected_extras() -> None:
     demo.test_handlertypes(logger)
 
     critical_calls = logger.critical.call_args_list
-    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Rich] for c in critical_calls)
-    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.File] for c in critical_calls)
-    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Lstdout] for c in critical_calls)
-    assert any(c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Throttle] for c in critical_calls)
+    assert any(
+        c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Rich]
+        for c in critical_calls
+    )
+    assert any(
+        c.kwargs.get("extra", {}).get("handlers") == [HandlerType.File]
+        for c in critical_calls
+    )
+    assert any(
+        c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Lstdout]
+        for c in critical_calls
+    )
+    assert any(
+        c.kwargs.get("extra", {}).get("handlers") == [HandlerType.Throttle]
+        for c in critical_calls
+    )
     assert any(
         c.kwargs.get("extra", {}).get("handlers")
         == [HandlerType.Rich, HandlerType.Protobufstream]

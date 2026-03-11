@@ -22,6 +22,8 @@ test_logger = get_daq_logger(
 )
 ```
 
+For now, **please see the docstring of `get_daq_logger` to see what stuff you can have and what to initialise with**
+
 
 
 #### Use 
@@ -155,6 +157,8 @@ test_logger.warning("Hello, world!")
 ```
 
 As shown above, initializing a logger with specific handlers is as easy as changing constructor flags.
+
+For now, **please see the docstring of `get_daq_logger` to see what stuff you can have and what to initialise with**
 
 
 The core philosophy of the logging framework in daqpytools is that each logger should only have _one_ instance of a specific type of logger. This means that while a single logger can have both a Rich and a Stream handler, a single logger cannot have _two_ Rich handlers to prevent duplicating messages.

@@ -5,6 +5,40 @@ Welcome, fellow beavers! This page provides a user guide to logging in Python in
 
 For advanced routing and expert configuration patterns, see `docs/Logging_advanced.md`.
 
+## TL;DR
+
+#### Initialise
+
+```python
+from daqpytools.logging import get_daq_logger
+test_logger = get_daq_logger(
+    logger_name = "test_logger", # Set as your logger name. Preferrably it should be relevant to what module / file you are in 
+    log_level = "INFO", # Default level you will transmit at or above. In this case, Debugs will not be transmitted
+    use_parent_handlers = True, # Just keep this true
+    
+    ## the rest are whatever handlers you want to attach. Read on for what exists. Rich is your standard TTY logger so the vast majority will be using this
+    rich_handler = True, 
+    stream_handlers = False # you dont really need this; its False by default
+)
+```
+
+
+
+#### Use 
+
+```python
+test_logger.info("Hello, world!")
+
+test_logger(
+        "[dim cyan]Look[/dim cyan] "
+        "[bold green]at[/bold green] "
+        "[bold yellow]all[/bold yellow] "
+        "[bold red]the[/bold red] "
+        "[bold white on red]colours![/bold white on red] "
+)
+```
+
+
 ## Basics
 
 The bulk of the logging functionality in drunc and other Python applications is built on the [Python logging framework](https://docs.python.org/3/library/logging.html), with its mission defined below:

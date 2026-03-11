@@ -2,6 +2,13 @@
 
 This page covers how to add new handlers and filters to **daqpytools.logging**.
 
+## Contents
+
+- **Adding a new handler** — Step-by-step guide from enum value to ERS support
+- **Adding a new logger-level filter** — Implementation pattern and usage
+- **Debugging and verification checklist** — Troubleshooting patterns when extending
+- **Common patterns** — Recipes for specific handler/filter types
+
 **Important:** You'll be editing files in the daqpytools repository itself. The main files you'll work with are:
 - `src/daqpytools/logging/handlerconf.py` — Handler/filter type definitions
 - `src/daqpytools/logging/handlers.py` — Handler implementations and registry

@@ -1,0 +1,55 @@
+site_name: DUNE Run Control (drunc) Developer Documentation
+
+repo_name: DUNE-DAQ/drunc
+repo_url: https://github.com/DUNE-DAQ/drunc
+
+theme:
+  name: material
+  palette: 
+    # Palette toggle for light/dark mode
+    - scheme: default
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/git-alt
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - exclude:
+      glob:
+        - Developer-Wiki/*
+  - gen-files:
+      # scripts:
+      #   - docs/utils/generate_ghpages_docstrings.py
+  - literate-nav:
+      nav_file: README.md
+  - section-index
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            merge_init_into_class: true
+          paths: [.]
+
+# hooks:
+# - docs/utils/mkdocs_hooks.py

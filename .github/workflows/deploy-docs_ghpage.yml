@@ -3,7 +3,7 @@ name: Deploy Docs to Pages
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]   # or "develop"
+    branches: [ "emmuhamm/deploy-docs" ]   # or "develop"
   # optional schedule:
   # schedule:
   #   - cron: "0 0 * * 6"

@@ -34,7 +34,7 @@ plugins:
   - exclude:
       glob:
         - Developer-Wiki/*
-  - gen-files:
+  # - gen-files:
       # scripts:
       #   - docs/utils/generate_ghpages_docstrings.py
   - literate-nav:

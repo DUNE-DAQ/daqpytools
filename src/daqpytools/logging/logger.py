@@ -71,28 +71,44 @@ def get_daq_logger(
     throttle: bool = False,
     **extras: object
 ) -> logging.Logger:
-    """C'tor for the default logging instances.
+    """Create or reuse a configured DAQ logger.
+
+    Handler/filter installation is driven by selected flags and resolved through
+    the handler/filter registries. Additional keyword arguments are forwarded to
+    the underlying factory functions.
 
     Args:
-        logger_name (str): Name of the logger.
-        log_level (int | str): Log level for the logger.
-        use_parent_handlers (bool): Whether to use parent handlers.
-        rich_handler (bool): Whether to add a rich handler.
-        file_handler_path (str | None): Path to the file handler log file. If None, no
-            file handler is added.
-        stream_handlers (bool): Whether to add both stdout and stderr stream handlers.
-        ers_kafka_session (str | None): ERS session name used to add an ERS
-            protobuf handler. If None, no ERS protobuf handler is added.
-        throttle (bool): Whether to add the throttle filter or not. Note, does not mean
-            outputs are filtered by default! See ThrottleFilter for details.
-        **extras (object): Extra keyword arguments forwarded to handler builders.
+        logger_name: Name of the logger to create or retrieve.
+        log_level: Logging level for the logger and its non-stderr handlers.
+        use_parent_handlers: If ``True``, logger propagation remains enabled.
+        rich_handler: Enable ``HandlerType.Rich``.
+        file_handler_path: Optional file path enabling ``HandlerType.File``.
+        stream_handlers: Enable ``HandlerType.Stream`` (stdout + stderr specs).
+        ers_kafka_session: Optional ERS session enabling
+            ``HandlerType.Protobufstream``.
+        throttle: Enable ``HandlerType.Throttle`` filter installation.
+        **extras: Additional keyword arguments forwarded to handler/filter
+            factories via ``add_handlers_from_types(..., **extras)``.
+
+            Common forwarded kwargs include:
+            - ``width`` -> ``_build_rich_handler``
+            - ``path`` -> ``_build_file_handler`` (internally mapped from
+              ``file_handler_path``)
+            - ``session_name`` -> ``_build_erskafka_handler`` (internally mapped
+              from ``ers_kafka_session``)
+            - ``topic``, ``address``, ``ers_app_name`` ->
+              ``_build_erskafka_handler``
+            - ``initial_treshold``, ``time_limit`` ->
+              ``_build_throttle_filter``
+
+            Unsupported kwargs may be ignored by factories that accept ``**_``.
 
     Returns:
-        logging.Logger: Configured logger instance.
+        Configured ``logging.Logger`` instance.
 
     Raises:
-        LoggerSetupError: If the configuration is invalid.
-
+        LoggerSetupError: If a logger with the same name already exists but
+            with a conflicting handler configuration.
     """
     rich_traceback_install(show_locals=True, width=get_width())
 

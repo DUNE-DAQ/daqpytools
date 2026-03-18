@@ -267,7 +267,23 @@ def _build_throttle_filter(
     time_limit: int = 30,
     **extras: object,
 ) -> logging.Filter:
-    """Build a throttle filter from extras."""
+    """Build a throttle filter.
+
+    Args:
+        fallback_handlers: Handler types used as fallback routing context.
+        initial_treshold: Number of first occurrences to emit before applying
+            suppression logic.
+        time_limit: Throttle time window in seconds.
+        **extras: Additional forwarded keyword arguments. Ignored by this
+            factory.
+
+    Returns:
+        A configured ``ThrottleFilter`` instance.
+
+    Notes:
+        The keyword name is currently ``initial_treshold`` to match the
+        existing function signature.
+    """
     del extras
     return ThrottleFilter(
         fallback_handlers=fallback_handlers,
@@ -287,7 +303,15 @@ FILTER_SPEC_REGISTRY: dict[HandlerType, FilterSpec] = {
 }
 
 def get_filter_spec(handler_types: HandlerType) -> FilterSpec | None:
-    """Return the filter specification for a handler type."""
+    """Return the filter specification for a handler type.
+
+    Args:
+        handler_types: Filter-capable ``HandlerType`` alias.
+
+    Returns:
+        The matching ``FilterSpec`` if present in ``FILTER_SPEC_REGISTRY``;
+        otherwise ``None``.
+    """
     return FILTER_SPEC_REGISTRY.get(handler_types)
 
 def add_filter(
@@ -296,7 +320,20 @@ def add_filter(
     fallback_handlers : set[HandlerType]| None,
     **extras: object,
 ) -> None:
-    """Add a logger filter according to the spec."""
+    """Add a logger filter resolved from ``FILTER_SPEC_REGISTRY``.
+
+    Args:
+        log: Logger receiving the filter instance.
+        handler_type: Filter-capable ``HandlerType`` to resolve.
+        fallback_handlers: Explicit fallback handler set passed to the filter
+            factory. If ``None``, the filter spec ``fallback_types`` are used.
+        **extras: Additional keyword arguments forwarded to the resolved filter
+            factory. These values typically come from
+            ``get_daq_logger(..., **extras)``.
+
+    Returns:
+        None.
+    """
     spec = get_filter_spec(handler_type)
 
     effective_fallback_handlers = (
@@ -315,7 +352,19 @@ def add_throttle_filter(
     log: logging.Logger,
     fallback_handlers: set[HandlerType] | None = None,
 ) -> None:
-    """Add the Throttle filter to the logger."""
+    """Add the throttle filter to a logger.
+
+    This is a convenience wrapper over ``add_filter`` for
+    ``HandlerType.Throttle``.
+
+    Args:
+        log: Logger receiving the throttle filter.
+        fallback_handlers: Optional fallback handler set used by throttle
+            routing. If omitted, registry defaults are used.
+
+    Returns:
+        None.
+    """
     add_filter(
         log,
         HandlerType.Throttle,

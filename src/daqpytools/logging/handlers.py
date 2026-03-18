@@ -148,7 +148,19 @@ def logger_or_ancestors_have_handler(
 #### Handlers #### 
 
 def _build_rich_handler(width: int | None = None, **_: object) -> logging.Handler:
-    """Building the rich handler with any extras."""
+    """Build the rich console handler.
+
+    This factory is invoked from handler resolution in ``get_daq_logger`` and
+    receives forwarded ``**extras``.
+
+    Args:
+        width: Optional console width used by ``FormattedRichHandler``.
+            If ``None``, terminal width is auto-detected via ``get_width``.
+        **_: Additional forwarded keyword arguments. Ignored by this factory.
+
+    Returns:
+        The configured rich logging handler.
+    """
     real_width = width if width is not None else get_width()
     return FormattedRichHandler(width=real_width)
 
@@ -160,6 +172,14 @@ RICH_HANDLER_SPEC = HandlerSpec(
 )
 
 def _build_stdout_handler(**_: object) -> logging.Handler:
+    """Build a stdout stream handler.
+
+    Args:
+        **_: Additional forwarded keyword arguments. Ignored by this factory.
+
+    Returns:
+        A ``logging.StreamHandler`` writing to ``sys.stdout``.
+    """
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(LoggingFormatter())
     return handler
@@ -173,6 +193,15 @@ STDOUT_HANDLER_SPEC = HandlerSpec(
 )
 
 def _build_stderr_handler(**_: object) -> logging.Handler:
+    """Build a stderr stream handler.
+
+    Args:
+        **_: Additional forwarded keyword arguments. Ignored by this factory.
+
+    Returns:
+        A ``logging.StreamHandler`` writing to ``sys.stderr`` with
+        ``ERROR`` level.
+    """
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(LoggingFormatter())
     handler.setLevel(logging.ERROR)
@@ -187,6 +216,19 @@ STDERR_HANDLER_SPEC = HandlerSpec(
 )
 
 def _build_file_handler(path: str | None = None, **_: object) -> logging.Handler:
+    """Build a file handler.
+
+    Args:
+        path: Path to the output log file. This is typically forwarded from
+            ``get_daq_logger(..., file_handler_path=...)`` as ``path``.
+        **_: Additional forwarded keyword arguments. Ignored by this factory.
+
+    Returns:
+        A configured ``logging.FileHandler``.
+
+    Raises:
+        ValueError: If ``path`` is not provided.
+    """
     if not path:
         err_msg = "path is required for file handler"
         raise ValueError(err_msg)
@@ -208,6 +250,21 @@ def _build_erskafka_handler(
         address : str = "monkafka.cern.ch:30092",
         ers_app_name : str | None = None,
     **_: object) -> logging.Handler: 
+    """Build an ERS Kafka handler.
+
+    Args:
+        session_name: ERS session name used by the Kafka handler.
+        topic: Kafka topic for ERS log messages.
+        address: Kafka broker address in ``host:port`` format.
+        ers_app_name: Optional ERS application name associated with messages.
+        **_: Additional forwarded keyword arguments. Ignored by this factory.
+
+    Returns:
+        A configured ``ERSKafkaLogHandler`` instance.
+
+    Raises:
+        ERSInitError: If the handler cannot be initialized.
+    """
     
     try:
         return ERSKafkaLogHandler(

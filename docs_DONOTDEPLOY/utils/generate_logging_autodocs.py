@@ -50,6 +50,8 @@ LOGGER_APIS: list[tuple[str, str]] = [
 ]
 
 
+
+
 def _install_erskafka_stub() -> None:
     """Install a lightweight erskafka stub so imports are docs-safe.
 
@@ -100,17 +102,10 @@ def _summary_from_docstring(obj: Any) -> str:
     return "No description provided."
 
 
-def _class_fqdn(cls: type[Any]) -> tuple[str, str]:
-    """Return class fully-qualified name and short class name."""
-    class_name = cls.__name__
-    fqdn = f"{cls.__module__}.{class_name}"
-    return fqdn, class_name
-
-
-def _factory_fqdn(factory: Any) -> tuple[str, str]:
-    """Return factory fully-qualified name and short function name."""
-    name = factory.__name__
-    fqdn = f"{factory.__module__}.{name}"
+def _symbol_fqdn(symbol: Any) -> tuple[str, str]:
+    """Return a symbol fully-qualified name and short symbol name."""
+    name = symbol.__name__
+    fqdn = f"{symbol.__module__}.{name}"
     return fqdn, name
 
 
@@ -131,26 +126,41 @@ def _to_text_list(items: tuple[Any, ...] | list[Any] | set[Any]) -> list[str]:
     return values
 
 
-def _build_handler_docspecs() -> dict[str, list[DocSpec]]:
-    """Convert handler registry content to grouped doc specs."""
-    from daqpytools.logging.handlers import HANDLER_SPEC_REGISTRY
+def _build_docspecs(
+    registry: dict[Any, Any],
+    *,
+    kind: str,
+    class_attr: str,
+) -> dict[str, list[DocSpec]]:
+    """Convert a spec registry to grouped ``DocSpec`` entries.
 
+    Args:
+        registry: Mapping from type enum to spec object(s).
+        kind: Documentation kind label (``handler`` or ``filter``).
+        class_attr: Name of the spec attribute holding the runtime class
+            (for example ``handler_class`` or ``filter_class``).
+
+    Returns:
+        A mapping keyed by type name with one or more ``DocSpec`` entries.
+    """
     grouped: dict[str, list[DocSpec]] = {}
 
-    for handler_type, specs in HANDLER_SPEC_REGISTRY.items():
-        type_name = handler_type.name
-        type_value = handler_type.value
-        grouped[type_name] = []
+    for item_type, raw_specs in registry.items():
+        type_name = item_type.name
+        type_value = item_type.value
+        specs = raw_specs if isinstance(raw_specs, tuple) else (raw_specs,)
 
+        grouped[type_name] = []
         for spec in specs:
-            class_fqdn, class_name = _class_fqdn(spec.handler_class)
-            factory_fqdn, factory_name = _factory_fqdn(spec.factory)
+            runtime_class = getattr(spec, class_attr)
+            class_fqdn, class_name = _symbol_fqdn(runtime_class)
+            factory_fqdn, factory_name = _symbol_fqdn(spec.factory)
 
             grouped[type_name].append(
                 DocSpec(
                     type_name=type_name,
                     type_value=type_value,
-                    kind="handler",
+                    kind=kind,
                     class_fqdn=class_fqdn,
                     class_name=class_name,
                     factory_fqdn=factory_fqdn,
@@ -163,77 +173,61 @@ def _build_handler_docspecs() -> dict[str, list[DocSpec]]:
     return grouped
 
 
-def _build_filter_docspecs() -> dict[str, list[DocSpec]]:
-    """Convert filter registry content to grouped doc specs."""
-    from daqpytools.logging.filters import FILTER_SPEC_REGISTRY
+def _render_index(
+    specs_by_type: dict[str, list[DocSpec]],
+    *,
+    kind: str,
+    title: str | None = None,
+    type_label: str | None = None,
+    source_registry: str | None = None,
+) -> str:
+    """Render an index page for one selected spec kind.
 
-    grouped: dict[str, list[DocSpec]] = {}
+    By default, ``kind`` selects standard values for title, type label,
+    and source registry. Any of those values can be overridden explicitly.
 
-    for filter_type, spec in FILTER_SPEC_REGISTRY.items():
-        type_name = filter_type.name
-        type_value = filter_type.value
-        class_fqdn, class_name = _class_fqdn(spec.filter_class)
-        factory_fqdn, factory_name = _factory_fqdn(spec.factory)
+    Args:
+        specs_by_type: Mapping of type name to one or more ``DocSpec`` entries.
+        kind: ``handler`` or ``filter``.
+        title: Optional custom page title.
+        type_label: Optional custom table header for type column.
+        source_registry: Optional custom source-of-truth registry label.
+    """
+    INDEX_KIND_DEFAULTS: dict[str, dict[str, str]] = {
+        "handler": {
+            "title": "Handlers reference",
+            "type_label": "HandlerType",
+            "source_registry": "HANDLER_SPEC_REGISTRY",
+        },
+        "filter": {
+            "title": "Filters reference",
+            "type_label": "FilterType",
+            "source_registry": "FILTER_SPEC_REGISTRY",
+        },
+    }
 
-        grouped[type_name] = [
-            DocSpec(
-                type_name=type_name,
-                type_value=type_value,
-                kind="filter",
-                class_fqdn=class_fqdn,
-                class_name=class_name,
-                factory_fqdn=factory_fqdn,
-                factory_name=factory_name,
-                fallback_types=_to_text_list(spec.fallback_types),
-                summary=_summary_from_docstring(spec.factory),
-            )
-        ]
+    
+    defaults = INDEX_KIND_DEFAULTS.get(kind)
+    if defaults is None:
+        err_msg = f"Unsupported index kind: {kind}"
+        raise ValueError(err_msg)
 
-    return grouped
+    resolved_title = title or defaults["title"]
+    resolved_type_label = type_label or defaults["type_label"]
+    resolved_source_registry = source_registry or defaults["source_registry"]
 
-
-def _render_handlers_index(handler_specs: dict[str, list[DocSpec]]) -> str:
-    """Render handlers index page."""
     lines = [
-        "# Handlers reference",
+        f"# {resolved_title}",
         "",
-        "Auto-generated from `HANDLER_SPEC_REGISTRY`.",
+        f"Auto-generated from `{resolved_source_registry}`.",
         "",
-        "| HandlerType | Page | Specs |",
+        f"| {resolved_type_label} | Page | Specs |",
         "|---|---|---|",
     ]
 
-    for type_name in sorted(handler_specs):
+    for type_name in sorted(specs_by_type):
         slug = _type_slug(type_name)
-        specs = handler_specs[type_name]
-        type_value = specs[0].type_value
-        page = f"[{type_name}](./{slug}.md)"
-        lines.append(f"| `{type_name}` (`{type_value}`) | {page} | {len(specs)} |")
-
-    lines.extend(
-        [
-            "",
-            "Factory signatures and kwargs are rendered from mkdocstrings directives",
-            "on each per-type page.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
-
-
-def _render_filters_index(filter_specs: dict[str, list[DocSpec]]) -> str:
-    """Render filters index page."""
-    lines = [
-        "# Filters reference",
-        "",
-        "Auto-generated from `FILTER_SPEC_REGISTRY`.",
-        "",
-        "| FilterType | Page | Specs |",
-        "|---|---|---|",
-    ]
-
-    for type_name in sorted(filter_specs):
-        slug = _type_slug(type_name)
-        specs = filter_specs[type_name]
+        specs = specs_by_type[type_name]
         type_value = specs[0].type_value
         page = f"[{type_name}](./{slug}.md)"
         lines.append(f"| `{type_name}` (`{type_value}`) | {page} | {len(specs)} |")
@@ -370,6 +364,9 @@ def _to_manifest(
 
 def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[Path]:
     """Generate all targeted docs files and return paths written."""
+    from daqpytools.logging.filters import FILTER_SPEC_REGISTRY
+    from daqpytools.logging.handlers import HANDLER_SPEC_REGISTRY
+
     if clean and output_root.exists():
         shutil.rmtree(output_root)
 
@@ -377,11 +374,25 @@ def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[P
     filters_dir = output_root / "filters"
     written: list[Path] = []
 
-    handler_specs = _build_handler_docspecs()
-    filter_specs = _build_filter_docspecs()
+    handler_specs = _build_docspecs(
+        HANDLER_SPEC_REGISTRY,
+        kind="handler",
+        class_attr="handler_class",
+    )
+    filter_specs = _build_docspecs(
+        FILTER_SPEC_REGISTRY,
+        kind="filter",
+        class_attr="filter_class",
+    )
 
     handlers_index = handlers_dir / "index.md"
-    _write_text(handlers_index, _render_handlers_index(handler_specs))
+    _write_text(
+        handlers_index,
+        _render_index(
+            handler_specs,
+            kind="handler",
+        ),
+    )
     written.append(handlers_index)
 
     for type_name in sorted(handler_specs):
@@ -392,7 +403,13 @@ def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[P
         written.append(page_path)
 
     filters_index = filters_dir / "index.md"
-    _write_text(filters_index, _render_filters_index(filter_specs))
+    _write_text(
+        filters_index,
+        _render_index(
+            filter_specs,
+            kind="filter",
+        ),
+    )
     written.append(filters_index)
 
     for type_name in sorted(filter_specs):

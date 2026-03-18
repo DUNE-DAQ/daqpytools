@@ -304,35 +304,3 @@ By default, throttle filters obtained via `get_daq_logger` are initialized with 
 
 **Note**
 Similarly to the ERS Kafka handler, this filter is not enabled by default, hence requiring the use of HandlerTypes. See the Advanced section for more info.
-
-### Operational gotchas
-
-This section captures the most common pitfalls that come up in real applications.
-
-1. Logger names are treated as identities.
-If a logger already exists and you call `get_daq_logger` again with a different
-handler configuration, construction will fail. Reuse the same configuration for that
-name, or choose a new logger name.
-
-2. `setup_root_logger` is strict.
-If the named root logger already has handlers attached, setup will fail instead of
-silently reconfiguring that logger.
-
-3. `throttle=True` only installs the filter.
-Throttle behavior is applied only when `HandlerType.Throttle` is in the resolved
-allowed handler set for the record (for example in `extra={"handlers": [...]}` or
-in stream-based routing metadata).
-
-4. ERS routing is level-mapped.
-ERS routing is keyed from Python levels to ERS env vars for
-`INFO`, `WARNING`, `ERROR`, and `CRITICAL`.
-Messages at levels without ERS mapping (for example Python `DEBUG`) will not route
-to ERS handlers through the ERS strategy.
-
-5. ERS env vars must exist when ERS is initialized.
-Calling ERS initialization without required `DUNEDAQ_ERS_*` vars results in
-configuration errors.
-
-6. Only one protobuf endpoint is supported in Python ERS setup.
-If ERS env parsing yields multiple distinct `protobufstream(url:port)` endpoints,
-setup will fail.

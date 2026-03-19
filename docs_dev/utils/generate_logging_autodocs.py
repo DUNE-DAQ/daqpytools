@@ -24,6 +24,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+_USING_MKDOCS_GEN_FILES = False
+
 
 @dataclass
 class DocSpec:
@@ -322,7 +324,15 @@ def _render_logging_index() -> str:
 
 
 def _write_text(path: Path, content: str) -> None:
-    """Write UTF-8 text to disk, creating parents as needed."""
+    """Write UTF-8 text either to filesystem or mkdocs virtual files."""
+    if _USING_MKDOCS_GEN_FILES:
+        import mkdocs_gen_files
+
+        relative_path = path.as_posix()
+        with mkdocs_gen_files.open(relative_path, "w") as fd:
+            fd.write(content)
+        return
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
@@ -447,8 +457,8 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-root",
-        default="docs/generated/logging",
-        help="Output directory for generated files (default: docs/generated/logging).",
+        default="docs_dev/APIref",
+        help="Output directory for generated files (default: docs_dev/APIref).",
     )
     parser.add_argument(
         "--repo-root",
@@ -456,7 +466,7 @@ def _parse_args() -> argparse.Namespace:
         help="Path to daqpytools repository root. Auto-detected if omitted.",
     )
     parser.add_argument(
-        "--no-json-manifest",
+        "--json-manifest",
         action="store_true",
         help="Do not emit the machine-readable JSON manifest.",
     )
@@ -487,7 +497,7 @@ def main() -> int:
 
     written = generate(
         output_root=output_root,
-        emit_json_manifest=not args.no_json_manifest,
+        emit_json_manifest=args.json_manifest,
         clean=args.clean,
     )
 
@@ -495,6 +505,29 @@ def main() -> int:
     for path in sorted(written):
         print(f" - {path.relative_to(repo_root)}")
     return 0
+
+
+def _run_from_mkdocs_gen_files() -> None:
+    """Run generation when this module is loaded by mkdocs-gen-files."""
+    global _USING_MKDOCS_GEN_FILES
+
+    script_path = Path(__file__).resolve()
+    repo_root = _repo_root_from_script(script_path)
+
+    _ensure_import_path(repo_root)
+    _install_erskafka_stub()
+
+    _USING_MKDOCS_GEN_FILES = True
+    output_root = Path("APIref")
+    generate(
+        output_root=output_root,
+        emit_json_manifest=False,
+        clean=False,
+    )
+
+
+if __name__ != "__main__":
+    _run_from_mkdocs_gen_files()
 
 
 if __name__ == "__main__":

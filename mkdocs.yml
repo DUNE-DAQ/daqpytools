@@ -3,6 +3,8 @@ site_name: DUNE Run Control (drunc) Developer Documentation
 repo_name: DUNE-DAQ/drunc
 repo_url: https://github.com/DUNE-DAQ/drunc
 
+docs_dir: docs_dev
+
 theme:
   name: material
   palette: 
@@ -31,12 +33,12 @@ markdown_extensions:
 
 plugins:
   - search
-  # - exclude:
-  #     glob:
-  #       - Developer-Wiki/*
-  # - gen-files:
-      # scripts:
-      #   - docs/utils/generate_ghpages_docstrings.py
+  - exclude:
+      glob:
+        - Developer-Wiki/*
+  - gen-files:
+      scripts:
+        - docs_dev/utils/generate_logging_autodocs.py
   # - literate-nav:
   #     nav_file: README.md
   # - section-index

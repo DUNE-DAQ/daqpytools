@@ -2,8 +2,8 @@
 
 This page is for developers who want to understand the internals of daqpytools logging — for example, to add a new handler or debug a routing issue.
 
-For user-facing concepts (Python logging fundamentals, streams), see the [user explanation](../user/explanation.md).
-For implementation recipes, see the [how-to guides](./how-to/).
+For user-facing concepts (Python logging fundamentals, streams), see the [user explanation](https://dune-daq-sw.readthedocs.io/en/latest/packages/daqpytools/explanation).
+For implementation recipes, see the how-to guides.
 
 ---
 
@@ -99,11 +99,11 @@ Defined in `specs.py`, there are two types:
 
 Specs are the "source of truth" for what a handler or filter is. When setup code needs to build something, it looks up the spec in a registry.
 
-![Specs](img/Specs_class.png)
+![Specs](../img/Specs_class.png)
 
 ### HandleIDFilter
 
-![Filtering](img/Filter_class.png)
+![Filtering](../img/Filter_class.png)
 
 `HandleIDFilter` is the core enforcement mechanism. Each handler gets one attached to it.
 
@@ -223,4 +223,4 @@ DUNEDAQ_ERS_WARNING="..."
 
 These are parsed into `ERSPyLogHandlerConf` objects that hold the handler list and optional protobuf endpoint for each severity.
 
-![LogHandlerConf](img/LHC_class.png)
+![LogHandlerConf](../img/LHC_class.png)

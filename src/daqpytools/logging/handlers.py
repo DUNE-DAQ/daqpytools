@@ -265,7 +265,6 @@ def _build_erskafka_handler(
     Raises:
         ERSInitError: If the handler cannot be initialized.
     """
-    
     try:
         return ERSKafkaLogHandler(
             session = session_name,

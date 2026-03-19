@@ -91,7 +91,7 @@ def _ensure_import_path(repo_root: Path) -> None:
         sys.path.insert(0, str(src_path))
 
 
-def _summary_from_docstring(obj: Any) -> str:
+def _summary_from_docstring(obj: Any) -> str:  # noqa: ANN401
     """Extract the first non-empty docstring line as a short summary."""
     doc = getattr(obj, "__doc__", None)
     if not doc:
@@ -104,7 +104,7 @@ def _summary_from_docstring(obj: Any) -> str:
     return "No description provided."
 
 
-def _symbol_fqdn(symbol: Any) -> tuple[str, str]:
+def _symbol_fqdn(symbol: Any) -> tuple[str, str]:  # noqa: ANN401
     """Return a symbol fully-qualified name and short symbol name."""
     name = symbol.__name__
     fqdn = f"{symbol.__module__}.{name}"
@@ -195,7 +195,7 @@ def _render_index(
         type_label: Optional custom table header for type column.
         source_registry: Optional custom source-of-truth registry label.
     """
-    INDEX_KIND_DEFAULTS: dict[str, dict[str, str]] = {
+    index_kind_defaults: dict[str, dict[str, str]] = {
         "handler": {
             "title": "Handlers reference",
             "type_label": "HandlerType",
@@ -209,7 +209,7 @@ def _render_index(
     }
 
     
-    defaults = INDEX_KIND_DEFAULTS.get(kind)
+    defaults = index_kind_defaults.get(kind)
     if defaults is None:
         err_msg = f"Unsupported index kind: {kind}"
         raise ValueError(err_msg)
@@ -501,9 +501,9 @@ def main() -> int:
         clean=args.clean,
     )
 
-    print(f"Generated {len(written)} files under: {output_root}")
+    print(f"Generated {len(written)} files under: {output_root}")  # noqa: T201
     for path in sorted(written):
-        print(f" - {path.relative_to(repo_root)}")
+        print(f" - {path.relative_to(repo_root)}")  # noqa: T201
     return 0
 
 

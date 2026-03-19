@@ -1,5 +1,9 @@
 # Getting Started with Logging in DUNE-DAQ
 
+This is a very quick tutorial for someone entirely new to logging.
+
+**NEED TO WRITE THE TUTORIAL HEREE**. still a wip
+
 <!-- YOU SHOULD WRITE A BRIEF INTRO HERE: one paragraph orienting a brand new user to what they will accomplish by the end of this tutorial (e.g. "By the end of this page you will have a working logger printing coloured output to your terminal"). Keep it concrete and task-focused. -->
 
 ## Prerequisites

@@ -16,13 +16,13 @@ For the full API reference (kwargs, types, defaults), see the [auto-generated re
 
 The Rich handler should be the 'default' handler for any messages that should be transmitted in the terminal. This handler has great support of colors, and delivers a complete message out to the terminal to make it easy to view and also trace back to the relevant message.
 
-![rich_demo](img/demo_rich.png)
+![rich_demo](../img/demo_rich.png)
 
 ## File handler
 
 As the name suggests, the file handler is used to transmit messages directly to a log file. Unlike stream and rich handlers, instead of defining a boolean in the constructor the user must supply the _filename_ of the target file for the messages to go into.
 
-![file_demo](img/demo_file.png)
+![file_demo](../img/demo_file.png)
 
 ## Stream handlers
 
@@ -30,7 +30,7 @@ Stream handlers are used to transmit messages directly to the terminal without a
 
 Note that stream handling consists of two handlers, one writing to `stdout` and one to `stderr`. The `stderr` stream emits only for records at `ERROR` or above.
 
-![streams_demo](img/demo_streams.png)
+![streams_demo](../img/demo_streams.png)
 
 ## ERS Kafka handler
 
@@ -56,7 +56,7 @@ main_logger.error(
 
 See [Configuring ERS](./configure-ers.md) for more details.
 
-![ers_demo](img/demo_ers.png)
+![ers_demo](../img/demo_ers.png)
 
 **Notes**
 
@@ -115,7 +115,7 @@ for i in range(1000):
 
 Which will behave as expected.
 
-![throttle_demo](img/demo_throttle.png)
+![throttle_demo](../img/demo_throttle.png)
 
 **Note**
 By default, throttle filters obtained via `get_daq_logger` are initialized with an `initial_treshold` of 30 and a `time_limit` of 30.

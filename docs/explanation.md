@@ -2,7 +2,7 @@
 
 This page explains the underlying concepts behind Python logging and how daqpytools builds on them. Reading this will help you understand *why* the how-to guides are structured the way they are.
 
-For hands-on instructions, see the [how-to guides](./how-to/). For the API reference, see the [reference](./reference/).
+For hands-on instructions, see the how-to guides. For the API reference, see the [reference](https://dune-daq.github.io/daqpytools/APIref).
 
 ---
 
@@ -28,11 +28,11 @@ log.warning("Hello, world!")
 
 ### Severity levels
 
-Every record has an attached severity level, which can be used to flag how important a log record is. By default, Python has 5 main levels and one 'notset' level as shown in the image below[^1]:
+Every record has an attached severity level, which can be used to flag how important a log record is. By default, Python has 5 main levels and one 'notset' level as shown in the image below:
 
 ![log_level_overview](img/loglevels.png)
 
-[^1]: more can be defined as required, see Python's logging manual.
+More levels can be defined as required, see Python's logging manual.
 
 Each logging instance can have an attached severity level. If it has one, then only records that have the same severity level or higher will be transmitted.
 
@@ -113,5 +113,5 @@ This is why routing via `extra={"handlers": [...]}` matters — it tells the log
 
 ## Further reading
 
-- For how this routing model is implemented under the hood, see the [developer explanation](../dev/explanation.md).
+- For how this routing model is implemented under the hood, see the [developer explanation](https://dune-daq.github.io/daqpytools/explanation).
 - For how to configure ERS and advanced routing in practice, see [Configuring ERS](./how-to/configure-ers.md) and [Routing messages to specific handlers](./how-to/route-messages.md).

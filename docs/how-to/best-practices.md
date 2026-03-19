@@ -22,7 +22,7 @@ In a similar vein, _never_ use `logging.basicConfig`. This tool will modify the 
 
 Following on setting up an empty root logger, the following image shows a good use of inheritance.
 
-![image](img/Example_usecase.png)
+![image](../img/Example_usecase.png)
 
 In this case, `drunc` serves as the pseudo-root logger in which no handlers are defined. All further loggers are inherited from this clean slate.
 

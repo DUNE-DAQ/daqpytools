@@ -31,7 +31,7 @@ If you add ERS handlers via `setup_daq_ers_logger(...)`, the process is similar 
    - A record marked `extra={"stream": StreamType.ERS}` triggers ERS-aware routing
    - The routing strategy maps Python level → ERS severity variable → handler set
 
-![LogHandlerConf](img/LHC_activity.png)
+![LogHandlerConf](../img/LHC_activity.png)
 
 ---
 
@@ -61,4 +61,4 @@ When you call `log.info("something")`, here's the actual flow:
 
 This two-stage filtering is key: logger-level filters decide "should ANY handler see this?" while handler-level filters decide "should THIS handler see this?"
 
-![Filtering](img/Filter_activity.png)
+![Filtering](../img/Filter_activity.png)

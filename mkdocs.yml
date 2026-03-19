@@ -31,15 +31,15 @@ markdown_extensions:
 
 plugins:
   - search
-  - exclude:
-      glob:
-        - Developer-Wiki/*
+  # - exclude:
+  #     glob:
+  #       - Developer-Wiki/*
   # - gen-files:
       # scripts:
       #   - docs/utils/generate_ghpages_docstrings.py
-  - literate-nav:
-      nav_file: README.md
-  - section-index
+  # - literate-nav:
+  #     nav_file: README.md
+  # - section-index
   - mkdocstrings:
       default_handler: python
       handlers:

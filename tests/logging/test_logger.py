@@ -5,8 +5,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from daqpytools.logging.exceptions import LoggerSetupError
+from daqpytools.logging.handlerconf import ERSPyLogHandlerConf, HandlerType, ProtobufConf
 from daqpytools.logging.handlers import logger_or_ancestors_have_handler
-from daqpytools.logging.logger import get_daq_logger, setup_root_logger
+from daqpytools.logging.logger import (
+    get_daq_logger,
+    setup_daq_ers_logger,
+    setup_root_logger,
+)
+from daqpytools.logging import logger as logger_mod
 
 test_logger_name = "test_logger"
 test_logger_child_name = f"{test_logger_name}.child"
@@ -225,3 +231,63 @@ def test_logger_parent_walk_handles_mock_logger_cycle():
         logger_or_ancestors_have_handler(fake_logger, True, logging.NullHandler)
         is False
     )
+
+
+def test_setup_daq_ers_logger_uses_single_protobuf_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logger = logging.getLogger(f"test.logger.ers.{id(object())}")
+    add_handlers_mock = MagicMock()
+    monkeypatch.setattr(logger_mod, "add_handlers_from_types", add_handlers_mock)
+
+    oks_conf = {
+        "DUNEDAQ_ERS_ERROR": ERSPyLogHandlerConf(
+            handlers=[HandlerType.Rich, HandlerType.Protobufstream],
+            protobufconf=ProtobufConf(url="host-a", port=30092),
+        ),
+        "DUNEDAQ_ERS_WARNING": ERSPyLogHandlerConf(
+            handlers=[HandlerType.Throttle],
+            protobufconf=ProtobufConf(url="host-a", port=30092),
+        ),
+    }
+    monkeypatch.setattr(
+        logger_mod.LogHandlerConf,
+        "_get_oks_conf",
+        staticmethod(lambda: oks_conf),
+    )
+
+    setup_daq_ers_logger(logger, ers_kafka_session="session-a", ers_app_name="app-a")
+
+    add_handlers_mock.assert_called_once_with(
+        logger,
+        {HandlerType.Rich, HandlerType.Protobufstream, HandlerType.Throttle},
+        use_parent_handlers=True,
+        fallback_handlers={HandlerType.Unknown},
+        session_name="session-a",
+        ers_app_name="app-a",
+        address="host-a:30092",
+    )
+
+
+def test_setup_daq_ers_logger_rejects_multiple_protobuf_configs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    logger = logging.getLogger(f"test.logger.ers.multi.{id(object())}")
+    oks_conf = {
+        "DUNEDAQ_ERS_ERROR": ERSPyLogHandlerConf(
+            handlers=[HandlerType.Protobufstream],
+            protobufconf=ProtobufConf(url="host-a", port=30092),
+        ),
+        "DUNEDAQ_ERS_WARNING": ERSPyLogHandlerConf(
+            handlers=[HandlerType.Protobufstream],
+            protobufconf=ProtobufConf(url="host-b", port=30093),
+        ),
+    }
+    monkeypatch.setattr(
+        logger_mod.LogHandlerConf,
+        "_get_oks_conf",
+        staticmethod(lambda: oks_conf),
+    )
+
+    with pytest.raises(ValueError, match="Multiple protobufstream"):
+        setup_daq_ers_logger(logger, ers_kafka_session="session-a")

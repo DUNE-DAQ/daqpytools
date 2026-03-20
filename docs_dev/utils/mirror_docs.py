@@ -4,7 +4,8 @@
 Virtual output structure:
     readme.md        ← from docs_dev/readme_toplevel.md
     user/            ← from docs/
-    dev/             ← from docs_dev/ (excluding utils/, requirements.txt, readme_toplevel.md)
+    dev/             ← from docs_dev/ (excluding utils/,
+                       requirements.txt, readme_toplevel.md)
 """
 
 from __future__ import annotations
@@ -12,7 +13,9 @@ from __future__ import annotations
 from pathlib import Path
 
 DOCS_DEV_EXCLUDE = {
-
+    "utils",
+    "requirements.txt",
+    "readme_toplevel.md",
 }
 
 
@@ -64,21 +67,21 @@ def _run_from_mkdocs_gen_files() -> None:
         with mkdocs_gen_files.open("README.md", "wb") as fd:
             fd.write(readme_source.read_bytes())
     else:
-        print(f"Warning: '{readme_source}' does not exist, skipping.")
+        print(f"Warning: '{readme_source}' does not exist, skipping.")  # noqa: T201
 
     # 2. docs/ → virtual user/
     docs_dir = repo_root / "docs"
     if docs_dir.exists():
         _mirror_into_virtual_fs(docs_dir, "user")
     else:
-        print(f"Warning: '{docs_dir}' does not exist, skipping.")
+        print(f"Warning: '{docs_dir}' does not exist, skipping.")  # noqa: T201
 
     # 3. docs_dev/ → virtual dev/ (with exclusions)
     docs_dev_dir = repo_root / "docs_dev"
     if docs_dev_dir.exists():
         _mirror_into_virtual_fs(docs_dev_dir, "dev", exclude=DOCS_DEV_EXCLUDE)
     else:
-        print(f"Warning: '{docs_dev_dir}' does not exist, skipping.")
+        print(f"Warning: '{docs_dev_dir}' does not exist, skipping.")  # noqa: T201
 
 
 if __name__ != "__main__":

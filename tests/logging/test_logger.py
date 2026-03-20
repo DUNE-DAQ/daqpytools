@@ -4,15 +4,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from daqpytools.logging import logger as logger_mod
 from daqpytools.logging.exceptions import LoggerSetupError
-from daqpytools.logging.handlerconf import ERSPyLogHandlerConf, HandlerType, ProtobufConf
+from daqpytools.logging.handlerconf import (
+    ERSPyLogHandlerConf,
+    HandlerType,
+    ProtobufConf,
+)
 from daqpytools.logging.handlers import logger_or_ancestors_have_handler
 from daqpytools.logging.logger import (
     get_daq_logger,
     setup_daq_ers_logger,
     setup_root_logger,
 )
-from daqpytools.logging import logger as logger_mod
 
 test_logger_name = "test_logger"
 test_logger_child_name = f"{test_logger_name}.child"

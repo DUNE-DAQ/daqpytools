@@ -8,7 +8,7 @@ Remember that by default, any messages received by the logger will be transmitte
 
 **In the future, this will be automatically generated from the docstrings.**
 
-For the full API reference (kwargs, types, defaults), see the [auto-generated reference](../reference/).
+For the full API reference (kwargs, types, defaults), see the [auto-generated reference](https://dune-daq.github.io/daqpytools/APIref).
 
 ---
 

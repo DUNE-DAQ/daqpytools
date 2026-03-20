@@ -10,7 +10,11 @@ from daqpytools.logging.routing import (
 
 
 class _StrategyForHelper(AllowedHandlersStrategy):
-    def resolve(self, record: logging.LogRecord, fallback_handlers: set[object]) -> set[object] | None:
+    def resolve(
+        self,
+        record: logging.LogRecord,
+        fallback_handlers: set[object],
+    ) -> set[object] | None:
         del record, fallback_handlers
         return None
 
@@ -19,7 +23,7 @@ def _record(level: int = logging.INFO) -> logging.LogRecord:
     return logging.LogRecord(
         name="test.routing",
         level=level,
-        pathname="/tmp/test_routing.py",
+        pathname="<test>",
         lineno=10,
         msg="message",
         args=(),
@@ -81,7 +85,9 @@ def test_ers_strategy_returns_none_when_level_conf_missing() -> None:
     strategy = ERSAllowedHandlersStrategy()
     record = _record(level=logging.ERROR)
     record.stream = StreamType.ERS
-    record.ers_handlers = {"DUNEDAQ_ERS_WARNING": ERSPyLogHandlerConf(handlers=[HandlerType.Rich])}
+    record.ers_handlers = {
+        "DUNEDAQ_ERS_WARNING": ERSPyLogHandlerConf(handlers=[HandlerType.Rich])
+    }
 
     assert strategy.resolve(record, set()) is None
 
@@ -103,7 +109,11 @@ class _FakeDefault:
     def __init__(self) -> None:
         self.called = False
 
-    def resolve(self, record: logging.LogRecord, fallback_handlers: set[object]) -> set[object] | None:
+    def resolve(
+        self,
+        record: logging.LogRecord,
+        fallback_handlers: set[object],
+    ) -> set[object] | None:
         del record, fallback_handlers
         self.called = True
         return {HandlerType.File}
@@ -113,7 +123,11 @@ class _FakeERS:
     def __init__(self) -> None:
         self.called = False
 
-    def resolve(self, record: logging.LogRecord, fallback_handlers: set[object]) -> set[object] | None:
+    def resolve(
+        self,
+        record: logging.LogRecord,
+        fallback_handlers: set[object],
+    ) -> set[object] | None:
         del record, fallback_handlers
         self.called = True
         return {HandlerType.Throttle}
@@ -122,7 +136,9 @@ class _FakeERS:
 def test_streamaware_uses_ers_strategy_for_ers_stream() -> None:
     default = _FakeDefault()
     ers = _FakeERS()
-    strategy = StreamAwareAllowedHandlersStrategy(default_strategy=default, ers_strategy=ers)
+    strategy = StreamAwareAllowedHandlersStrategy(
+        default_strategy=default, ers_strategy=ers
+    )
 
     record = _record(level=logging.ERROR)
     record.stream = StreamType.ERS
@@ -137,7 +153,9 @@ def test_streamaware_uses_ers_strategy_for_ers_stream() -> None:
 def test_streamaware_uses_default_strategy_for_non_ers_stream() -> None:
     default = _FakeDefault()
     ers = _FakeERS()
-    strategy = StreamAwareAllowedHandlersStrategy(default_strategy=default, ers_strategy=ers)
+    strategy = StreamAwareAllowedHandlersStrategy(
+        default_strategy=default, ers_strategy=ers
+    )
 
     record = _record(level=logging.INFO)
 

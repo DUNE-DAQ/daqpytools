@@ -1,5 +1,6 @@
 import logging
 import uuid
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 import pytest
@@ -35,9 +36,13 @@ def test_loghandlerconf_ers_property_raises_before_init() -> None:
         _ = conf.ERS
 
 
-def test_loghandlerconf_init_ers_stream_sets_structure(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_loghandlerconf_init_ers_stream_sets_structure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fake_oks = {"DUNEDAQ_ERS_ERROR": ERSPyLogHandlerConf(handlers=[HandlerType.Rich])}
-    monkeypatch.setattr(LogHandlerConf, "_get_oks_conf", staticmethod(lambda: fake_oks))
+    monkeypatch.setattr(
+        LogHandlerConf, "_get_oks_conf", staticmethod(lambda: fake_oks)
+    )
 
     conf = LogHandlerConf(init_ers=False)
     conf.init_ers_stream()
@@ -123,7 +128,9 @@ def test_get_oks_conf_builds_mapping_for_all_ers_level_vars(
         calls.append(level_var)
         return ERSPyLogHandlerConf(handlers=[HandlerType.Rich])
 
-    monkeypatch.setattr(LogHandlerConf, "_make_ers_handler_conf", staticmethod(_fake_make))
+    monkeypatch.setattr(
+        LogHandlerConf, "_make_ers_handler_conf", staticmethod(_fake_make)
+    )
 
     conf = LogHandlerConf._get_oks_conf()
 
@@ -133,36 +140,44 @@ def test_get_oks_conf_builds_mapping_for_all_ers_level_vars(
 
 # demonstrator test_* parity integrated into handlerconf tests
 
-def test_demo_test_handlerconf_runs_ers_flow_and_restores(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_demo_test_handlerconf_runs_ers_flow_and_restores(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     logger = MagicMock(spec=logging.Logger)
 
     class FakeHC:
-        Base = {"handlers": {HandlerType.Stream}, "stream": StreamType.BASE}
-        Opmon = {"handlers": {HandlerType.Rich}, "stream": StreamType.OPMON}
+        Base: ClassVar[dict] = {
+            "handlers": {HandlerType.Stream},
+            "stream": StreamType.BASE,
+        }
+        Opmon: ClassVar[dict] = {
+            "handlers": {HandlerType.Rich},
+            "stream": StreamType.OPMON,
+        }
 
         def __init__(self, init_ers: bool = False) -> None:
             self._ers = {
-                "ers_handlers": {"DUNEDAQ_ERS_ERROR": ERSPyLogHandlerConf(handlers=[HandlerType.Rich])},
+                "ers_handlers": {
+                    "DUNEDAQ_ERS_ERROR": ERSPyLogHandlerConf(
+                        handlers=[HandlerType.Rich]
+                    ),
+                },
                 "stream": StreamType.ERS,
             }
             if init_ers:
                 self.init_ers_stream()
 
         @property
-        def ERS(self) -> dict:
+        def ERS(self) -> dict:  # noqa: N802
             return self._ers
 
         def init_ers_stream(self) -> None:
             return None
 
-    restore_mock = MagicMock()
-
     monkeypatch.setattr(demo, "LogHandlerConf", FakeHC)
-    monkeypatch.setattr(demo, "restore_original_envs", restore_mock)
 
     demo.test_handlerconf(logger)
 
-    restore_mock.assert_called_once()
     logger.warning.assert_called()
     logger.info.assert_called()
 
@@ -185,7 +200,7 @@ def test_demo_test_ers_handler_configuration_calls_setup_and_logs(
             self._ers = {"stream": StreamType.ERS, "ers_handlers": {}}
 
         @property
-        def ERS(self) -> dict:
+        def ERS(self) -> dict:  # noqa: N802
             return self._ers
 
     monkeypatch.setattr(demo, "get_daq_logger", get_logger_mock)

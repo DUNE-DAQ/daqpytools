@@ -1,5 +1,5 @@
-from dataclasses import FrozenInstanceError
 import logging
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -11,7 +11,9 @@ def _handler_factory(**kwargs: object) -> logging.Handler:
     return logging.NullHandler()
 
 
-def _filter_factory(fallback_handlers: set[object], extras: dict[str, object]) -> logging.Filter:
+def _filter_factory(
+    fallback_handlers: set[object], extras: dict[str, object]
+) -> logging.Filter:
     del fallback_handlers, extras
     return logging.Filter()
 

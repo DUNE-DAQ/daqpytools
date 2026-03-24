@@ -1,0 +1,21 @@
+name: Add to Project (Assigned or Review Requested)
+
+on:
+  issues:
+    types: [assigned]
+  pull_request:
+    types: [assigned, review_requested]
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'issues' && github.event.assignee.login == 'emmuhamm') ||
+      (github.event_name == 'pull_request' && github.event.action == 'assigned' && github.event.assignee.login == 'emmuhamm') ||
+      (github.event_name == 'pull_request' && github.event.action == 'review_requested' && contains(github.event.requested_reviewers.*.login, 'emmuhamm'))
+    steps:
+      - uses: actions/add-to-project@v0.6.1
+        with:
+          project-url: https://github.com/orgs/DUNE-DAQ/projects/10/
+          github-token: ${{ secrets.EMMUHAMM_PROJECT_PAT }}
+

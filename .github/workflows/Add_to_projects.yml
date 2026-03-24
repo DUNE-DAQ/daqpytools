@@ -12,7 +12,7 @@ jobs:
     if: |
       (github.event_name == 'issues' && github.event.assignee.login == 'emmuhamm') ||
       (github.event_name == 'pull_request' && github.event.action == 'assigned' && github.event.assignee.login == 'emmuhamm') ||
-      (github.event_name == 'pull_request' && github.event.action == 'review_requested' && contains(github.event.requested_reviewers.*.login, 'emmuhamm'))
+      (github.event_name == 'pull_request' && github.event.action == 'review_requested' && contains(github.event.pull_request.requested_reviewers.*.login, 'emmuhamm'))
     steps:
       - uses: actions/add-to-project@v0.6.1
         with:

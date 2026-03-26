@@ -14,145 +14,159 @@ Example (drop-in replacement for your existing command):
         daqpytools \
         --output-directory pics
 
-The script:
-  1. Runs pyreverse with -o dot (always, regardless of what you pass)
-  2. Post-processes the .dot file to apply a clean UML style
-  3. Renders to PNG via Graphviz
-
 Dependencies:
-    pip install graphviz        # Python graphviz bindings (optional, fallback uses subprocess)
-    pip install pylint          # provides pyreverse
+    pip install pylint     # provides pyreverse
     graphviz must be installed on your system (provides the 'dot' binary)
 """
 
 import re
 import subprocess
 import sys
-import os
 import argparse
 from pathlib import Path
 
+
 # ── Colour palette (tweak these to your taste) ──────────────────────────────
 STYLE = {
-    # Node (class box) colours
-    "class_fill":       "#FFFDE7",   # warm cream  (matches Image 1)
-    "class_fill_dark":  "#FFF9C4",   # slightly deeper cream for header rows
-    "class_stroke":     "#A0522D",   # siennna-ish border
-    "class_font":       "Helvetica", # clean sans-serif
-    "class_fontsize":   "10",
-
-    # Edge colours
-    "inherit_color":    "#555555",   # solid grey for inheritance
-    "uses_color":       "#555555",   # dashed grey for dependencies
-
-    # Graph background
-    "bg_color":         "white",
-    "rankdir":          "BT",        # bottom-to-top like a proper UML diagram
+    "class_fill":     "#FFFDE7",   # warm cream (matches Image 1)
+    "class_stroke":   "#8B7355",   # warm brown border
+    "class_font":     "Helvetica",
+    "class_fontsize": "10",
+    "inherit_color":  "#555555",
+    "uses_color":     "#555555",
+    "bg_color":       "white",
+    "rankdir":        "BT",
 }
 # ────────────────────────────────────────────────────────────────────────────
 
 
-def run_pyreverse(extra_args: list[str], output_dir: Path) -> list[Path]:
+def run_pyreverse(extra_args, output_dir):
     """Run pyreverse with -o dot and return the paths to generated .dot files."""
-    cmd = [
-        "pyreverse",
-        "-o", "dot",
-        "--output-directory", str(output_dir),
-    ] + extra_args
-
+    cmd = ["pyreverse", "-o", "dot", "--output-directory", str(output_dir)] + extra_args
     print(f"[style_pyreverse] Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
-
     if result.returncode != 0:
         print("[style_pyreverse] pyreverse stderr:", result.stderr)
         sys.exit(result.returncode)
-
     dot_files = list(output_dir.glob("*.dot"))
     if not dot_files:
         print("[style_pyreverse] ERROR: pyreverse produced no .dot files in", output_dir)
         sys.exit(1)
-
     return dot_files
 
 
-def patch_dot(dot_src: str) -> str:
-    """
-    Rewrite the .dot source to apply a clean UML style:
-      - cream fill for all class nodes
-      - proper record shape kept intact
-      - inheritance arrows → open hollow arrowhead (UML style)
-      - dependency arrows → dashed with open arrowhead
-    """
+def patch_dot(dot_src):
+    """Rewrite .dot source to apply a clean UML style."""
     s = STYLE
 
-    # ── 1. Graph-level defaults ──────────────────────────────────────────────
-    graph_defaults = f"""
-    graph [bgcolor="{s['bg_color']}", fontname="{s['class_font']}", pad="0.5", nodesep="0.6", ranksep="0.8"];
-    node  [shape=record, style="filled,rounded", fillcolor="{s['class_fill']}",
-           color="{s['class_stroke']}", fontname="{s['class_font']}",
-           fontsize={s['class_fontsize']}];
-    edge  [fontname="{s['class_font']}", fontsize="9"];
-"""
+    # ── 1. Strip all per-node colour/style attributes pyreverse injected ─────
+    dot_src = re.sub(r',?\s*\bfontcolor\s*=\s*"[^"]*"', '', dot_src)
+    dot_src = re.sub(r',?\s*\bcolor\s*=\s*"[^"]*"', '', dot_src)
+    dot_src = re.sub(r',?\s*\bstyle\s*=\s*"[^"]*"', '', dot_src)
+    dot_src = re.sub(r',?\s*\bfillcolor\s*=\s*"[^"]*"', '', dot_src)
 
-    # Insert defaults right after the opening brace of the digraph
-    dot_src = re.sub(
-        r'(digraph\s+\S+\s*\{)',
-        r'\1' + graph_defaults,
-        dot_src,
-        count=1,
+    # Clean up empty/malformed attribute lists left by the removals above
+    dot_src = re.sub(r'\[\s*\]', '', dot_src)
+    dot_src = re.sub(r'\[\s*,', '[', dot_src)
+    dot_src = re.sub(r',\s*\]', ']', dot_src)
+    dot_src = re.sub(r',\s*,', ', ', dot_src)
+
+    # ── 2. Inject graph-level defaults right after the opening brace ─────────
+    graph_line = (
+        'graph ['
+        'bgcolor="' + s["bg_color"] + '" '
+        'fontname="' + s["class_font"] + '" '
+        'pad="0.5" nodesep="0.6" ranksep="0.9" '
+        'rankdir="' + s["rankdir"] + '"'
+        '];'
     )
+    node_line = (
+        'node ['
+        'shape=record '
+        'style="filled" '
+        'fillcolor="' + s["class_fill"] + '" '
+        'color="' + s["class_stroke"] + '" '
+        'fontname="' + s["class_font"] + '" '
+        'fontsize=' + s["class_fontsize"] +
+        '];'
+    )
+    edge_line = (
+        'edge ['
+        'fontname="' + s["class_font"] + '" '
+        'fontsize="9" '
+        'color="' + s["inherit_color"] + '"'
+        '];'
+    )
+    defaults_block = "\n  " + graph_line + "\n  " + node_line + "\n  " + edge_line + "\n"
 
-    # ── 2. Strip pyreverse colorised per-node styles ─────────────────────────
-    # pyreverse --colorized adds  color="..." fontcolor="..."  inside each node.
-    # We remove those so our graph-level defaults win.
-    dot_src = re.sub(r'\bcolor="[^"]*"', '', dot_src)
-    dot_src = re.sub(r'\bfontcolor="[^"]*"', '', dot_src)
-    dot_src = re.sub(r'\bstyle="[^"]*"', '', dot_src)   # remove per-node style too
+    def insert_defaults(m):
+        return m.group(0) + defaults_block
+
+    dot_src = re.sub(r'digraph\s+\S+\s*\{', insert_defaults, dot_src, count=1)
 
     # ── 3. Fix arrowheads to proper UML style ────────────────────────────────
-    # Inheritance (solid line, hollow triangle): arrowhead=empty
-    dot_src = re.sub(
-        r'(->.*?)\[([^\]]*)\]',
-        lambda m: _fix_edge(m),
-        dot_src,
-    )
-
-    # ── 4. Tidy up extra whitespace left by removals ─────────────────────────
-    dot_src = re.sub(r'\[\s*,', '[', dot_src)
-    dot_src = re.sub(r',\s*,', ',', dot_src)
-    dot_src = re.sub(r'\[\s*\]', '', dot_src)
+    dot_src = fix_edges(dot_src)
 
     return dot_src
 
 
-def _fix_edge(match: re.Match) -> str:
+def fix_edges(dot_src):
     """
-    Re-style edges:
-      - dashed edge  → arrowhead=open,  style=dashed  (dependency / uses)
-      - solid edge   → arrowhead=empty, style=solid   (inheritance)
+    Restyle edges line-by-line:
+      dashed → dependency/uses:  arrowhead=open,  style=dashed
+      solid  → inheritance:      arrowhead=empty, style=solid (hollow triangle)
     """
-    full = match.group(0)
-    attrs = match.group(2)
+    lines = dot_src.splitlines()
+    out = []
+    for line in lines:
+        if '->' not in line:
+            out.append(line)
+            continue
 
-    if 'style="dashed"' in attrs or "style=dashed" in attrs:
-        new_attrs = re.sub(r'arrowhead="[^"]*"', 'arrowhead="open"', attrs)
-        if 'arrowhead' not in new_attrs:
-            new_attrs += ', arrowhead="open"'
-        new_attrs += f', color="{STYLE["uses_color"]}", style="dashed"'
-    else:
-        new_attrs = re.sub(r'arrowhead="[^"]*"', 'arrowhead="empty"', attrs)
-        if 'arrowhead' not in new_attrs:
-            new_attrs += ', arrowhead="empty"'
-        new_attrs += f', color="{STYLE["inherit_color"]}", style="solid"'
+        is_dashed = 'dashed' in line
 
-    arrow_part = match.group(1)
-    return f"{arrow_part}[{new_attrs}]"
+        # Strip existing arrowhead/style/color attrs from this edge line
+        line = re.sub(r',?\s*arrowhead\s*=\s*"?[^",\]\s]+"?', '', line)
+        line = re.sub(r',?\s*\bstyle\s*=\s*"[^"]*"', '', line)
+        line = re.sub(r',?\s*\bcolor\s*=\s*"[^"]*"', '', line)
+
+        # Clean up any resulting empty/malformed brackets
+        line = re.sub(r'\[\s*,', '[', line)
+        line = re.sub(r',\s*\]', ']', line)
+        line = re.sub(r'\[\s*\]', '', line)
+
+        if is_dashed:
+            new_attrs = (
+                'arrowhead="open" '
+                'style="dashed" '
+                'color="' + STYLE["uses_color"] + '"'
+            )
+        else:
+            new_attrs = (
+                'arrowhead="empty" '
+                'style="solid" '
+                'color="' + STYLE["inherit_color"] + '"'
+            )
+
+        if '[' in line:
+            # Append new attrs inside the existing bracket
+            line = re.sub(
+                r'\[([^\]]*)\]',
+                lambda m: '[' + (m.group(1).strip().rstrip(',') + ', ' if m.group(1).strip() else '') + new_attrs + ']',
+                line
+            )
+        else:
+            # No existing bracket — add one before the semicolon or at end
+            line = re.sub(r';?\s*$', ' [' + new_attrs + '];', line.rstrip())
+
+        out.append(line)
+    return '\n'.join(out)
 
 
-def render_dot(dot_path: Path, output_dir: Path, fmt: str = "png") -> Path:
+def render_dot(dot_path, output_dir, fmt="png"):
     """Run graphviz 'dot' to render a .dot file to an image."""
-    out_path = output_dir / (dot_path.stem + f".{fmt}")
-    cmd = ["dot", f"-T{fmt}", str(dot_path), "-o", str(out_path)]
+    out_path = output_dir / (dot_path.stem + "." + fmt)
+    cmd = ["dot", "-T" + fmt, str(dot_path), "-o", str(out_path)]
     print(f"[style_pyreverse] Rendering: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -162,49 +176,44 @@ def render_dot(dot_path: Path, output_dir: Path, fmt: str = "png") -> Path:
 
 
 def main():
-    # Simple arg parsing: just grab --output-directory / -o ourselves,
-    # pass everything else straight to pyreverse.
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--output-directory", default=".")
     parser.add_argument("--format", default="png",
                         help="Output image format (png, svg, pdf …)")
-
     known, pyreverse_args = parser.parse_known_args()
 
-    # Strip -o / --output from pyreverse args to avoid confusion
-    # (we always force -o dot)
+    # Strip -o / --output flags (we always force dot output)
     filtered = []
     skip_next = False
-    for i, arg in enumerate(pyreverse_args):
+    for arg in pyreverse_args:
         if skip_next:
             skip_next = False
             continue
         if arg in ("-o", "--output"):
-            skip_next = True  # skip the value too
+            skip_next = True
             continue
-        if arg.startswith("-o") and len(arg) > 2:
-            continue  # e.g. -opng
+        if re.match(r'^-o\w+', arg):    # e.g. -opng
+            continue
+        if arg == "--colorized":         # we handle colour ourselves
+            continue
         filtered.append(arg)
     pyreverse_args = filtered
 
     output_dir = Path(known.output_directory)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Generate .dot files
     dot_files = run_pyreverse(pyreverse_args, output_dir)
 
     for dot_path in dot_files:
         print(f"[style_pyreverse] Styling {dot_path.name} …")
 
-        # 2. Read & patch
         original = dot_path.read_text(encoding="utf-8")
-        patched = patch_dot(original)
+        patched  = patch_dot(original)
 
-        # Save the patched dot alongside the original for debugging
-        patched_path = dot_path.with_stem(dot_path.stem + "_styled")
+        # Save patched .dot alongside original (useful for debugging)
+        patched_path = dot_path.with_name(dot_path.stem + "_styled.dot")
         patched_path.write_text(patched, encoding="utf-8")
 
-        # 3. Render to image
         img_path = render_dot(patched_path, output_dir, fmt=known.format)
         print(f"[style_pyreverse] ✓  Written: {img_path}")
 

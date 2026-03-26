@@ -27,6 +27,8 @@ dev = [
   "ruff",
   "pytest",
   "pytest-cov",
+  "pylint",
+  "graphviz"
 ]
 test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 

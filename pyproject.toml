@@ -34,6 +34,7 @@ test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 
 [project.scripts]
 daqpytools-logging-demonstrator = "daqpytools.apps.logging_demonstrator:main"
+daqpytools-generate-uml = "daqpytools.apps.generate_uml:main"
 
 
 # Stricter linting rules than the standard (daq-deliverables #196); this is fine

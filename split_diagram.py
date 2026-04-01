@@ -9,10 +9,13 @@ Isolated nodes (no edges) are grouped by their Python module path
 rather than generating a file per class.
 
 Usage:
-    python split_diagram.py <input.dot> [--output-directory DIR] [--format png]
+    python split_diagram.py <input.dot> [--output-directory DIR] [--format png] [--concise]
 
 Example:
     python split_diagram.py pics/classes_styled.dot --output-directory pics/split
+    
+    # With --concise to remove type hints:
+    python split_diagram.py pics/classes_styled.dot --output-directory pics/split --concise
 """
 
 import re
@@ -24,6 +27,78 @@ from collections import defaultdict
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _strip_param_types(params_str: str) -> str:
+    """Strip type hints from a parameter list (the content between parentheses).
+
+    Handles complex types like ``dict[str, IssueRecord]`` by counting
+    bracket depth so inner commas are not treated as parameter separators.
+    """
+    if not params_str.strip():
+        return params_str
+
+    # Split on top-level commas only (not commas inside [] or {})
+    params, current, depth = [], [], 0
+    for ch in params_str:
+        if ch in '[({':
+            depth += 1
+            current.append(ch)
+        elif ch in '])}':
+            depth -= 1
+            current.append(ch)
+        elif ch == ',' and depth == 0:
+            params.append(''.join(current).strip())
+            current = []
+        else:
+            current.append(ch)
+    if current:
+        params.append(''.join(current).strip())
+
+    # Keep only the name (everything before the first ':')
+    stripped = []
+    for param in params:
+        colon = param.find(':')
+        stripped.append(param[:colon].rstrip() if colon != -1 else param)
+    return ', '.join(stripped)
+
+
+def strip_typehints(dot_src: str) -> str:
+    """Remove type annotations from class/attribute/method labels.
+
+    Three-pass approach applied only to lines that carry an HTML label:
+
+    1. Return types  – strips ``: ReturnType`` that follows a closing ``)``.
+       e.g. ``filter(record: logging.LogRecord): bool`` → ``filter(record: logging.LogRecord)``
+
+    2. Parameter types – strips ``: Type`` from each parameter inside ``()``.
+       e.g. ``filter(record: logging.LogRecord)`` → ``filter(record)``
+       Handles complex types such as ``dict[str, IssueRecord]`` correctly.
+
+    3. Attribute types – strips `` : Type`` from plain field entries.
+       e.g. ``initial_threshold : int`` → ``initial_threshold``
+    """
+    lines = dot_src.splitlines()
+    out_lines = []
+
+    for line in lines:
+        if 'label=<' not in line:
+            out_lines.append(line)
+            continue
+
+        # Pass 1 – return types: ): ReturnType<br  →  )<br
+        line = re.sub(r'(?<=\)):\s*[^<}]+(?=<br|}>)', '', line)
+
+        # Pass 2 – parameter types inside ()
+        def _replace_params(m):
+            return '(' + _strip_param_types(m.group(1)) + ')'
+        line = re.sub(r'\(([^)]*)\)', _replace_params, line)
+
+        # Pass 3 – attribute types: name : Type<br  →  name<br
+        line = re.sub(r'\s*:\s*[^<}]+(?=<br|}>)', '', line)
+
+        out_lines.append(line)
+
+    return '\n'.join(out_lines)
 
 def parse_dot(dot_src: str):
     """
@@ -128,7 +203,7 @@ def cluster_name(node_ids: set) -> str:
     return name or 'misc'
 
 
-def build_dot(graph_name: str, header_lines: list, node_lines: list, edge_lines: list) -> str:
+def build_dot(graph_name: str, header_lines: list, node_lines: list, edge_lines: list, concise: bool = False) -> str:
     """Assemble a complete dot file from parts."""
     # The first header line is the digraph opener; rest are defaults
     opener = header_lines[0]  # e.g. 'digraph "classes" {'
@@ -143,7 +218,13 @@ def build_dot(graph_name: str, header_lines: list, node_lines: list, edge_lines:
     parts += ['']
     parts += edge_lines
     parts += ['}']
-    return '\n'.join(parts)
+    dot_content = '\n'.join(parts)
+    
+    # Strip type hints if concise mode is enabled
+    if concise:
+        dot_content = strip_typehints(dot_content)
+    
+    return dot_content
 
 
 def render(dot_path: Path, fmt: str = 'png') -> Path:
@@ -165,6 +246,8 @@ def main():
     parser.add_argument('--format', default='png', help='Output image format (png, svg, pdf)')
     parser.add_argument('--min-size', type=int, default=1,
                         help='Minimum cluster size to render as its own file (default: 1)')
+    parser.add_argument('--concise', action='store_true',
+                        help='Remove type hints from class attributes and methods')
     args = parser.parse_args()
 
     dot_path = Path(args.input_dot)
@@ -213,7 +296,7 @@ def main():
             if src in cluster_nodes and dst in cluster_nodes
         ]
 
-        dot_content = build_dot(name, header_lines, node_lines, edge_lines)
+        dot_content = build_dot(name, header_lines, node_lines, edge_lines, concise=args.concise)
 
         out_dot = output_dir / f'{safe_name}.dot'
         out_dot.write_text(dot_content, encoding='utf-8')

@@ -18,4 +18,5 @@ This documentation is split into two sections depending on your role:
 | [How to add a handler](./how-to/add-a-handler.md) | Step-by-step guide to adding a new handler type |
 | [How to add a filter](./how-to/add-a-filter.md) | Step-by-step guide to adding a new logger-level filter |
 | [How to debug routing](./how-to/debug-routing.md) | Systematic workflow for diagnosing routing issues |
+| [How docs work and how to update them](./how-to/update-documentation.md) | Explains docs structure, generation pipeline, and update workflow |
 | [Common patterns](./reference/patterns.md) | Quick-reference recipes for handlers and filters |

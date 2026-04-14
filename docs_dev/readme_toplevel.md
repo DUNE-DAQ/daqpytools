@@ -35,5 +35,6 @@ Furthermore, a separate API reference set that includes Auto-generated kwargs, t
 | [How to add a handler](./dev/how-to/add-a-handler.md) | Step-by-step guide to adding a new handler type |
 | [How to add a filter](./dev/how-to/add-a-filter.md) | Step-by-step guide to adding a new logger-level filter |
 | [How to debug routing](./dev/how-to/debug-routing.md) | Systematic workflow for diagnosing routing issues |
+| [How docs work and how to update them](./dev/how-to/update-documentation.md) | Explains docs structure, generation pipeline, and update workflow |
 | [Common patterns](./dev/reference/patterns.md) | Quick-reference recipes for handlers and filters |
 

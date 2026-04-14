@@ -386,6 +386,7 @@ def _render_root_summary(
         "        - [Add a handler](dev/how-to/add-a-handler.md)",
         "        - [Add a filter](dev/how-to/add-a-filter.md)",
         "        - [Debug routing](dev/how-to/debug-routing.md)",
+        "        - [How docs work and how to update them](dev/how-to/update-documentation.md)",
         "    - [Common patterns](dev/reference/patterns.md)",
         "- API reference",
         "    - [Overview](APIref/index.md)",

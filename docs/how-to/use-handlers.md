@@ -28,8 +28,8 @@ As the name suggests, the file handler is used to transmit messages directly to 
 
 Stream handlers are used to transmit messages directly to the terminal without any color formatting. This is of great use for the logs of the controllers in drunc, which has its own method of capturing logs via a capture of the terminal output and a pipe to the relevant log file.
 
-Note that stream handling consists of two handlers, one writing to `stdout` and one to `stderr`. The `stderr` stream emits only for records at `ERROR` or above.
-
+Note that stream handling consists of two handlers in daqpytools, one writing to `stdout` and one to `stderr`. The `stderr` stream is configured to emit only for records at `ERROR` or above.
+ 
 ![streams_demo](../img/demo_streams.png)
 
 ## ERS Kafka handler
@@ -100,17 +100,17 @@ main_logger: logging.Logger = get_daq_logger(
     throttle=True
 )
 
-emit_err = lambda i: main_logger.info(
+emit_log_record = lambda i: main_logger.info(
     f"Throttle test {i}",
     extra={"handlers": [HandlerType.Rich, HandlerType.Throttle]},
 )
 
 for i in range(50):
-    emit_err(i)
+    emit_log_record(i)
 main_logger.warning("Sleeping for 30 seconds")
 time.sleep(30)
 for i in range(1000):
-    emit_err(i)
+    emit_log_record(i)
 ```
 
 Which will behave as expected.

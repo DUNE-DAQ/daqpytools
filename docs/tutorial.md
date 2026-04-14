@@ -26,11 +26,13 @@ test_logger = get_daq_logger(
 )
 ```
 
-For now, **please see the docstring of `get_daq_logger` to see what stuff you can have and what to initialise with.**
+Please see the API reference of `get_daq_logger` [here](https://dune-daq.github.io/daqpytools/APIref/get_daq_logger/), or alternatively the code itself [here](https://github.com/DUNE-DAQ/daqpytools/blob/develop/src/daqpytools/logging/logger.py), to see what options exist in initialising `get_daq_logger`. 
 
 This gives you a named logger with a single Rich handler attached, emitting at `INFO` level and above. Loggers in daqpytools are singletons — calling `get_daq_logger` with the same name twice will return the same instance, so it's safe to call this once at module level and reuse it throughout your code.
 
 ## Step 2: Emit your first messages
+
+Emitting refers to the act of processing the log record and sending it out to its intended destination! You can emit your messages to the terminal, to a file, via a RESTapi, and so on. For this tutorial, we are simply emitting a message to the terminal. 
 
 ```python
 test_logger.info("Hello, world!")

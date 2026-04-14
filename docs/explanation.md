@@ -32,7 +32,7 @@ Every record has an attached severity level, which can be used to flag how impor
 
 ![log_level_overview](img/loglevels.png)
 
-More levels can be defined as required, see Python's logging manual.
+It's worth noting that the severity levels are just enums in Python, with `CRITICAL` being 50, with increments of 10 down to 0 for `NOTSET`. More levels can be defined as required, see Python's [logging manual](https://docs.python.org/3/library/logging.html#logging-levels).
 
 Each logging instance can have an attached severity level. If it has one, then only records that have the same severity level or higher will be transmitted.
 
@@ -72,11 +72,24 @@ By default, loggers inherit certain properties from the parent:
 - severity level of the logger 
 - handlers (and all attached properties, including severity level and filters on handlers)
 
+
+A good model to think about while developing is shown below, where its thought of that the loggers 'get' the same handlers as their ancestors. Note one exception: they _do not_ inherit filters attached directly to the parent logger itself.
 ![inheritance](img/inheritance.png)
 
-Note one exception: they _do not_ inherit filters attached directly to the parent logger itself.
 
-A useful diagram is the [logging flow in the official Python 3 docs](https://docs.python.org/3/howto/logging.html#logging-flow).
+Behind the scenes, what actually happens is that the log record gets passed to the ancestor loggers; this is beneficial as it doesn't duplicate the two handles and instead passes the record around. See the [logging flow in the official Python3 docs](https://docs.python.org/3/howto/logging.html#logging-flow).
+
+
+
+#### The root logger
+
+In the native Python logging framework the highest possible logger is the (usually unnamed) root logger. For example, calling `logging.getLogger("top")` will usually yield you a logger called `{root}."top"`. Calling `logging.getLogger()` gets you the `{root}` logger.
+
+As the root logger is the highest logger which every logger inherits from, modifying this logger will have a _global_ effect on all your loggers, which is almost always undesirable.
+
+**Importantly, changing the root logger will affect the logging instances in other repositories too! This can lead to some undesirable behaviours, such as [this](https://github.com/DUNE-DAQ/drunc/blob/df51ce36cffe08efab6bd2a7a47554554deed22b/src/drunc/utils/utils.py#L64-L71).
+
+This information is not actionable in and of itself, however this provides context on some of the [best practices](./how-to/best-practices.md) that have been laid out. 
 
 ---
 
@@ -108,6 +121,8 @@ You can think of streams as different "channels" where each has its own set of h
 ![streams](img/streams.png)
 
 This is why routing via `extra={"handlers": [...]}` matters — it tells the logger which stream/handlers to use for each record.
+
+For a hands on explanation of these, please read the [how-to guide on how to use handlers and filters](./how-to/use-handlers.md)
 
 ---
 

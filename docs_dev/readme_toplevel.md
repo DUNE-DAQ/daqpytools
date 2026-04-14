@@ -1,6 +1,6 @@
 # Logging in DUNE-DAQ — Documentation
 
-Welcome to the logging documentation for daqpytools (as of 5.6.0).
+Welcome to the logging documentation for daqpytools (as of fddaq-v5.6.0).
 
 This documentation is split into two sections depending on your role:
 

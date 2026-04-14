@@ -8,11 +8,9 @@ The docs so far give a nice overview of how the logging tools work, but now you 
 
 ## Use of the root logger
 
+For background information surrounding this tip, please see the explanation on the Python root logger found [here](../explanation.md).
+
 **Always** set up a named pseudo-root logger in your application as close to initialisation of your application as possible. Use the daqpytools implementation `setup_root_logger` to do so.
-
-For context, in the native Python logging framework the highest possible logger is the (usually unnamed) root logger. For example, calling `logging.getLogger("top")` will usually yield you a logger called `{root}."top"`. Calling `logging.getLogger()` gets you the `{root}` logger.
-
-As the root logger is the highest logger which every logger inherits from, modifying this logger will have a _global_ effect on all your loggers, which is almost always undesirable.
 
 To keep things safe and compartmentalisable, a pseudo-root logger should be defined very early on, and should contain no handlers. This has benefits of compartmentalising publishing, and making things clearer in the logs due to more traceable names.
 
@@ -36,11 +34,13 @@ As shown here, all loggers are initialised via `{pseudo_root_logger}.{parent}.{c
 
 _Ideally_, loggers should only be defined once. While they _are_ singleton objects and there are simple ways to call an already defined logger, preference should be made to use inheritance to call 'new' loggers to keep things traceable.
 
-A good place to define parent-level loggers with handlers (c.f `drunc.process_manager`) is the module's `__init__` file. Subsequent new loggers can be defined in the various files of that Python module. For example, in the `process_manager/utils.py`, a new logger called `drunc.process_manager.utils` can be defined and used for the duration of that file, where it automatically inherits the handlers defined from the parent-level logger.
+A good place to define parent-level loggers with handlers (c.f. `drunc.process_manager`) is the module's `__init__` file. Subsequent new loggers can be defined in the various files of that Python module. For example, in the `process_manager/utils.py`, a new logger called `drunc.process_manager.utils` can be defined and used for the duration of that file, where it automatically inherits the handlers defined from the parent-level logger.
 
 ## Calling and configuring loggers
 
-Use `get_daq_logger` to initialise it once.
+Once the pseudo-root logger is defined, you can use `get_daq_logger` to initialise it once. 
+
+A useful tip for package managers is to define a function that prepends a prefix to actually inherit from the pseudo-root logger to ensure that inheritance is followed. See [here](https://github.com/DUNE-DAQ/drunc/blob/df51ce36cffe08efab6bd2a7a47554554deed22b/src/drunc/utils/utils.py#L52-L61) for an example.
 
 Following the previous tip, if you feel the need to get an already-initialised logger with `get_daq_logger`, consider making a child.
 

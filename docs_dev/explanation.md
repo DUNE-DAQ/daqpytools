@@ -85,16 +85,25 @@ This is extensible: you can add new `StreamType` values and teach the strategy d
 Defined in `specs.py`, there are two types:
 
 **`HandlerSpec`** describes how to build a handler:
+
 - `alias`: The `HandlerType` key
+
 - `handler_class`: The runtime handler class (used to detect existing instances)
+
 - `factory`: A callable that builds the handler from configuration
+
 - `fallback_types`: Which `HandlerType` values this handler represents for routing purposes
+
 - `target_stream`: Optional (for stream-specific handlers like stdout vs stderr)
 
 **`FilterSpec`** describes how to build a logger-level filter:
+
 - `alias`: The activation `HandlerType` token
+
 - `filter_class`: The runtime filter class
+
 - `factory`: A callable that builds the filter
+
 - `fallback_types`: Default handler types for the filter
 
 Specs are the "source of truth" for what a handler or filter is. When setup code needs to build something, it looks up the spec in a registry.

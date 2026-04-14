@@ -1,9 +1,9 @@
 # How to add handlers at runtime
 
-You can configure handlers in two phases:
+Loggers and their respective handlers can be configured in two ways.
 
-1. Build a logger first with `get_daq_logger(...)`.
-2. Add more handlers/filters later, based on runtime context.
+1. Build a logger first with `get_daq_logger(...)`. This is covered in the [getting started tutorial](../tutorial.md)/.
+2. Add more handlers/filters later, based on runtime context. This is covered in this page.
 
 This is useful in long-running services where extra outputs (for example ERS Kafka) should only be attached after additional configuration becomes available.
 
@@ -32,6 +32,8 @@ log.info("Now routes to rich + stdout by default")
 
 ## Suppress by default with `fallback_handler={HandlerType.Unknown}`
 
+This feature takes heavy advantage of the `extra` feature of Python logging. Please read the documentation on how `extra` is used, [found here](https://dune-daq.github.io/daqpytools/dev/explanation/).
+
 You can make newly-added handlers opt-in only by setting fallback handlers to `HandlerType.Unknown`. This means records without explicit `extra["handlers"]` will not be emitted by those handlers.
 
 ```python
@@ -55,6 +57,8 @@ log.critical(
     extra={"handlers": [HandlerType.Rich, HandlerType.Lstderr]},
 )
 ```
+
+For a more in depth discussion on this feature, please see the development docs. 
 
 ---
 

@@ -2,9 +2,24 @@
 
 This page covers how to attach and use ERS (error reporting system) handlers on a logger.
 
-For background on ERS streams and routing, see [Concepts](../explanation.md). For the `LogHandlerConf` routing API, see [Routing messages to specific handlers](./route-messages.md).
+For background on ERS streams and routing, see [Concepts](../explanation.md). For the `LogHandlerConf` routing API, see [Routing messages to specific handlers](./route-messages.md). For the definition of the handler itself as well as how it can be used, see [How to use handlers and filters](https://dune-daq.github.io/daqpytools/dev/explanation/).
 
 ---
+
+## Configuring ERS handlers onto a new logger (by construction)
+
+Use the `ers_kafka_session` variable to put in the relevant session name in `get_daq_logger`. There are several attributes that you can use to customise the ERS handler as well, such as changing the ERS application name as displayed on the ERS dashboards, exampled below. Please see the [API reference](https://dune-daq.github.io/daqpytools/APIref/handlers/protobufstream/) for full details on what can be passed in.  
+
+```python
+    from daqpytools.logging import get_daq_logger, 
+    main_logger: logging.Logger = get_daq_logger(
+        logger_name="logger_name",
+        log_level="INFO",
+        use_parent_handlers=True,
+        ers_kafka_session="session_name,
+        ers_app_name="Custom App Name", # Can be none!
+    )
+```
 
 ## Configuring ERS handlers on an existing logger
 

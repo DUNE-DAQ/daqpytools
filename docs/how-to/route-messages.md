@@ -6,7 +6,7 @@ For background on *why* routing works this way, see [Concepts](../explanation.md
 
 ---
 
-## Choosing handlers with HandlerTypes
+## Choosing handlers with HandlerTypes and the extra keyword
 
 You can route individual records to specific handlers by using `extra={"handlers": [...]}`:
 
@@ -26,7 +26,7 @@ Note: Asking for a handler type that isn't attached is a no-op. Using `HandlerTy
 
 ## Using LogHandlerConf for structured routing
 
-`LogHandlerConf` is a configuration dataclass that encapsulates the handler setup for different streams. It handles ERS environment variable parsing and creates routing metadata bundles that you attach to records via `extra`.
+`LogHandlerConf` is a configuration dataclass that encapsulates the handler setup for different streams. It can handle ERS environment variable parsing and creates routing metadata bundles that you attach to records via `extra`.
 
 ### Understanding LogHandlerConf
 

@@ -128,5 +128,6 @@ For a hands on explanation of these, please read the [how-to guide on how to use
 
 ## Further reading
 
-- For how this routing model is implemented under the hood, see the [developer explanation](https://dune-daq.github.io/daqpytools/explanation).
+- For how this routing model is implemented under the hood, see the [developer explanation](https://dune-daq.github.io/daqpytools/dev).
+  - The architecture reference includes diagrams which explain exactly how the routing works. See [here](https://dune-daq.github.io/daqpytools/dev/reference/architecture/).
 - For how to configure ERS and advanced routing in practice, see [Configuring ERS](./how-to/configure-ers.md) and [Routing messages to specific handlers](./how-to/route-messages.md).

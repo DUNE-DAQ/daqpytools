@@ -47,10 +47,3 @@ log.info("skip me", extra={"skip_logging": True})
 ```
 
 ---
-
-## Next steps
-
-- Look at existing handlers in `handlers.py` for patterns
-- Look at `ThrottleFilter` for a complex filter example
-- Check test files in `tests/logging/` for usage examples
-- Add your handler/filter, submit a PR!

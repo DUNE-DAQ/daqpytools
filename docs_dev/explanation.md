@@ -133,15 +133,18 @@ Defined in `routing.py`, strategies answer: "What `HandlerType` values are allow
 **`AllowedHandlersStrategy`** is the abstract base. Implementations:
 
 1. **`DefaultAllowedHandlerStrategy`**:
+   
    - Uses `record.handlers` if present (explicit routing metadata)
    - Falls back to `fallback_handlers` set if `record.handlers` is absent or None
 
 2. **`ERSAllowedHandlersStrategy`**:
+   
    - Reads `record.ers_handlers` dict and `record.levelno` (Python log level)
    - Maps the level to an ERS severity variable using `level_to_ers_var`
    - Returns the handler set for that severity
 
 3. **`StreamAwareAllowedHandlersStrategy`**:
+   
    - Looks at `record.stream`
    - If `stream == StreamType.ERS`, uses `ERSAllowedHandlersStrategy`
    - Otherwise uses `DefaultAllowedHandlerStrategy`
@@ -195,6 +198,12 @@ If routing isn't what you expect, debug:
 
 1. Does the record have explicit `extra["handlers"]`?
 2. If not, what's the fallback set?
+
+
+For a more concrete logical flow of the entire thing, with examples, please see the [architecture](./reference/architecture.md).
+
+### How HandleIDFillters, the routing strategies, and the fallback handlers work together
+
 
 ### Handler and Filter Registries
 

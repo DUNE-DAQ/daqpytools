@@ -21,6 +21,7 @@ Furthermore, a separate API reference set that includes Auto-generated kwargs, t
 | [How to route messages](./user/how-to/route-messages.md) | Direct records to specific handlers using HandlerType and LogHandlerConf |
 | [How to add handlers at runtime](./user/how-to/add-handlers-at-runtime.md) | Attach handlers after logger creation; pass kwargs |
 | [How to configure ERS](./user/how-to/configure-ers.md) | Attach and use ERS handlers |
+| [How to upgrade an existing package](./user/how-to/upgrade-package.md) | Migration checklist for adopting daqpytools logging in existing codebases |
 | [Best practices](./user/how-to/best-practices.md) | Recommended patterns for structuring logging in your application |
 | [Troubleshooting](./user/reference/troubleshooting.md) | Common symptoms, causes, and fixes |
 

@@ -15,6 +15,7 @@ nav:
       - Route messages: user/how-to/route-messages.md
       - Add handlers at runtime: user/how-to/add-handlers-at-runtime.md
       - Configure ERS: user/how-to/configure-ers.md
+      - Upgrade an existing package: user/how-to/upgrade-package.md
       - Best practices: user/how-to/best-practices.md
     - Troubleshooting: user/reference/troubleshooting.md
   - Developer Documentation:

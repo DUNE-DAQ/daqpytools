@@ -323,6 +323,104 @@ def _render_logging_index() -> str:
     return "\n".join(lines)
 
 
+def _render_api_summary(
+    handler_specs: dict[str, list[DocSpec]],
+    filter_specs: dict[str, list[DocSpec]],
+) -> str:
+    """Render literate-nav summary for dynamically generated APIref pages."""
+    lines = [
+        "- [Overview](index.md)",
+        "- Logger APIs",
+    ]
+
+    for title, _ in LOGGER_APIS:
+        lines.append(f"    - [{title}]({title}.md)")
+
+    lines.extend(
+        [
+            "- Registries",
+            "    - Handlers",
+            "        - [Overview](handlers/index.md)",
+        ]
+    )
+
+    for type_name in sorted(handler_specs):
+        slug = _type_slug(type_name)
+        lines.append(f"        - [{type_name}](handlers/{slug}.md)")
+
+    lines.extend(
+        [
+            "    - Filters",
+            "        - [Overview](filters/index.md)",
+        ]
+    )
+
+    for type_name in sorted(filter_specs):
+        slug = _type_slug(type_name)
+        lines.append(f"        - [{type_name}](filters/{slug}.md)")
+
+    return "\n".join(lines) + "\n"
+
+
+def _render_root_summary(
+    handler_specs: dict[str, list[DocSpec]],
+    filter_specs: dict[str, list[DocSpec]],
+) -> str:
+    """Render root literate-nav summary with fixed site order and dynamic APIref."""
+    lines = [
+        "- [Home](README.md)",
+        "- User Documentation",
+        "    - [Tutorial](user/tutorial.md)",
+        "    - [Concepts & explanation](user/explanation.md)",
+        "    - How-to",
+        "        - [Use handlers and filters](user/how-to/use-handlers.md)",
+        "        - [Route messages](user/how-to/route-messages.md)",
+        "        - [Add handlers at runtime](user/how-to/add-handlers-at-runtime.md)",
+        "        - [Configure ERS](user/how-to/configure-ers.md)",
+        "        - [Best practices](user/how-to/best-practices.md)",
+        "    - [Troubleshooting](user/reference/troubleshooting.md)",
+        "- Developer Documentation",
+        "    - [Concepts & explanation](dev/explanation.md)",
+        "    - [Architecture reference](dev/reference/architecture.md)",
+        "    - How-to",
+        "        - [Add a handler](dev/how-to/add-a-handler.md)",
+        "        - [Add a filter](dev/how-to/add-a-filter.md)",
+        "        - [Debug routing](dev/how-to/debug-routing.md)",
+        "    - [Common patterns](dev/reference/patterns.md)",
+        "- API reference",
+        "    - [Overview](APIref/index.md)",
+        "    - Logger APIs",
+    ]
+
+    for title, _ in LOGGER_APIS:
+        lines.append(f"        - [{title}](APIref/{title}.md)")
+
+    lines.extend(
+        [
+            "    - Registries",
+            "        - Handlers",
+            "            - [Overview](APIref/handlers/index.md)",
+        ]
+    )
+
+    for type_name in sorted(handler_specs):
+        slug = _type_slug(type_name)
+        lines.append(f"            - [{type_name}](APIref/handlers/{slug}.md)")
+
+    lines.extend(
+        [
+            "        - Filters",
+            "            - [Overview](APIref/filters/index.md)",
+        ]
+    )
+
+    for type_name in sorted(filter_specs):
+        slug = _type_slug(type_name)
+        lines.append(f"            - [{type_name}](APIref/filters/{slug}.md)")
+
+    return "\n".join(lines) + "\n"
+
+
 def _write_text(path: Path, content: str) -> None:
     """Write UTF-8 text either to filesystem or mkdocs virtual files."""
     if _USING_MKDOCS_GEN_FILES:
@@ -437,6 +535,18 @@ def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[P
     logging_index = output_root / "index.md"
     _write_text(logging_index, _render_logging_index())
     written.append(logging_index)
+
+    summary_path = output_root / "SUMMARY.md"
+    _write_text(summary_path, _render_api_summary(handler_specs, filter_specs))
+    written.append(summary_path)
+
+    if _USING_MKDOCS_GEN_FILES:
+        root_summary_path = Path("SUMMARY.md")
+        _write_text(
+            root_summary_path,
+            _render_root_summary(handler_specs, filter_specs),
+        )
+        written.append(root_summary_path)
 
     if emit_json_manifest:
         manifest = _to_manifest(handler_specs, filter_specs)

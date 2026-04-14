@@ -5,6 +5,27 @@ repo_url: https://github.com/DUNE-DAQ/drunc
 
 docs_dir: docs_anchor
 
+nav:
+  - Home: README.md
+  - User Documentation:
+    - Tutorial: user/tutorial.md
+    - Concepts & explanation: user/explanation.md
+    - How-to:
+      - Use handlers and filters: user/how-to/use-handlers.md
+      - Route messages: user/how-to/route-messages.md
+      - Add handlers at runtime: user/how-to/add-handlers-at-runtime.md
+      - Configure ERS: user/how-to/configure-ers.md
+      - Best practices: user/how-to/best-practices.md
+    - Troubleshooting: user/reference/troubleshooting.md
+  - Developer Documentation:
+    - Concepts & explanation: dev/explanation.md
+    - Architecture reference: dev/reference/architecture.md
+    - How-to:
+      - Add a handler: dev/how-to/add-a-handler.md
+      - Add a filter: dev/how-to/add-a-filter.md
+      - Debug routing: dev/how-to/debug-routing.md
+    - Common patterns: dev/reference/patterns.md
+  - API reference: APIref
 theme:
   name: material
   palette: 
@@ -41,9 +62,9 @@ plugins:
       scripts:
         - docs_dev/utils/generate_logging_autodocs.py
         - docs_dev/utils/mirror_docs.py
-  # - literate-nav:
-  #     nav_file: README.md
-  # - section-index
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
   - mkdocstrings:
       default_handler: python
       handlers:

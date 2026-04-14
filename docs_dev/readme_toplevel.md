@@ -7,6 +7,8 @@ This documentation is split into two sections depending on your role:
 - **User docs** — for anyone writing Python applications that use logging
 - **Developer docs** — for anyone extending the logging system itself (new handlers, new filters)
 
+Furthermore, a separate API reference set that includes Auto-generated kwargs, types, and defaults for all public APIs is found in the [API reference](./APIref) page.
+
 ---
 
 ## User documentation
@@ -21,7 +23,6 @@ This documentation is split into two sections depending on your role:
 | [How to configure ERS](./user/how-to/configure-ers.md) | Attach and use ERS handlers |
 | [Best practices](./user/how-to/best-practices.md) | Recommended patterns for structuring logging in your application |
 | [Troubleshooting](./user/reference/troubleshooting.md) | Common symptoms, causes, and fixes |
-| [API reference](https://dune-daq.github.io/daqpytools/APIref) | Auto-generated kwargs, types, and defaults for all public APIs |
 
 ---
 
@@ -35,3 +36,4 @@ This documentation is split into two sections depending on your role:
 | [How to add a filter](./dev/how-to/add-a-filter.md) | Step-by-step guide to adding a new logger-level filter |
 | [How to debug routing](./dev/how-to/debug-routing.md) | Systematic workflow for diagnosing routing issues |
 | [Common patterns](./dev/reference/patterns.md) | Quick-reference recipes for handlers and filters |
+

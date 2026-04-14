@@ -362,64 +362,102 @@ def _render_api_summary(
     return "\n".join(lines) + "\n"
 
 
-def _render_root_summary(
+def _render_apiref_section_for_root_summary(
     handler_specs: dict[str, list[DocSpec]],
     filter_specs: dict[str, list[DocSpec]],
-) -> str:
-    """Render root literate-nav summary with fixed site order and dynamic APIref."""
+    indent: int,
+) -> list[str]:
+    """Render dynamic APIref section for root SUMMARY.md at a given indent."""
+    prefix = "    " * indent
     lines = [
-        "- [Home](README.md)",
-        "- User Documentation",
-        "    - [Tutorial](user/tutorial.md)",
-        "    - [Concepts & explanation](user/explanation.md)",
-        "    - How-to",
-        "        - [Use handlers and filters](user/how-to/use-handlers.md)",
-        "        - [Route messages](user/how-to/route-messages.md)",
-        "        - [Add handlers at runtime](user/how-to/add-handlers-at-runtime.md)",
-        "        - [Configure ERS](user/how-to/configure-ers.md)",
-        "        - [Best practices](user/how-to/best-practices.md)",
-        "    - [Troubleshooting](user/reference/troubleshooting.md)",
-        "- Developer Documentation",
-        "    - [Concepts & explanation](dev/explanation.md)",
-        "    - [Architecture reference](dev/reference/architecture.md)",
-        "    - How-to",
-        "        - [Add a handler](dev/how-to/add-a-handler.md)",
-        "        - [Add a filter](dev/how-to/add-a-filter.md)",
-        "        - [Debug routing](dev/how-to/debug-routing.md)",
-        "        - [How docs work and how to update them](dev/how-to/update-documentation.md)",
-        "    - [Common patterns](dev/reference/patterns.md)",
-        "- API reference",
-        "    - [Overview](APIref/index.md)",
-        "    - Logger APIs",
+        f"{prefix}- [Overview](APIref/index.md)",
+        f"{prefix}- Logger APIs",
     ]
 
+    child_prefix = "    " * (indent + 1)
     for title, _ in LOGGER_APIS:
-        lines.append(f"        - [{title}](APIref/{title}.md)")
+        lines.append(f"{child_prefix}- [{title}](APIref/{title}.md)")
 
     lines.extend(
         [
-            "    - Registries",
-            "        - Handlers",
-            "            - [Overview](APIref/handlers/index.md)",
+            f"{prefix}- Registries",
+            f"{child_prefix}- Handlers",
+            f"{'    ' * (indent + 2)}- [Overview](APIref/handlers/index.md)",
         ]
     )
 
     for type_name in sorted(handler_specs):
         slug = _type_slug(type_name)
-        lines.append(f"            - [{type_name}](APIref/handlers/{slug}.md)")
+        lines.append(f"{'    ' * (indent + 2)}- [{type_name}](APIref/handlers/{slug}.md)")
 
     lines.extend(
         [
-            "        - Filters",
-            "            - [Overview](APIref/filters/index.md)",
+            f"{child_prefix}- Filters",
+            f"{'    ' * (indent + 2)}- [Overview](APIref/filters/index.md)",
         ]
     )
 
     for type_name in sorted(filter_specs):
         slug = _type_slug(type_name)
-        lines.append(f"            - [{type_name}](APIref/filters/{slug}.md)")
+        lines.append(f"{'    ' * (indent + 2)}- [{type_name}](APIref/filters/{slug}.md)")
 
-    return "\n".join(lines) + "\n"
+    return lines
+
+
+def _render_root_summary_from_mkdocs_nav(
+    repo_root: Path,
+    handler_specs: dict[str, list[DocSpec]],
+    filter_specs: dict[str, list[DocSpec]],
+) -> str:
+    """Render root SUMMARY.md from mkdocs.yml nav, with dynamic APIref expansion."""
+    import yaml
+
+    mkdocs_config_path = repo_root / "mkdocs.yml"
+    config = yaml.safe_load(mkdocs_config_path.read_text(encoding="utf-8")) or {}
+    nav = config.get("nav")
+
+    if not isinstance(nav, list):
+        err_msg = "mkdocs.yml nav must be a list to generate root SUMMARY.md"
+        raise ValueError(err_msg)
+
+    def render_nav_items(items: list[Any], indent: int = 0) -> list[str]:
+        prefix = "    " * indent
+        lines: list[str] = []
+
+        for item in items:
+            if isinstance(item, str):
+                lines.append(f"{prefix}- [{item}]({item})")
+                continue
+
+            if not isinstance(item, dict) or len(item) != 1:
+                err_msg = f"Unsupported nav item in mkdocs.yml: {item!r}"
+                raise ValueError(err_msg)
+
+            title, value = next(iter(item.items()))
+
+            if title == "API reference" and value == "APIref":
+                lines.append(f"{prefix}- {title}")
+                lines.extend(
+                    _render_apiref_section_for_root_summary(
+                        handler_specs,
+                        filter_specs,
+                        indent + 1,
+                    )
+                )
+                continue
+
+            if isinstance(value, str):
+                lines.append(f"{prefix}- [{title}]({value})")
+            elif isinstance(value, list):
+                lines.append(f"{prefix}- {title}")
+                lines.extend(render_nav_items(value, indent + 1))
+            else:
+                err_msg = f"Unsupported nav value for '{title}': {value!r}"
+                raise ValueError(err_msg)
+
+        return lines
+
+    return "\n".join(render_nav_items(nav)) + "\n"
 
 
 def _write_text(path: Path, content: str) -> None:
@@ -471,7 +509,12 @@ def _to_manifest(
     }
 
 
-def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[Path]:
+def generate(
+    output_root: Path,
+    emit_json_manifest: bool,
+    clean: bool,
+    repo_root: Path | None = None,
+) -> list[Path]:
     """Generate all targeted docs files and return paths written."""
     from daqpytools.logging.filters import FILTER_SPEC_REGISTRY
     from daqpytools.logging.handlers import HANDLER_SPEC_REGISTRY
@@ -542,10 +585,17 @@ def generate(output_root: Path, emit_json_manifest: bool, clean: bool) -> list[P
     written.append(summary_path)
 
     if _USING_MKDOCS_GEN_FILES:
+        if repo_root is None:
+            err_msg = "repo_root is required when generating root SUMMARY.md"
+            raise ValueError(err_msg)
         root_summary_path = Path("SUMMARY.md")
         _write_text(
             root_summary_path,
-            _render_root_summary(handler_specs, filter_specs),
+            _render_root_summary_from_mkdocs_nav(
+                repo_root,
+                handler_specs,
+                filter_specs,
+            ),
         )
         written.append(root_summary_path)
 
@@ -610,6 +660,7 @@ def main() -> int:
         output_root=output_root,
         emit_json_manifest=args.json_manifest,
         clean=args.clean,
+        repo_root=repo_root,
     )
 
     print(f"Generated {len(written)} files under: {output_root}")  # noqa: T201
@@ -634,6 +685,7 @@ def _run_from_mkdocs_gen_files() -> None:
         output_root=output_root,
         emit_json_manifest=False,
         clean=False,
+        repo_root=repo_root,
     )
 
 

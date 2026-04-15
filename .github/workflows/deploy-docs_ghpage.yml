@@ -28,5 +28,9 @@ jobs:
           # if you want mkdocstrings to import your package:
           pip install .
 
+      - name: Run Lychee link checker
+        uses: lycheeverse/lychee-action@v2
+
+
       - name: Deploy
         run: mkdocs gh-deploy --force

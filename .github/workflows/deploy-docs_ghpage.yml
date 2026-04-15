@@ -34,7 +34,7 @@ jobs:
       - name: Run Lychee link checker
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --verbose --no-progress 'site/**/*.html'
+          args: --verbose --no-progress --root-dir site 'site/**/*.html'
 
       - name: Deploy
         run: mkdocs gh-deploy --force

@@ -60,6 +60,6 @@ The Rich handler supports the full [Rich markup syntax](https://rich.readthedocs
   ```
   View the help string to learn more, and the script itself in the repository to see how it is implemented.
 - To understand *why* logging works the way it does, read the [Concepts & explanation](./explanation.md).
-- To learn how to use specific handlers and filters, see the [How-to guides](./how-to/).
+- To learn how to use specific handlers and filters, see the [How-to guides](./how-to/use-handlers.md).
 - For a full API reference, see the [API Ref](https://dune-daq.github.io/daqpytools/APIref).
 - If you are introducing logging to your Python repo, or upgrading an existing implementation, **please** read the [Logging best practices](./how-to/best-practices.md).

@@ -12,7 +12,7 @@ on:
   #   - cron: "0 0 * * 6"
 
 jobs:
-  docs:
+  build_and_check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,9 +28,13 @@ jobs:
           # if you want mkdocstrings to import your package:
           pip install .
 
+      - name: Build docs
+        run: mkdocs build --strict
+
       - name: Run Lychee link checker
         uses: lycheeverse/lychee-action@v2
-
+        with:
+          args: --verbose --no-progress 'site/**/*.html'
 
       - name: Deploy
         run: mkdocs gh-deploy --force

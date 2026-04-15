@@ -26,7 +26,7 @@ test_logger = get_daq_logger(
 )
 ```
 
-Please see the API reference of `get_daq_logger` [here](https://dune-daq.github.io/daqpytools/APIref/get_daq_logger/), or alternatively the code itself [here](https://github.com/DUNE-DAQ/daqpytools/blob/develop/src/daqpytools/logging/logger.py), to see what options exist in initialising `get_daq_logger`. 
+Please see the API reference of `get_daq_logger` [here](../../APIref/get_daq_logger/), or alternatively the code itself [here](https://github.com/DUNE-DAQ/daqpytools/blob/develop/src/daqpytools/logging/logger.py), to see what options exist in initialising `get_daq_logger`. 
 
 This gives you a named logger with a single Rich handler attached, emitting at `INFO` level and above. Loggers in daqpytools are singletons — calling `get_daq_logger` with the same name twice will return the same instance, so it's safe to call this once at module level and reuse it throughout your code.
 
@@ -61,5 +61,5 @@ The Rich handler supports the full [Rich markup syntax](https://rich.readthedocs
   View the help string to learn more, and the script itself in the repository to see how it is implemented.
 - To understand *why* logging works the way it does, read the [Concepts & explanation](./explanation.md).
 - To learn how to use specific handlers and filters, see the [How-to guides](./how-to/use-handlers.md).
-- For a full API reference, see the [API Ref](https://dune-daq.github.io/daqpytools/APIref).
+- For a full API reference, see the [API Reference](../../APIref/).
 - If you are introducing logging to your Python repo, or upgrading an existing implementation, **please** read the [Logging best practices](./how-to/best-practices.md).

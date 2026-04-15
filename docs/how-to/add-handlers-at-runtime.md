@@ -32,7 +32,7 @@ log.info("Now routes to rich + stdout by default")
 
 ## Suppress by default with `fallback_handler={HandlerType.Unknown}`
 
-This feature takes heavy advantage of the `extra` feature of Python logging. Please read the documentation on how `extra` is used, [found here](https://dune-daq.github.io/daqpytools/dev/explanation/).
+This feature takes heavy advantage of the `extra` feature of Python logging. Please read the documentation on how `extra` is used, [found here](../../../dev/explanation/).
 
 You can make newly-added handlers opt-in only by setting fallback handlers to `HandlerType.Unknown`. This means records without explicit `extra["handlers"]` will not be emitted by those handlers.
 

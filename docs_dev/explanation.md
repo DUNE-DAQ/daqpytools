@@ -2,7 +2,7 @@
 
 This page is for developers who want to understand the internals of daqpytools logging — for example, to add a new handler or debug a routing issue.
 
-For user-facing concepts (Python logging fundamentals, streams), see the [user explanation](https://dune-daq.github.io/daqpytools/user/explanation/).
+For user-facing concepts (Python logging fundamentals, streams), see the [user explanation](../../user/explanation/).
 For implementation recipes, see the how-to guides.
 
 ---

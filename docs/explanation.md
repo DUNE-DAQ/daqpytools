@@ -2,7 +2,7 @@
 
 This page explains the underlying concepts behind Python logging and how daqpytools builds on them. Reading this will help you understand *why* the how-to guides are structured the way they are.
 
-For hands-on instructions, see the how-to guides. For the API reference, see the [reference](https://dune-daq.github.io/daqpytools/APIref).
+For hands-on instructions, see the how-to guides. For the API reference, see the [reference](../../APIref).
 
 ---
 
@@ -128,6 +128,6 @@ For a hands on explanation of these, please read the [how-to guide on how to use
 
 ## Further reading
 
-- For how this routing model is implemented under the hood, see the [developer explanation](https://dune-daq.github.io/daqpytools/dev).
-  - The architecture reference includes diagrams which explain exactly how the routing works. See [here](https://dune-daq.github.io/daqpytools/dev/reference/architecture/).
+- For how this routing model is implemented under the hood, see the [developer explanation](../../dev/).
+  - The architecture reference includes diagrams which explain exactly how the routing works. See [here](../../dev/reference/architecture/).
 - For how to configure ERS and advanced routing in practice, see [Configuring ERS](./how-to/configure-ers.md) and [Routing messages to specific handlers](./how-to/route-messages.md).

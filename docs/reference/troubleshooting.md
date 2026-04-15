@@ -2,7 +2,7 @@
 
 This page lists common symptoms, their likely causes, and fixes.
 
-For a systematic debugging workflow when extending the system, see the [developer debugging checklist](https://dune-daq.github.io/daqpytools/dev/how-to/debug-routing/).
+For a systematic debugging workflow when extending the system, see the [developer debugging checklist](../../../dev/how-to/debug-routing/).
 ---
 
 | Symptom | Likely cause | What to check | Fix |

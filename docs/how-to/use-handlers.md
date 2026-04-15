@@ -4,11 +4,7 @@ This page walks through each available handler and filter in daqpytools with sho
 
 Remember that by default, any messages received by the logger will be transmitted to _all_ available handlers that are attached to the logger.
 
-**For now, please view both `get_daq_logger` and the relevant builders in `handlers.py` and `filters.py` to see what options exist on how to initialise them.**
-
-**In the future, this will be automatically generated from the docstrings.**
-
-For the full API reference (kwargs, types, defaults), see the [auto-generated reference](https://dune-daq.github.io/daqpytools/APIref).
+For the full API reference (kwargs, types, defaults), see the [auto-generated reference](../../../APIref/).
 
 ---
 

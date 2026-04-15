@@ -1,0 +1,16 @@
+# UML Diagram Style Configuration
+# ──────────────────────────────────────────────────────────────────────────
+
+class:
+  fill: "#FFFDE7"        # warm cream (matches Image 1)
+  stroke: "#8B7355"      # warm brown border
+  font: "Helvetica"
+  fontsize: 10
+
+relationships:
+  inherit_color: "#555555"   # inheritance arrow color
+  uses_color: "#555555"      # dependency/uses arrow color
+
+graph:
+  bg_color: "white"
+  rankdir: "BT"             # bottom-to-top layout

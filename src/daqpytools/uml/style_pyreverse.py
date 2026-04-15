@@ -27,20 +27,10 @@ import subprocess
 import sys
 import argparse
 from pathlib import Path
+from daqpytools.uml.utils import strip_typehints, load_style_config
 
-
-# ── Colour palette (tweak these to your taste) ──────────────────────────────
-STYLE = {
-    "class_fill":     "#FFFDE7",   # warm cream (matches Image 1)
-    "class_stroke":   "#8B7355",   # warm brown border
-    "class_font":     "Helvetica",
-    "class_fontsize": "10",
-    "inherit_color":  "#555555",
-    "uses_color":     "#555555",
-    "bg_color":       "white",
-    "rankdir":        "BT",
-}
-# ────────────────────────────────────────────────────────────────────────────
+# Load UML diagram style configuration from style.yaml
+STYLE = load_style_config()
 
 
 def run_pyreverse(extra_args, output_dir):
@@ -56,79 +46,6 @@ def run_pyreverse(extra_args, output_dir):
         print("[style_pyreverse] ERROR: pyreverse produced no .dot files in", output_dir)
         sys.exit(1)
     return dot_files
-
-
-def _strip_param_types(params_str: str) -> str:
-    """Strip type hints from a parameter list (the content between parentheses).
-
-    Handles complex types like ``dict[str, IssueRecord]`` by counting
-    bracket depth so inner commas are not treated as parameter separators.
-    """
-    if not params_str.strip():
-        return params_str
-
-    # Split on top-level commas only (not commas inside [] or {})
-    params, current, depth = [], [], 0
-    for ch in params_str:
-        if ch in '[({':
-            depth += 1
-            current.append(ch)
-        elif ch in '])}':
-            depth -= 1
-            current.append(ch)
-        elif ch == ',' and depth == 0:
-            params.append(''.join(current).strip())
-            current = []
-        else:
-            current.append(ch)
-    if current:
-        params.append(''.join(current).strip())
-
-    # Keep only the name (everything before the first ':')
-    stripped = []
-    for param in params:
-        colon = param.find(':')
-        stripped.append(param[:colon].rstrip() if colon != -1 else param)
-    return ', '.join(stripped)
-
-
-def strip_typehints(dot_src):
-    """Remove type annotations from class/attribute/method labels.
-
-    Three-pass approach applied only to lines that carry an HTML label:
-
-    1. Return types  – strips ``: ReturnType`` that follows a closing ``)``.
-       e.g. ``filter(record: logging.LogRecord): bool`` → ``filter(record: logging.LogRecord)``
-
-    2. Parameter types – strips ``: Type`` from each parameter inside ``()``.
-       e.g. ``filter(record: logging.LogRecord)`` → ``filter(record)``
-       Handles complex types such as ``dict[str, IssueRecord]`` correctly.
-
-    3. Attribute types – strips `` : Type`` from plain field entries.
-       e.g. ``initial_threshold : int`` → ``initial_threshold``
-    """
-    lines = dot_src.splitlines()
-    out_lines = []
-
-    for line in lines:
-        if 'label=<' not in line:
-            out_lines.append(line)
-            continue
-
-        # Pass 1 – return types: ): ReturnType<br  →  )<br
-        line = re.sub(r'(?<=\)):\s*[^<}]+(?=<br|}>)', '', line)
-
-        # Pass 2 – parameter types inside ()
-        def _replace_params(m):
-            return '(' + _strip_param_types(m.group(1)) + ')'
-        line = re.sub(r'\(([^)]*)\)', _replace_params, line)
-
-        # Pass 3 – attribute types: name : Type<br  →  name<br
-        line = re.sub(r'\s*:\s*[^<}]+(?=<br|}>)', '', line)
-
-        out_lines.append(line)
-
-    return '\n'.join(out_lines)
 
 
 def patch_dot(dot_src, concise=False):

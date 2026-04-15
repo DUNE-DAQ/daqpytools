@@ -212,7 +212,7 @@ def _render_index(
     defaults = index_kind_defaults.get(kind)
     if defaults is None:
         err_msg = f"Unsupported index kind: {kind}"
-        raise ValueError(err_msg)
+        raise TypeError(err_msg)
 
     resolved_title = title or defaults["title"]
     resolved_type_label = type_label or defaults["type_label"]
@@ -388,7 +388,8 @@ def _render_apiref_section_for_root_summary(
 
     for type_name in sorted(handler_specs):
         slug = _type_slug(type_name)
-        lines.append(f"{'    ' * (indent + 2)}- [{type_name}](APIref/handlers/{slug}.md)")
+        prefix = f"{'    ' * (indent + 2)} - "
+        lines.append(prefix + f"[{type_name}](APIref/handlers/{slug}.md)")
 
     lines.extend(
         [
@@ -399,7 +400,8 @@ def _render_apiref_section_for_root_summary(
 
     for type_name in sorted(filter_specs):
         slug = _type_slug(type_name)
-        lines.append(f"{'    ' * (indent + 2)}- [{type_name}](APIref/filters/{slug}.md)")
+        prefix = f"{'    ' * (indent + 2)}- "
+        lines.append(prefix + f"[{type_name}](APIref/filters/{slug}.md)")
 
     return lines
 
@@ -418,7 +420,7 @@ def _render_root_summary_from_mkdocs_nav(
 
     if not isinstance(nav, list):
         err_msg = "mkdocs.yml nav must be a list to generate root SUMMARY.md"
-        raise ValueError(err_msg)
+        raise TypeError(err_msg)
 
     def render_nav_items(items: list[Any], indent: int = 0) -> list[str]:
         prefix = "    " * indent
@@ -431,7 +433,7 @@ def _render_root_summary_from_mkdocs_nav(
 
             if not isinstance(item, dict) or len(item) != 1:
                 err_msg = f"Unsupported nav item in mkdocs.yml: {item!r}"
-                raise ValueError(err_msg)
+                raise TypeError(err_msg)
 
             title, value = next(iter(item.items()))
 
@@ -453,7 +455,7 @@ def _render_root_summary_from_mkdocs_nav(
                 lines.extend(render_nav_items(value, indent + 1))
             else:
                 err_msg = f"Unsupported nav value for '{title}': {value!r}"
-                raise ValueError(err_msg)
+                raise TypeError(err_msg)
 
         return lines
 
@@ -587,7 +589,7 @@ def generate(
     if _USING_MKDOCS_GEN_FILES:
         if repo_root is None:
             err_msg = "repo_root is required when generating root SUMMARY.md"
-            raise ValueError(err_msg)
+            raise TypeError(err_msg)
         root_summary_path = Path("SUMMARY.md")
         _write_text(
             root_summary_path,

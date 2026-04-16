@@ -5,7 +5,7 @@ style_pyreverse.py
 Wraps pyreverse to produce nicely styled UML class diagrams.
 
 Usage:
-    python style_pyreverse.py [pyreverse args...] [--concise]
+    python style_pyreverse.py [pyreverse args...] [--concise] [--style-config PATH]
 
 Example (drop-in replacement for your existing command):
     python style_pyreverse.py \
@@ -28,9 +28,19 @@ import sys
 import argparse
 from pathlib import Path
 from daqpytools.uml.utils import strip_typehints, load_style_config
+from daqpytools.uml.dot_patch_config import (
+    PATCH_DOT_SUBSTITUTION_PIPELINE,
+    EDGE_SUBSTITUTION_PIPELINE,
+    DIGRAPH_OPEN_PATTERN,
+    build_defaults_block,
+    build_edge_attrs,
+)
 
-# Load UML diagram style configuration from style.yaml
-STYLE = load_style_config()
+def _apply_substitutions(text: str, substitutions: list[tuple[str, str]]) -> str:
+    """Apply regex substitutions in order."""
+    for pattern, replacement in substitutions:
+        text = re.sub(pattern, replacement, text)
+    return text
 
 
 def run_pyreverse(extra_args, output_dir):
@@ -48,66 +58,34 @@ def run_pyreverse(extra_args, output_dir):
     return dot_files
 
 
-def patch_dot(dot_src, concise=False):
+def patch_dot(dot_src, style, concise=False):
     """Rewrite .dot source to apply a clean UML style."""
-    s = STYLE
 
-    # ── 1. Strip all per-node colour/style attributes pyreverse injected ─────
-    dot_src = re.sub(r',?\s*\bfontcolor\s*=\s*"[^"]*"', '', dot_src)
-    dot_src = re.sub(r',?\s*\bcolor\s*=\s*"[^"]*"', '', dot_src)
-    dot_src = re.sub(r',?\s*\bstyle\s*=\s*"[^"]*"', '', dot_src)
-    dot_src = re.sub(r',?\s*\bfillcolor\s*=\s*"[^"]*"', '', dot_src)
-
-    # Clean up empty/malformed attribute lists left by the removals above
-    dot_src = re.sub(r'\[\s*\]', '', dot_src)
-    dot_src = re.sub(r'\[\s*,', '[', dot_src)
-    dot_src = re.sub(r',\s*\]', ']', dot_src)
-    dot_src = re.sub(r',\s*,', ', ', dot_src)
+    # ── 1. Run configured dot-level substitution pipeline ────────────────────
+    for substitutions in PATCH_DOT_SUBSTITUTION_PIPELINE:
+        dot_src = _apply_substitutions(dot_src, substitutions)
     
     # ── Concise mode: strip type hints ─────────────────────────────────────
     if concise:
         dot_src = strip_typehints(dot_src)
 
     # ── 2. Inject graph-level defaults right after the opening brace ─────────
-    graph_line = (
-        'graph ['
-        'bgcolor="' + s["bg_color"] + '" '
-        'fontname="' + s["class_font"] + '" '
-        'pad="0.5" nodesep="0.6" ranksep="0.9" '
-        'rankdir="' + s["rankdir"] + '"'
-        '];'
-    )
-    node_line = (
-        'node ['
-        'shape=record '
-        'style="filled" '
-        'fillcolor="' + s["class_fill"] + '" '
-        'color="' + s["class_stroke"] + '" '
-        'fontname="' + s["class_font"] + '" '
-        'fontsize=' + s["class_fontsize"] +
-        '];'
-    )
-    edge_line = (
-        'edge ['
-        'fontname="' + s["class_font"] + '" '
-        'fontsize="9" '
-        'color="' + s["inherit_color"] + '"'
-        '];'
-    )
-    defaults_block = "\n  " + graph_line + "\n  " + node_line + "\n  " + edge_line + "\n"
+    defaults_block = build_defaults_block(style)
 
     def insert_defaults(m):
         return m.group(0) + defaults_block
 
-    dot_src = re.sub(r'digraph\s+\S+\s*\{', insert_defaults, dot_src, count=1)
+    dot_src = re.sub(DIGRAPH_OPEN_PATTERN, insert_defaults, dot_src, count=1)
 
     # ── 3. Fix arrowheads to proper UML style ────────────────────────────────
-    dot_src = fix_edges(dot_src)
+    dot_src = fix_edges(dot_src, style)
 
     return dot_src
 
 
-def fix_edges(dot_src):
+#TODO: There is scope here to instead of 'fix' the edge to make this modifiable
+# maybe not for the initial release..
+def fix_edges(dot_src, style):
     """
     Restyle edges line-by-line:
       dashed → dependency/uses:  arrowhead=open,  style=dashed
@@ -122,28 +100,10 @@ def fix_edges(dot_src):
 
         is_dashed = 'dashed' in line
 
-        # Strip existing arrowhead/style/color attrs from this edge line
-        line = re.sub(r',?\s*arrowhead\s*=\s*"?[^",\]\s]+"?', '', line)
-        line = re.sub(r',?\s*\bstyle\s*=\s*"[^"]*"', '', line)
-        line = re.sub(r',?\s*\bcolor\s*=\s*"[^"]*"', '', line)
-
-        # Clean up any resulting empty/malformed brackets
-        line = re.sub(r'\[\s*,', '[', line)
-        line = re.sub(r',\s*\]', ']', line)
-        line = re.sub(r'\[\s*\]', '', line)
-
-        if is_dashed:
-            new_attrs = (
-                'arrowhead="open" '
-                'style="dashed" '
-                'color="' + STYLE["uses_color"] + '"'
-            )
-        else:
-            new_attrs = (
-                'arrowhead="empty" '
-                'style="solid" '
-                'color="' + STYLE["inherit_color"] + '"'
-            )
+        # Run configured edge-level substitution pipeline, then append style attrs
+        for substitutions in EDGE_SUBSTITUTION_PIPELINE:
+            line = _apply_substitutions(line, substitutions)
+        new_attrs = build_edge_attrs(style, is_dashed)
 
         if '[' in line:
             # Append new attrs inside the existing bracket
@@ -172,16 +132,8 @@ def render_dot(dot_path, output_dir, fmt="png"):
     return out_path
 
 
-def main():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--output-directory", default=".")
-    parser.add_argument("--format", default="png",
-                        help="Output image format (png, svg, pdf …)")
-    parser.add_argument("--concise", action="store_true",
-                        help="Remove type hints from class attributes and methods")
-    known, pyreverse_args = parser.parse_known_args()
-
-    # Strip -o / --output flags (we always force dot output)
+def _filter_pyreverse_args(pyreverse_args: list[str]) -> list[str]:
+    """Remove CLI args we override when forcing pyreverse dot output."""
     filtered = []
     skip_next = False
     for arg in pyreverse_args:
@@ -196,7 +148,26 @@ def main():
         if arg == "--colorized":         # we handle colour ourselves
             continue
         filtered.append(arg)
-    pyreverse_args = filtered
+    return filtered
+
+
+def main():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--output-directory", default=".")
+    parser.add_argument("--format", default="png",
+                        help="Output image format (png, svg, pdf …)")
+    parser.add_argument("--concise", action="store_true",
+                        help="Remove type hints from class attributes and methods")
+    parser.add_argument(
+        "--style-config",
+        default=None,
+        help="Path to YAML style config file (defaults to uml/style.yaml).",
+    )
+    
+    known, pyreverse_args = parser.parse_known_args()
+
+    pyreverse_args = _filter_pyreverse_args(pyreverse_args)
+    style = load_style_config(known.style_config)
 
     output_dir = Path(known.output_directory)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +178,7 @@ def main():
         print(f"[style_pyreverse] Styling {dot_path.name} …")
 
         original = dot_path.read_text(encoding="utf-8")
-        patched  = patch_dot(original, concise=known.concise)
+        patched  = patch_dot(original, style=style, concise=known.concise)
 
         # Save patched .dot alongside original (useful for debugging)
         patched_path = dot_path.with_name(dot_path.stem + "_styled.dot")

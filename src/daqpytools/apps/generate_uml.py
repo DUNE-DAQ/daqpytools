@@ -11,6 +11,7 @@ Usage:
     daqpytools-generate-uml daqpytools --output-directory pics --concise
     daqpytools-generate-uml -p my_package -c MyClass --output-directory pics --no-split
     daqpytools-generate-uml daqpytools --format svg --min-size 2
+    daqpytools-generate-uml daqpytools --style-config ./my_style.yaml
 """
 
 import subprocess
@@ -97,6 +98,12 @@ def validate_output_directory(ctx, param, value):
     is_flag=True,
     help="Verbose output.",
 )
+@click.option(
+    "--style-config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to YAML style config file for style_pyreverse.",
+)
 def main(
     targets,
     output_directory,
@@ -107,6 +114,7 @@ def main(
     package,
     classes,
     verbose,
+    style_config,
 ):
     """
     Generate styled UML class diagrams from Python code.
@@ -161,6 +169,9 @@ def main(
     
     if concise:
         style_cmd.append("--concise")
+
+    if style_config is not None:
+        style_cmd.extend(["--style-config", str(style_config)])
     
     if verbose:
         click.echo(f"  Command: {' '.join(style_cmd)}")

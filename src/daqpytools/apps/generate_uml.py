@@ -7,6 +7,9 @@ This command calls the UML helper functions directly to:
 4. optionally split the diagrams into connected components.
 
 Usage:
+    daqpytools-generate-uml [package name] --directory [package directory] 
+        --output-directory [dir] --split 
+    
     daqpytools-generate-uml daqpytools --output-directory pics
     daqpytools-generate-uml daqpytools 
         --directory some/path --output-directory pics --split

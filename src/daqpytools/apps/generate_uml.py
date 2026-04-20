@@ -1,7 +1,4 @@
-"""
-generate_uml.py
----------------
-CLI interface for generating UML class diagrams using pyreverse.
+"""CLI interface for generating UML class diagrams.
 
 This command calls the UML helper functions directly to:
 1. run pyreverse in a chosen working directory,
@@ -11,7 +8,8 @@ This command calls the UML helper functions directly to:
 
 Usage:
     daqpytools-generate-uml daqpytools --output-directory pics
-    daqpytools-generate-uml daqpytools --directory some/path --output-directory pics --split
+    daqpytools-generate-uml daqpytools 
+        --directory some/path --output-directory pics --split
     daqpytools-generate-uml daqpytools --format none
 """
 
@@ -27,14 +25,18 @@ from daqpytools.uml.style_pyreverse import run_pyreverse
 from daqpytools.uml.utils import load_style_config, vprint
 
 
-def validate_output_directory(ctx, param, value):
+def validate_output_directory(
+    ctx: click.Context, param: click.Parameter, value: Path | None
+) -> Path | None:
     """Return the output directory path without creating it yet."""
     if value is None:
         return None
     return Path(value)
 
 
-def build_pyreverse_args(targets, packages, classes):
+def build_pyreverse_args(
+    targets: tuple[str, ...], packages: tuple[str, ...], classes: tuple[str, ...]
+) -> list[str]:
     """Build the pyreverse argument list from CLI inputs."""
     pyreverse_args = []
     pyreverse_args.extend(targets)
@@ -44,15 +46,19 @@ def build_pyreverse_args(targets, packages, classes):
     return pyreverse_args
 
 
-def resolve_output_directory(directory: Path | None, output_directory: Path) -> tuple[Path, Path]:
+def resolve_output_directory(
+    directory: Path | None, output_directory: Path
+) -> tuple[Path, Path]:
     """Resolve the working directory and output directory consistently."""
     cwd = Path.cwd() if directory is None else Path(directory).resolve()
-    resolved_output = output_directory if output_directory.is_absolute() else cwd / output_directory
+    resolved_output = (
+        output_directory if output_directory.is_absolute() else cwd / output_directory
+    )
     resolved_output.mkdir(parents=True, exist_ok=True)
     return cwd, resolved_output
 
 
-def style_dot_file(dot_path: Path, style: dict, concise: bool) -> Path:
+def style_dot_file(dot_path: Path, style: dict[str, str], concise: bool) -> Path:
     """Patch a raw dot file and write the styled version next to it."""
     original = dot_path.read_text(encoding="utf-8")
     patched = patch_dot(original, style=style, concise=concise)
@@ -82,6 +88,7 @@ def style_dot_file(dot_path: Path, style: dict, concise: bool) -> Path:
 @click.option(
     "-f",
     "--format",
+    "output_format",
     type=click.Choice(["png", "svg", "pdf", "jpg", "none"], case_sensitive=False),
     default="png",
     help="Output image format, or 'none' to keep dot files only. [default: png]",
@@ -128,20 +135,19 @@ def style_dot_file(dot_path: Path, style: dict, concise: bool) -> Path:
     help="Path to YAML style config file for the UML renderer.",
 )
 def main(
-    targets,
-    directory,
-    output_directory,
-    format,
-    concise,
-    split,
-    min_size,
-    package,
-    classes,
-    verbose,
-    style_config,
-):
+    targets: tuple[str, ...],
+    directory: Path | None,
+    output_directory: Path,
+    output_format: str,
+    concise: bool,
+    split: bool,
+    min_size: int,
+    package: tuple[str, ...],
+    classes: tuple[str, ...],
+    verbose: bool,
+    style_config: Path | None,
+) -> None:
     """Generate styled UML class diagrams from Python code."""
-
     pyreverse_args = build_pyreverse_args(targets, package, classes)
     if not pyreverse_args:
         click.secho("Error: No targets or packages specified.", fg="red", err=True)
@@ -149,38 +155,47 @@ def main(
 
     cwd, resolved_output_dir = resolve_output_directory(directory, output_directory)
     style = load_style_config(style_config)
-    render_format = None if format.lower() == "none" else format.lower()
+    render_format = None if output_format.lower() == "none" else output_format.lower()
 
     vprint(verbose, f"[generate_uml] Running pyreverse in {cwd}")
-    dot_files = run_pyreverse(pyreverse_args, resolved_output_dir, cwd=str(cwd), verbose=verbose)
+    dot_files = run_pyreverse(
+        pyreverse_args, resolved_output_dir, cwd=str(cwd), verbose=verbose
+    )
 
-    styled_dot_files = []
+    styled_dot_files: list[Path] = []
     for dot_path in dot_files:
         vprint(verbose, f"[generate_uml] Styling {dot_path.name}")
         styled_dot_files.append(style_dot_file(dot_path, style=style, concise=concise))
 
-    split_dot_files = []
+    split_dot_files: list[Path] = []
     if split:
         split_root = resolved_output_dir / "split"
         for styled_dot in styled_dot_files:
             split_output_dir = split_root / styled_dot.stem
-            split_dot_files.extend(split_dot_file(
-                input_dot=styled_dot,
-                output_dir=split_output_dir,
-                concise=concise,
-                verbose=verbose,
-                min_size=min_size,
-            ))
-            vprint(verbose, f"[generate_uml] Split diagrams written to {split_output_dir}")
+            split_dot_files.extend(
+                split_dot_file(
+                    input_dot=styled_dot,
+                    output_dir=split_output_dir,
+                    concise=concise,
+                    verbose=verbose,
+                    min_size=min_size,
+                )
+            )
+            vprint(
+                verbose, f"[generate_uml] Split diagrams written to {split_output_dir}"
+            )
 
     if render_format is not None:
-
         for split_dot in split_dot_files:
-            img_path = render_dot(split_dot, split_dot.parent, fmt=render_format, verbose=verbose)
+            img_path = render_dot(
+                split_dot, split_dot.parent, fmt=render_format, verbose=verbose
+            )
             vprint(verbose, f"[generate_uml] Written: {img_path}")
 
         for styled_dot in styled_dot_files:
-            img_path = render_dot(styled_dot, resolved_output_dir, fmt=render_format, verbose=verbose)
+            img_path = render_dot(
+                styled_dot, resolved_output_dir, fmt=render_format, verbose=verbose
+            )
             vprint(verbose, f"[generate_uml] Written: {img_path}")
     else:
         vprint(verbose, "[generate_uml] Skipping rendering (--format none)")

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""
-style_pyreverse.py
-------------------
+"""Wrap pyreverse to produce styled UML class diagrams.
+
 Wraps pyreverse to produce nicely styled UML class diagrams.
 
 Usage:
@@ -23,16 +22,21 @@ Dependencies:
 """
 
 import argparse
+import os
 import re
-import subprocess
 import sys
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
+
+from pylint.pyreverse.main import Run
+
 from daqpytools.uml.dot_parsing import patch_dot
 from daqpytools.uml.render import render_dot
 from daqpytools.uml.utils import load_style_config, vprint
 
 
-def _filter_pyreverse_args(pyreverse_args: list[str]) -> list[str]:
+def _filter_pyreverse_args(pyreverse_args: Sequence[str]) -> list[str]:
     """Remove CLI args we override when forcing pyreverse dot output."""
     filtered = []
     skip_next = False
@@ -43,36 +47,58 @@ def _filter_pyreverse_args(pyreverse_args: list[str]) -> list[str]:
         if arg in ("-o", "--output"):
             skip_next = True
             continue
-        if re.match(r'^-o\w+', arg):    # e.g. -opng
+        if re.match(r"^-o\w+", arg):  # e.g. -opng
             continue
-        if arg == "--colorized":         # we handle colour ourselves
+        if arg == "--colorized":  # we handle colour ourselves
             continue
         filtered.append(arg)
     return filtered
 
 
+@contextmanager
+def _pushd(directory: Path | None) -> Iterator[None]:
+    previous_directory = Path.cwd()
+    if directory is None:
+        yield
+        return
 
-def run_pyreverse(extra_args, output_dir, cwd=None, verbose=False):
-    """Run pyreverse with -o dot and return the paths to generated .dot files."""
-    cmd = ["pyreverse", "-o", "dot", "--output-directory", str(output_dir)] + extra_args
-    vprint(verbose, f"[style_pyreverse] Running: {' '.join(cmd)}")
+    os.chdir(directory)
+    try:
+        yield
+    finally:
+        os.chdir(previous_directory)
 
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
 
-    if result.returncode != 0:
-        print("[style_pyreverse] pyreverse stderr:", result.stderr)
-        sys.exit(result.returncode)
+def run_pyreverse(
+    extra_args: Sequence[str],
+    output_dir: Path,
+    cwd: Path | None = None,
+    verbose: bool = False,
+) -> list[Path]:
+    """Run pyreverse and return the generated dot files."""
+    cmd_args = ["-o", "dot", "--output-directory", str(output_dir), *extra_args]
+    vprint(verbose, f"[style_pyreverse] Running: pyreverse {' '.join(cmd_args)}")
+
+    with _pushd(cwd):
+        result = Run(cmd_args).run()
+
+    if result != 0:
+        sys.stderr.write(
+            f"[style_pyreverse] pyreverse failed with exit code {result}\n"
+        )
+        raise SystemExit(result)
     dot_files = list(output_dir.glob("*.dot"))
     if not dot_files:
-        print("[style_pyreverse] ERROR: pyreverse produced no .dot files in", output_dir)
-        sys.exit(1)
+        sys.stderr.write(
+            f"[style_pyreverse] ERROR: pyreverse produced no .dot files in "
+            f"{output_dir}\n"
+        )
+        raise SystemExit(1)
     return dot_files
 
 
-
-
-
-def main():
+def main() -> None:
+    """Parse CLI arguments and run pyreverse."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--output-directory", default=".")
     parser.add_argument(
@@ -84,19 +110,21 @@ def main():
     parser.add_argument(
         "--cwd",
         default=None,
-        help="Working directory to run pyreverse from and resolve relative output paths against.",
+        help="Working directory for pyreverse and relative output paths.",
     )
-    parser.add_argument("--format", default=None,
-                        help="Output image format (png, svg, pdf …)")
-    parser.add_argument("--concise", action="store_true",
-                        help="Remove type hints from class attributes and methods")
+    parser.add_argument("--format", default=None, help="Output image format.")
+    parser.add_argument(
+        "--concise",
+        action="store_true",
+        help="Remove type hints from class attributes and methods",
+    )
     parser.add_argument(
         "--style-config",
         default=None,
-        help="Path to YAML style config file (defaults to uml/style.yaml).",
+        help="Path to YAML style config file.",
     )
     parser.set_defaults(verbose=True)
-    
+
     known, pyreverse_args = parser.parse_known_args()
 
     pyreverse_args = _filter_pyreverse_args(pyreverse_args)
@@ -108,23 +136,22 @@ def main():
         output_dir = cwd / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    
     # Stage 1. Run pyreverse
     dot_files = run_pyreverse(
         pyreverse_args,
         output_dir,
-        cwd=str(cwd) if cwd is not None else None,
+        cwd=cwd,
         verbose=known.verbose,
     )
 
-    # Stage 2. Patch and save the original 
+    # Stage 2. Patch and save the original
     ## If you are running this script directly you are probably debugging
     ## So we save the patched dot file along with the original
     for dot_path in dot_files:
         vprint(known.verbose, f"[style_pyreverse] Styling {dot_path.name} …")
 
         original = dot_path.read_text(encoding="utf-8")
-        patched  = patch_dot(original, style=style, concise=known.concise)
+        patched = patch_dot(original, style=style, concise=known.concise)
 
         # Save patched .dot alongside original (useful for debugging)
         patched_path = dot_path.with_name(dot_path.stem + "_styled.dot")
@@ -132,10 +159,12 @@ def main():
 
         # Stage 2.5 Render the dot files
         if known.format:
-            img_path = render_dot(patched_path, output_dir, fmt=known.format, verbose=known.verbose)
+            img_path = render_dot(
+                patched_path, output_dir, fmt=known.format, verbose=known.verbose
+            )
             vprint(known.verbose, f"[style_pyreverse] ✓  Written: {img_path}")
         else:
-            vprint(known.verbose, f"[style_pyreverse] x  No format, skipping render")
+            vprint(known.verbose, "[style_pyreverse] x  No format, skipping render")
 
 
 if __name__ == "__main__":

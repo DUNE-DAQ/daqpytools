@@ -15,7 +15,6 @@ Regex example notation used below:
     before -> after
 """
 
-from typing import Dict
 
 Substitution = tuple[str, str]
 
@@ -123,7 +122,7 @@ EDGE_ATTR_BUILDERS = {
 }
 
 
-def build_defaults_block(style: Dict[str, str]) -> str:
+def build_defaults_block(style: dict[str, str]) -> str:
     """Return formatted graph/node/edge defaults block for a digraph body.
 
     Example output shape:
@@ -135,7 +134,7 @@ def build_defaults_block(style: Dict[str, str]) -> str:
     return "\n  " + "\n  ".join(lines) + "\n"
 
 
-def build_edge_attrs(style: Dict[str, str], is_dashed: bool) -> str:
+def build_edge_attrs(style: dict[str, str], is_dashed: bool) -> str:
     """Return edge attribute string chosen by edge semantic type.
 
     is_dashed=True  -> dependency/uses style

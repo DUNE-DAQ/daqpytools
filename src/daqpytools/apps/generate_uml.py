@@ -3,63 +3,88 @@ generate_uml.py
 ---------------
 CLI interface for generating UML class diagrams using pyreverse.
 
-This tool wraps style_pyreverse.py and split_diagram.py to produce
-nicely styled UML diagrams, optionally split into multiple files by connected components.
+This command calls the UML helper functions directly to:
+1. run pyreverse in a chosen working directory,
+2. style the generated dot files,
+3. optionally render them, and
+4. optionally split the diagrams into connected components.
 
 Usage:
     daqpytools-generate-uml daqpytools --output-directory pics
-    daqpytools-generate-uml daqpytools --output-directory pics --concise
-    daqpytools-generate-uml -p my_package -c MyClass --output-directory pics --no-split
-    daqpytools-generate-uml daqpytools --format svg --min-size 2
-    daqpytools-generate-uml daqpytools --style-config ./my_style.yaml
+    daqpytools-generate-uml daqpytools --directory some/path --output-directory pics --split
+    daqpytools-generate-uml daqpytools --format none
 """
 
-import subprocess
-import sys
 from pathlib import Path
+
 import click
+
 from daqpytools.logging.formatter import CONTEXT_SETTINGS
-
-
-class PassthroughArgs(click.Command):
-    """Custom Click command that captures unknown arguments for pyreverse passthrough."""
-    
-    def main(self, *args, **kwargs):
-        """Override main to collect unknown args."""
-        try:
-            return super().main(*args, **kwargs)
-        except click.exceptions.UsageError as e:
-            # Check if this is an unrecognized option meant for pyreverse
-            if "no such option" in str(e):
-                # Let it through for passthrough handling
-                raise
-            raise
+from daqpytools.uml.dot_parsing import patch_dot
+from daqpytools.uml.render import render_dot
+from daqpytools.uml.split_diagram import split_dot_file
+from daqpytools.uml.style_pyreverse import run_pyreverse
+from daqpytools.uml.utils import load_style_config, vprint
 
 
 def validate_output_directory(ctx, param, value):
-    """Validate and create output directory if needed."""
-    if value:
-        out_dir = Path(value)
-        out_dir.mkdir(parents=True, exist_ok=True)
-    return value
+    """Return the output directory path without creating it yet."""
+    if value is None:
+        return None
+    return Path(value)
+
+
+def build_pyreverse_args(targets, packages, classes):
+    """Build the pyreverse argument list from CLI inputs."""
+    pyreverse_args = []
+    pyreverse_args.extend(targets)
+    pyreverse_args.extend(packages)
+    for cls in classes:
+        pyreverse_args.extend(["-c", cls])
+    return pyreverse_args
+
+
+def resolve_output_directory(directory: Path | None, output_directory: Path) -> tuple[Path, Path]:
+    """Resolve the working directory and output directory consistently."""
+    cwd = Path.cwd() if directory is None else Path(directory).resolve()
+    resolved_output = output_directory if output_directory.is_absolute() else cwd / output_directory
+    resolved_output.mkdir(parents=True, exist_ok=True)
+    return cwd, resolved_output
+
+
+def style_dot_file(dot_path: Path, style: dict, concise: bool) -> Path:
+    """Patch a raw dot file and write the styled version next to it."""
+    original = dot_path.read_text(encoding="utf-8")
+    patched = patch_dot(original, style=style, concise=concise)
+    patched_path = dot_path.with_name(f"{dot_path.stem}_styled.dot")
+    patched_path.write_text(patched, encoding="utf-8")
+    return patched_path
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
 @click.argument("targets", nargs=-1, required=False)
 @click.option(
+    "-d",
+    "--directory",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=None,
+    help="Working directory to run pyreverse from. [default: current directory]",
+)
+@click.option(
     "-o",
+    "-od",
     "--output-directory",
-    type=click.Path(),
-    default=".",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=Path("pics"),
     callback=validate_output_directory,
-    help="Output directory for generated diagrams. [default: .]",
+    help="Output directory for generated diagrams. [default: pics]",
 )
 @click.option(
     "-f",
     "--format",
-    type=click.Choice(["png", "svg", "pdf", "jpg"]),
+    type=click.Choice(["png", "svg", "pdf", "jpg", "none"], case_sensitive=False),
     default="png",
-    help="Output image format. [default: png]",
+    help="Output image format, or 'none' to keep dot files only. [default: png]",
 )
 @click.option(
     "-c",
@@ -68,17 +93,16 @@ def validate_output_directory(ctx, param, value):
     help="Remove type hints from class attributes and methods.",
 )
 @click.option(
-    "-ns",
-    "--no-split",
-    is_flag=True,
-    help="Do not split diagram by connected components; generate single diagram.",
+    "--split/--no-split",
+    default=False,
+    help="Split generated diagrams into connected components.",
 )
 @click.option(
     "-ms",
     "--min-size",
     type=int,
     default=1,
-    help="Minimum cluster size to render as separate file (used with --split). [default: 1]",
+    help="Minimum cluster size to render as separate file. [default: 1]",
 )
 @click.option(
     "-p",
@@ -93,140 +117,76 @@ def validate_output_directory(ctx, param, value):
     help="Specific class(es) to include (passed to pyreverse as -c).",
 )
 @click.option(
-    "-v",
-    "--verbose",
-    is_flag=True,
-    help="Verbose output.",
+    "--verbose/--suppress-verbose",
+    default=True,
+    help="Print progress messages.",
 )
 @click.option(
     "--style-config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="Path to YAML style config file for style_pyreverse.",
+    help="Path to YAML style config file for the UML renderer.",
 )
 def main(
     targets,
+    directory,
     output_directory,
     format,
     concise,
-    no_split,
+    split,
     min_size,
     package,
     classes,
     verbose,
     style_config,
 ):
-    """
-    Generate styled UML class diagrams from Python code.
+    """Generate styled UML class diagrams from Python code."""
 
-    You can specify packages/modules as TARGETS or use --package/-p.
-    
-    Examples:
-        # Generate diagram for daqpytools package
-        daqpytools-generate-uml daqpytools --output-directory pics
-        
-        # Generate with concise mode (no type hints)
-        daqpytools-generate-uml daqpytools --concise
-        
-        # Generate specific class diagram
-        daqpytools-generate-uml -p daqpytools -c MyClass
-        
-        # Skip splitting into components
-        daqpytools-generate-uml daqpytools --no-split
-        
-        # Generate SVG with minimum cluster size of 2
-        daqpytools-generate-uml daqpytools --format svg --min-size 2
-    """
-    
-    output_dir = Path(output_directory)
-    
-    # ── Step 1: Build pyreverse command ──────────────────────────────────────
-    pyreverse_args = []
-    
-    # Add targets and packages
-    for target in targets:
-        pyreverse_args.append(target)
-    for pkg in package:
-        pyreverse_args.append(pkg)
-    
-    # Add specific classes (-c flag)
-    for cls in classes:
-        pyreverse_args.extend(["-c", cls])
-    
-    if not pyreverse_args and not targets:
+    pyreverse_args = build_pyreverse_args(targets, package, classes)
+    if not pyreverse_args:
         click.secho("Error: No targets or packages specified.", fg="red", err=True)
-        sys.exit(1)
-    
-    # ── Step 2: Run style_pyreverse.py ───────────────────────────────────────
-    click.secho("[generate_uml] Running style_pyreverse...", fg="cyan")
-    
-    style_cmd = [
-        "python", "-m", "daqpytools.uml.style_pyreverse",
-    ] + pyreverse_args + [
-        "--output-directory", str(output_dir),
-        "--format", format,
-    ]
-    
-    if concise:
-        style_cmd.append("--concise")
+        raise SystemExit(1)
 
-    if style_config is not None:
-        style_cmd.extend(["--style-config", str(style_config)])
-    
-    if verbose:
-        click.echo(f"  Command: {' '.join(style_cmd)}")
-    
-    result = subprocess.run(style_cmd, capture_output=not verbose, text=True)
-    if result.returncode != 0:
-        click.secho(f"Error running style_pyreverse: {result.stderr}", fg="red", err=True)
-        sys.exit(result.returncode)
-    
-    # ── Step 3: Find the generated .dot file ─────────────────────────────────
-    dot_files = sorted(output_dir.glob("*_styled.dot"))
-    if not dot_files:
-        click.secho(
-            "Warning: No styled .dot files found. Check style_pyreverse output.",
-            fg="yellow",
-            err=True,
-        )
-        return
-    
-    styled_dot = dot_files[-1]  # Use most recent if multiple
-    click.secho(f"  ✓ Generated: {styled_dot.name}", fg="green")
-    
-    # ── Step 4: Run split_diagram.py (unless --no-split) ──────────────────────
-    if not no_split:
-        click.secho("[generate_uml] Running split_diagram...", fg="cyan")
-        
-        split_dir = output_dir / "split"
-        split_cmd = [
-            "python", "-m", "daqpytools.uml.split_diagram",
-            str(styled_dot),
-            "--output-directory", str(split_dir),
-            "--format", format,
-            "--min-size", str(min_size),
-        ]
-        
-        if concise:
-            split_cmd.append("--concise")
-        
-        if verbose:
-            click.echo(f"  Command: {' '.join(split_cmd)}")
-        
-        result = subprocess.run(split_cmd, capture_output=not verbose, text=True)
-        if result.returncode != 0:
-            click.secho(f"Error running split_diagram: {result.stderr}", fg="red", err=True)
-            sys.exit(result.returncode)
-        
-        click.secho(f"  ✓ Split diagrams written to: {split_dir}", fg="green")
+    cwd, resolved_output_dir = resolve_output_directory(directory, output_directory)
+    style = load_style_config(style_config)
+    render_format = None if format.lower() == "none" else format.lower()
+
+    vprint(verbose, f"[generate_uml] Running pyreverse in {cwd}")
+    dot_files = run_pyreverse(pyreverse_args, resolved_output_dir, cwd=str(cwd), verbose=verbose)
+
+    styled_dot_files = []
+    for dot_path in dot_files:
+        vprint(verbose, f"[generate_uml] Styling {dot_path.name}")
+        styled_dot_files.append(style_dot_file(dot_path, style=style, concise=concise))
+
+    split_dot_files = []
+    if split:
+        split_root = resolved_output_dir / "split"
+        for styled_dot in styled_dot_files:
+            split_output_dir = split_root / styled_dot.stem
+            split_dot_files.extend(split_dot_file(
+                input_dot=styled_dot,
+                output_dir=split_output_dir,
+                concise=concise,
+                verbose=verbose,
+                min_size=min_size,
+            ))
+            vprint(verbose, f"[generate_uml] Split diagrams written to {split_output_dir}")
+
+    if render_format is not None:
+
+        for split_dot in split_dot_files:
+            img_path = render_dot(split_dot, split_dot.parent, fmt=render_format, verbose=verbose)
+            vprint(verbose, f"[generate_uml] Written: {img_path}")
+
+        for styled_dot in styled_dot_files:
+            img_path = render_dot(styled_dot, resolved_output_dir, fmt=render_format, verbose=verbose)
+            vprint(verbose, f"[generate_uml] Written: {img_path}")
     else:
-        click.secho("[generate_uml] Skipping split_diagram (--no-split set)", fg="yellow")
-    
-    # ── Summary ──────────────────────────────────────────────────────────────
-    click.secho("\n[generate_uml] ✓ Complete!", fg="green", bold=True)
-    click.echo(f"  Output directory: {output_dir.resolve()}")
-    if not no_split:
-        click.echo(f"  Split diagrams: {(output_dir / 'split').resolve()}")
+        vprint(verbose, "[generate_uml] Skipping rendering (--format none)")
+
+    vprint(verbose, "[generate_uml] Complete")
+    vprint(verbose, f"[generate_uml] Output directory: {resolved_output_dir.resolve()}")
 
 
 if __name__ == "__main__":

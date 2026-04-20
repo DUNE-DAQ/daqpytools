@@ -9,7 +9,7 @@ Isolated nodes (no edges) are grouped by their Python module path
 rather than generating a file per class.
 
 Usage:
-    python split_diagram.py <input.dot> [--output-directory DIR] [--format png] [--concise]
+    python split_diagram.py <input.dot> [--output-directory DIR] [--format png] [--concise] [--suppress-verbose]
 
 Example:
     python split_diagram.py pics/classes_styled.dot --output-directory pics/split
@@ -19,12 +19,12 @@ Example:
 """
 
 import re
-import subprocess
 import sys
 import argparse
 from pathlib import Path
 from collections import defaultdict
-from daqpytools.uml.utils import strip_typehints
+from daqpytools.uml.utils import strip_typehints, vprint
+from daqpytools.uml.render import render_dot
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -157,45 +157,18 @@ def build_dot(graph_name: str, header_lines: list, node_lines: list, edge_lines:
     return dot_content
 
 
-def render(dot_path: Path, fmt: str = 'png') -> Path:
-    out_path = dot_path.with_suffix('.' + fmt)
-    cmd = ['dot', '-T' + fmt, str(dot_path), '-o', str(out_path)]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f'  [dot error] {result.stderr.strip()}')
-        sys.exit(1)
-    return out_path
-
-
-# ── Main ─────────────────────────────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input_dot', help='Path to the styled .dot file')
-    parser.add_argument('--output-directory', default='.', help='Where to write output files')
-    parser.add_argument('--format', default='png', help='Output image format (png, svg, pdf)')
-    parser.add_argument('--min-size', type=int, default=1,
-                        help='Minimum cluster size to render as its own file (default: 1)')
-    parser.add_argument('--concise', action='store_true',
-                        help='Remove type hints from class attributes and methods')
-    args = parser.parse_args()
-
-    dot_path = Path(args.input_dot)
-    output_dir = Path(args.output_directory)
+def split_dot_file(input_dot: Path, output_dir: Path, concise: bool = False, verbose: bool = False, min_size: int = 1):
+    """Split a styled .dot file into cluster-specific .dot files."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    dot_src = dot_path.read_text(encoding='utf-8')
+    dot_src = input_dot.read_text(encoding='utf-8')
     header_lines, nodes, edges = parse_dot(dot_src)
 
-    print(f'[split] Found {len(nodes)} nodes, {len(edges)} edges')
+    vprint(verbose, f'[split] Found {len(nodes)} nodes, {len(edges)} edges')
 
-    # ── 1. Find connected components ─────────────────────────────────────────
     components = find_connected_components(set(nodes.keys()), edges)
-    print(f'[split] Found {len(components)} connected components')
+    vprint(verbose, f'[split] Found {len(components)} connected components')
 
-    # ── 2. Group singleton components by module ──────────────────────────────
-    # Singletons: components of size 1
-    # Multi-node: keep as-is (they are meaningfully connected)
     singleton_groups: dict[str, set] = defaultdict(set)
     multi_components = []
 
@@ -207,34 +180,59 @@ def main():
         else:
             multi_components.append(comp)
 
-    # Merge singleton groups into the component list
     all_clusters = multi_components + list(singleton_groups.values())
-    print(f'[split] Will generate {len(all_clusters)} file(s) '
+    vprint(verbose, f'[split] Will generate {len(all_clusters)} file(s) '
           f'({len(multi_components)} connected + {len(singleton_groups)} module groups)')
 
-    # ── 3. Render each cluster ────────────────────────────────────────────────
+    written_dot_files: list[Path] = []
+
     for cluster_nodes in sorted(all_clusters, key=lambda c: -len(c)):
+        if len(cluster_nodes) < min_size:
+            vprint(verbose, f'  -  skipping {len(cluster_nodes)} node cluster below min_size={min_size}')
+            continue
+
         name = cluster_name(cluster_nodes)
         safe_name = re.sub(r'[^\w\-.]', '_', name)
-
-        # Gather node lines
         node_lines = [nodes[n] for n in cluster_nodes if n in nodes]
-
-        # Gather edge lines that connect nodes within this cluster
         edge_lines = [
             raw for src, dst, raw in edges
             if src in cluster_nodes and dst in cluster_nodes
         ]
-
-        dot_content = build_dot(name, header_lines, node_lines, edge_lines, concise=args.concise)
-
+        dot_content = build_dot(name, header_lines, node_lines, edge_lines, concise=concise)
         out_dot = output_dir / f'{safe_name}.dot'
         out_dot.write_text(dot_content, encoding='utf-8')
+        written_dot_files.append(out_dot)
 
-        out_img = render(out_dot, fmt=args.format)
         size_label = f'{len(cluster_nodes)} class{"es" if len(cluster_nodes) != 1 else ""}'
-        print(f'  ✓  {out_img.name}  ({size_label})')
+        vprint(verbose, f'  ✓  {out_dot.name}  ({size_label})')
+
+    return written_dot_files
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_dot', help='Path to the styled .dot file')
+    parser.add_argument('--output-directory', default='.', help='Where to write output files')
+    parser.add_argument('--format', default='png', choices=['png', 'svg', 'pdf', 'jpg', 'none'], help='Output image format (png, svg, pdf, jpg) or none')
+    parser.add_argument('--min-size', type=int, default=1,
+                        help='Minimum cluster size to render as its own file (default: 1)')
+    parser.add_argument('--concise', action='store_true',
+                        help='Remove type hints from class attributes and methods')
+    parser.add_argument('--suppress-verbose', dest='verbose', action='store_false',
+                        help='Suppress split progress messages')
+    parser.set_defaults(verbose=True)
+    args = parser.parse_args()
+
+    dot_files = split_dot_file(
+        input_dot=Path(args.input_dot),
+        output_dir=Path(args.output_directory),
+        concise=args.concise,
+        verbose=args.verbose,
+        min_size=args.min_size,
+    )
+
+    render_format = None if args.format == 'none' else args.format
+    if render_format is not None:
+        for dot_file in dot_files:
+            out_img = render_dot(dot_file, Path(args.output_directory), fmt=render_format, verbose=args.verbose)
+            vprint(args.verbose, f'  ✓  {out_img.name}  (rendered)')

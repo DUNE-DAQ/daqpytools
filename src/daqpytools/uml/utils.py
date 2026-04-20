@@ -3,6 +3,12 @@ import yaml
 from pathlib import Path
 
 
+def vprint(verbose, *args, **kwargs):
+    """Print only when verbose output is enabled."""
+    if verbose:
+        print(*args, **kwargs)
+
+
 def _strip_param_types(params_str: str) -> str:
     """Strip type hints from a parameter list (the content between parentheses).
 

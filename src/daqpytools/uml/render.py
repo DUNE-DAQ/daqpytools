@@ -19,7 +19,7 @@ def render_dot(
         source.render(
             filename=dot_path.stem,
             directory=str(output_dir),
-            cleanup=False,
+            cleanup=True,
             quiet=not verbose,
         )
     )

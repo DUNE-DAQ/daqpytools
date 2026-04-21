@@ -6,6 +6,8 @@ from copy import copy
 from datetime import datetime, tzinfo
 from pathlib import Path
 
+from rich.console import Console
+
 from pytz import UnknownTimeZoneError, timezone
 from rich.theme import Theme
 
@@ -131,3 +133,8 @@ class LoggingFormatter(logging.Formatter):
         formatted_record.name = f"{formatted_record.name}".ljust(padding)[:padding]
 
         return super().format(formatted_record)
+
+## Single console instance
+DAQ_CONSOLE = Console(
+            force_terminal=True, theme=CONSOLE_THEME
+        )

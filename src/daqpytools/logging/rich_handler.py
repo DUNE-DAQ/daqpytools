@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from rich.console import Console, ConsoleRenderable
+from rich.console import ConsoleRenderable, Console
 from rich.logging import RichHandler
 from rich.text import Text
 
@@ -12,6 +12,7 @@ from daqpytools.logging.formatter import (
     DATE_TIME_FORMAT,
     LOG_RECORD_PADDING,
     TIME_ZONE,
+    DAQ_CONSOLE
 )
 from daqpytools.logging.levels import logging_log_level_to_str
 
@@ -21,9 +22,7 @@ class FormattedRichHandler(RichHandler):
 
     def __init__(self, width: int = 100) -> None:
         """Initialize with custom console and style settings."""
-        console: Console = Console(
-            force_terminal=True, width=width, theme=CONSOLE_THEME
-        )
+        console: Console = DAQ_CONSOLE
         super().__init__(
             console=console,
             omit_repeated_times=False,

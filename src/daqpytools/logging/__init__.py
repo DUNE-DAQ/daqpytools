@@ -6,6 +6,7 @@ from daqpytools.logging.logger import (
     setup_daq_ers_logger,
     setup_root_logger,
 )
+from daqpytools.logging.formatter import DAQ_CONSOLE
 
 __all__ = [
     "HandlerType",
@@ -15,4 +16,5 @@ __all__ = [
     "logging_log_levels",
     "setup_daq_ers_logger",
     "setup_root_logger",
+    "DAQ_CONSOLE",
 ]

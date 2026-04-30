@@ -2,22 +2,27 @@
 
 import re
 import sys
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import TextIO
 
 from daqpytools.utils.config_loader import ConfigLoader
 
-CONTEXT_SETTINGS = (
-    lambda cfg_path=Path(__file__).parent / "uml_format.ini":
-    {
-        "help_option_names": [
-            opt.strip()
-            for opt in ConfigLoader(cfg_path).safe_load_config(
-                "cli", "help_option_names"
-            ).split(",")
-        ]
+
+def _load_context_settings() -> dict[str, list[str]]:
+    """Load CLI context settings from the packaged UML configuration."""
+    with as_file(files("daqpytools.uml") / "uml_format.ini") as config_path:
+        help_options_str = ConfigLoader(config_path).safe_load_config(
+            "cli", "help_option_names"
+        )
+
+    return {
+        "help_option_names": [opt.strip() for opt in help_options_str.split(",")]
     }
-)()
+
+
+CONTEXT_SETTINGS = _load_context_settings()
+__all__ = ["CONTEXT_SETTINGS"]
 
 
 def vprint(

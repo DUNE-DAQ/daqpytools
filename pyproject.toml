@@ -21,6 +21,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "daqpytools.logging" = ["log_format.ini"]
+"daqpytools.uml" = ["uml_format.ini"]
 
 [project.optional-dependencies]
 dev = [

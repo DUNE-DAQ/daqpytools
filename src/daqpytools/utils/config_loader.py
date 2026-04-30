@@ -1,0 +1,106 @@
+
+import configparser
+from pathlib import Path
+from typing import overload
+
+class ConfigurationError(Exception):
+    """Custom error for logger configuration issues."""
+
+    def __init__(self, configuration_file_path: str | Path, err_msg: str) -> None:
+        """C'tor."""
+        err_msg = (
+            f"Configuration file '{configuration_file_path}' could not be read or "
+            f"contains invalid configuration:\n {err_msg}"
+        )
+        super().__init__(err_msg)
+
+
+class ConfigLoader():
+
+    def __init__(self, config_file):
+        """
+        Read a configuration file into a ``ConfigParser`` instance.
+
+        Raises:
+            FileNotFoundError: If ``config_file`` cannot be found or read.
+        """
+        self.config_file = config_file
+        self.config: configparser.ConfigParser = configparser.ConfigParser()
+
+        if not self.config.read(self.config_file):
+            err_msg = (
+                f"Configuration file '{self.config_file}' not found or could not be read."
+            )
+            raise FileNotFoundError(err_msg)
+
+
+    @overload
+    def safe_load_config(
+        self,
+        section: str,
+    ) -> dict[str, str]:
+        ...
+
+
+    @overload
+    def safe_load_config(
+        self,
+        section: str,
+        option: str,
+    ) -> str:
+        ...
+
+
+    def safe_load_config(
+        self,
+        section: str,
+        option: str | None = None,
+    ) -> dict[str, str] | str:
+        """Safely load configuration content from a section or a single option.
+
+        Behavior:
+            - If ``option`` is ``None``, returns all key/value pairs from ``section``.
+            - If ``option`` is provided, returns that single option value.
+
+        Validation:
+            - Ensures the requested section exists.
+            - Ensures section content is non-empty.
+            - Ensures the requested option exists when provided.
+            - Ensures option values are non-empty.
+
+        Args:
+            section: Configuration section name.
+            option: Optional option name within ``section``.
+
+        Returns:
+            Either ``dict[str, str]`` for section reads or ``str`` for option reads.
+
+        Raises:
+            ConfigurationError: If the section/option is missing or empty.
+        """
+        if option is None:
+            if not self.config.has_section(section):
+                err_msg = f"Configuration section '{section}' is missing."
+                raise ConfigurationError(self.config_file, err_msg)
+
+            values = dict(self.config.items(section))
+            if not values:
+                err_msg = f"Configuration section '{section}' is empty."
+                raise ConfigurationError(self.config_file, err_msg)
+
+            return values
+
+        if not self.config.has_option(section, option):
+            err_msg = (
+                f"Configuration option '{option}' in section '{section}' is missing."
+            )
+            raise ConfigurationError(self.config_file, err_msg)
+
+        value = self.config.get(section, option)
+        if not value:
+            err_msg = (
+                f"Configuration option '{option}' in section '{section}' is empty."
+            )
+            raise ConfigurationError(self.config_file, err_msg)
+
+        return value

@@ -1,4 +1,3 @@
-import configparser
 import logging
 import os
 import re
@@ -10,54 +9,22 @@ from pytz import UnknownTimeZoneError, timezone
 from rich.theme import Theme
 
 from daqpytools.logging.exceptions import LoggerConfigurationError
+from daqpytools.utils.config_loader import ConfigLoader
 
 DAQPYTOOLS_LOGGING_ROOT = Path(os.path.abspath(__file__)).parent
 CONFIGURATION_FILE = DAQPYTOOLS_LOGGING_ROOT / "log_format.ini"
-CONFIG: configparser.ConfigParser = configparser.ConfigParser()
-if not CONFIG.read(CONFIGURATION_FILE):
-    err_msg = (
-        f"Configuration file '{CONFIGURATION_FILE}' not found or could not be read."
-    )
-    raise FileNotFoundError(err_msg)
 
-LOG_RECORD_PADDING = {k: int(v) for k, v in CONFIG.items("padding")}
-if not LOG_RECORD_PADDING:
-    err_msg = f"Padding configuration in '{CONFIGURATION_FILE}' is empty or invalid."
-    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
+config_loader = ConfigLoader(CONFIGURATION_FILE)
 
-LOG_FORMAT = CONFIG.get("logging", "record_format")
-if not LOG_FORMAT:
-    err_msg = (
-        f"Record format in '{CONFIGURATION_FILE}' is empty or not defined under "
-        "'format'."
-    )
-    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
+LOG_RECORD_PADDING = {
+    k: int(v) for k, v in config_loader.safe_load_config("padding").items()
+}
+LOG_FORMAT = config_loader.safe_load_config("logging", "record_format")
+DATE_TIME_FORMAT = config_loader.safe_load_config("logging", "date_time")
+DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_base")
+CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
-DATE_TIME_FORMAT = CONFIG.get("logging", "date_time")
-if not DATE_TIME_FORMAT:
-    err_msg = (
-        f"Date and time format in '{CONFIGURATION_FILE}' is empty or not defined under "
-        "'format'."
-    )
-    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
-
-DATE_TIME_BASE_FORMAT = CONFIG.get("logging", "date_time_base")
-if not DATE_TIME_BASE_FORMAT:
-    err_msg = (
-        f"Date and time base format in '{CONFIGURATION_FILE}' is empty or not defined "
-        "under 'format'."
-    )
-    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
-
-CONSOLE_THEME = Theme(dict(CONFIG.items("theme")))
-if not CONSOLE_THEME:
-    err_msg = (
-        f"Theme configuration in '{CONFIGURATION_FILE}' is empty or not defined under "
-        "'theme'."
-    )
-    raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg)
-
-timezone_name = CONFIG.get("logging", "timezone")
+timezone_name = config_loader.safe_load_config("logging", "timezone")
 try:
     TIME_ZONE = timezone(timezone_name)
 except UnknownTimeZoneError as e:
@@ -67,7 +34,7 @@ except UnknownTimeZoneError as e:
     )
     raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg) from e
 
-help_options_str = CONFIG.get("cli", "help_option_names")
+help_options_str = config_loader.safe_load_config("cli", "help_option_names")
 HELP_OPTION_NAMES = [opt.strip() for opt in help_options_str.split(",")]
 CONTEXT_SETTINGS = {"help_option_names": HELP_OPTION_NAMES}
 

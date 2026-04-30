@@ -5,8 +5,20 @@ import re
 import sys
 from pathlib import Path
 from typing import TextIO
+from daqpytools.utils.config_loader import ConfigLoader
 
-import yaml
+
+CONTEXT_SETTINGS = (
+    lambda cfg_path=Path(__file__).parent / "uml_format.ini":
+    {
+        "help_option_names": [
+            opt.strip()
+            for opt in ConfigLoader(cfg_path).safe_load_config(
+                "cli", "help_option_names"
+            ).split(",")
+        ]
+    }
+)()
 
 
 def vprint(
@@ -83,24 +95,31 @@ def strip_typehints(dot_src: str) -> str:
 
 
 def load_style_config(path: Path | str | None = None) -> dict[str, str]:
-    """Load UML style configuration from ini file."""
+    """Load UML style configuration from ini file using ConfigLoader.
+
+    Uses ``ConfigLoader`` so section/option presence and emptiness are validated
+    consistently with the rest of the codebase.
+    """
     if path is None:
         path = Path(__file__).parent / "uml_format.ini"
 
-    config = configparser.ConfigParser()
-    config.read(path, encoding="utf-8")
+    loader = ConfigLoader(path)
+
+    class_style = loader.safe_load_config("uml_class_style")
+    relationships = loader.safe_load_config("uml_relationships")
+    graph = loader.safe_load_config("uml_graph")
 
     # Flatten the ini sections to match existing STYLE dict format
     return {
-        "class_fill": config["uml_class_style"]["fill"],
-        "class_stroke": config["uml_class_style"]["stroke"],
-        "class_font": config["uml_class_style"]["font"],
-        "class_fontsize": config["uml_class_style"]["fontsize"],
-        "inherit_color": config["uml_relationships"]["inherit_color"],
-        "uses_color": config["uml_relationships"]["uses_color"],
-        "bg_color": config["uml_graph"]["bg_color"],
-        "rankdir": config["uml_graph"]["rankdir"],
-        "pad": config["uml_graph"]["pad"],
-        "nodesep": config["uml_graph"]["nodesep"],
-        "ranksep": config["uml_graph"]["ranksep"],
+        "class_fill": class_style["fill"],
+        "class_stroke": class_style["stroke"],
+        "class_font": class_style["font"],
+        "class_fontsize": class_style["fontsize"],
+        "inherit_color": relationships["inherit_color"],
+        "uses_color": relationships["uses_color"],
+        "bg_color": graph["bg_color"],
+        "rankdir": graph["rankdir"],
+        "pad": graph["pad"],
+        "nodesep": graph["nodesep"],
+        "ranksep": graph["ranksep"],
     }

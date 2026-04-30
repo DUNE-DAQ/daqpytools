@@ -3,6 +3,7 @@ import configparser
 from pathlib import Path
 from typing import overload
 
+
 class ConfigurationError(Exception):
     """Custom error for logger configuration issues."""
 
@@ -15,11 +16,18 @@ class ConfigurationError(Exception):
         super().__init__(err_msg)
 
 
-class ConfigLoader():
+class ConfigLoader:
+    """Helper to read and validate INI configuration files.
 
-    def __init__(self, config_file):
-        """
-        Read a configuration file into a ``ConfigParser`` instance.
+    Provides `safe_load_config` for guarded access to sections and
+    options with consistent error messages.
+    """
+
+    def __init__(self, config_file: Path | str) -> None:
+        """Read a configuration file into a ``ConfigParser`` instance.
+
+        Args:
+            config_file: Path to the configuration file.
 
         Raises:
             FileNotFoundError: If ``config_file`` cannot be found or read.
@@ -29,7 +37,8 @@ class ConfigLoader():
 
         if not self.config.read(self.config_file):
             err_msg = (
-                f"Configuration file '{self.config_file}' not found or could not be read."
+                f"Configuration file '{self.config_file}' "
+                "not found or could not be read."
             )
             raise FileNotFoundError(err_msg)
 

@@ -1,12 +1,11 @@
 """Utilities for UML styling and type-hint stripping."""
 
-import configparser
 import re
 import sys
 from pathlib import Path
 from typing import TextIO
-from daqpytools.utils.config_loader import ConfigLoader
 
+from daqpytools.utils.config_loader import ConfigLoader
 
 CONTEXT_SETTINGS = (
     lambda cfg_path=Path(__file__).parent / "uml_format.ini":

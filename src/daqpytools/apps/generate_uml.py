@@ -20,12 +20,11 @@ from pathlib import Path
 
 import click
 
-
 from daqpytools.uml.dot_parsing import patch_dot
 from daqpytools.uml.render import render_dot
 from daqpytools.uml.split_diagram import split_dot_file
 from daqpytools.uml.style_pyreverse import run_pyreverse
-from daqpytools.uml.utils import load_style_config, vprint, CONTEXT_SETTINGS
+from daqpytools.uml.utils import CONTEXT_SETTINGS, load_style_config, vprint
 
 
 def validate_output_directory(

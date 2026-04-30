@@ -1,5 +1,6 @@
 """Utilities for UML styling and type-hint stripping."""
 
+import configparser
 import re
 import sys
 from pathlib import Path
@@ -82,21 +83,24 @@ def strip_typehints(dot_src: str) -> str:
 
 
 def load_style_config(path: Path | str | None = None) -> dict[str, str]:
-    """Load UML style configuration from YAML."""
+    """Load UML style configuration from ini file."""
     if path is None:
-        path = Path(__file__).parent / "style.yaml"
+        path = Path(__file__).parent / "uml_format.ini"
 
-    with open(path, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    config = configparser.ConfigParser()
+    config.read(path, encoding="utf-8")
 
-    # Flatten the nested YAML structure to match existing STYLE dict format
+    # Flatten the ini sections to match existing STYLE dict format
     return {
-        "class_fill": config["class"]["fill"],
-        "class_stroke": config["class"]["stroke"],
-        "class_font": config["class"]["font"],
-        "class_fontsize": str(config["class"]["fontsize"]),
-        "inherit_color": config["relationships"]["inherit_color"],
-        "uses_color": config["relationships"]["uses_color"],
-        "bg_color": config["graph"]["bg_color"],
-        "rankdir": config["graph"]["rankdir"],
+        "class_fill": config["uml_class_style"]["fill"],
+        "class_stroke": config["uml_class_style"]["stroke"],
+        "class_font": config["uml_class_style"]["font"],
+        "class_fontsize": config["uml_class_style"]["fontsize"],
+        "inherit_color": config["uml_relationships"]["inherit_color"],
+        "uses_color": config["uml_relationships"]["uses_color"],
+        "bg_color": config["uml_graph"]["bg_color"],
+        "rankdir": config["uml_graph"]["rankdir"],
+        "pad": config["uml_graph"]["pad"],
+        "nodesep": config["uml_graph"]["nodesep"],
+        "ranksep": config["uml_graph"]["ranksep"],
     }

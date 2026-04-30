@@ -83,7 +83,7 @@ DEFAULT_BLOCK_BUILDERS = (
         'graph ['
         f'bgcolor="{style["bg_color"]}" '
         f'fontname="{style["class_font"]}" '
-        'pad="0.5" nodesep="0.6" ranksep="0.9" '
+        f'pad="{style["pad"]}" nodesep="{style["nodesep"]}" ranksep="{style["ranksep"]}" '
         f'rankdir="{style["rankdir"]}"'
         '];'
     ),

@@ -29,6 +29,17 @@ dev = [
   "pytest-cov",
 ]
 test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
+docs = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings",
+  "mkdocstrings-python",
+  "mkdocs-gen-files",
+  "mkdocs-literate-nav",
+  "mkdocs-section-index",
+  "mkdocs-exclude",
+
+]
 
 [project.scripts]
 daqpytools-logging-demonstrator = "daqpytools.apps.logging_demonstrator:main"

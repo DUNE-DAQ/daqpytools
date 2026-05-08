@@ -1,0 +1,82 @@
+site_name: DUNE Run Control (drunc) Developer Documentation
+
+repo_name: DUNE-DAQ/drunc
+repo_url: https://github.com/DUNE-DAQ/drunc
+
+docs_dir: docs_anchor
+
+nav:
+  - Home: README.md
+  - User Documentation:
+    - Tutorial: user/tutorial.md
+    - Concepts & explanation: user/explanation.md
+    - How-to:
+      - Use handlers and filters: user/how-to/use-handlers.md
+      - Route messages: user/how-to/route-messages.md
+      - Add handlers at runtime: user/how-to/add-handlers-at-runtime.md
+      - Configure ERS: user/how-to/configure-ers.md
+      - Upgrade an existing package: user/how-to/upgrade-package.md
+      - Best practices: user/how-to/best-practices.md
+    - Troubleshooting: user/reference/troubleshooting.md
+  - Developer Documentation:
+    - Concepts & explanation: dev/explanation.md
+    - Architecture reference: dev/reference/architecture.md
+    - How-to:
+      - Add a handler: dev/how-to/add-a-handler.md
+      - Add a filter: dev/how-to/add-a-filter.md
+      - Debug routing: dev/how-to/debug-routing.md
+      - How docs work and how to update them: dev/how-to/update-documentation.md
+    - Common patterns: dev/reference/patterns.md
+  - API reference: APIref
+theme:
+  name: material
+  palette: 
+    # Palette toggle for light/dark mode
+    - scheme: default
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/git-alt
+
+
+markdown_extensions:
+  - sane_lists
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - exclude:
+      glob:
+        - Developer-Wiki/*
+  - gen-files:
+      scripts:
+        - docs_dev/utils/generate_logging_autodocs.py
+        - docs_dev/utils/mirror_docs.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            merge_init_into_class: true
+          paths: [.]
+
+# hooks:
+# - docs/utils/mkdocs_hooks.py

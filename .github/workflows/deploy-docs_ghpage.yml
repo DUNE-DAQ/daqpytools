@@ -1,0 +1,40 @@
+name: Deploy Docs to Pages
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "develop" ]   # or "develop"
+  # optional schedule:
+  # schedule:
+  #   - cron: "0 0 * * 6"
+
+jobs:
+  build_and_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r docs_dev/requirements.txt
+          # if you want mkdocstrings to import your package:
+          pip install .
+
+      - name: Build docs
+        run: mkdocs build --strict
+
+      - name: Run Lychee link checker
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --verbose --no-progress --root-dir site 'site/**/*.html'
+
+      - name: Deploy
+        run: mkdocs gh-deploy --force

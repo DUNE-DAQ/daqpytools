@@ -6,7 +6,7 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches: [ "emmuhamm/deploy-docs" ]   # or "develop"
+    branches: [ "develop" ]   # or "develop"
   # optional schedule:
   # schedule:
   #   - cron: "0 0 * * 6"

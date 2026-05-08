@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from collections.abc import Mapping
 
 import click
 from rich.traceback import install as rich_traceback_install
@@ -38,6 +39,56 @@ def validate_test_configuration(
         raise LoggerSetupError(logger_name, err_msg)
     return
 
+
+
+class EnvInjector:
+    """Manage temporary overrides for ERS-related environment variables."""
+
+    def __init__(self, ers_envs: Mapping[str, str]) -> None:
+        """Initialize handler state and capture original environment values.
+
+        Args:
+            ers_envs (Mapping[str, str]): Environment variables and values to inject.
+        """
+        self.update_ers_envs(ers_envs)
+        self.update_original_envs()
+
+    def return_original_envs(self) -> dict[str, str | None]:
+        """Return current values for tracked environment variables.
+
+        Returns:
+            dict[str, str | None]: Mapping of variable names to their current values,
+                or None if unset.
+        """
+        return {
+            key: os.environ.get(key)
+            for key in self.ers_envs
+        }
+
+    def update_original_envs(self) -> None:
+        """Store a snapshot of current values for tracked environment variables."""
+        self.ori_envs = self.return_original_envs()
+
+    def update_ers_envs(self, ers_envs: Mapping[str, str]) -> None:
+        """Update the environment variables managed by this handler.
+
+        Args:
+            ers_envs (Mapping[str, str]): Variables and values to manage.
+        """
+        self.ers_envs = dict(ers_envs)
+
+    def inject_ers_envs(self) -> None:
+        """Inject managed environment variable values into process environment."""
+        for key, value in self.ers_envs.items():
+            os.environ[key] = value
+
+    def restore_original_envs(self) -> None:
+        """Restore tracked environment variables to their original values."""
+        for var_name, original_value in self.ori_envs.items():
+            if original_value is None:
+                os.environ.pop(var_name, None)
+            else:
+                os.environ[var_name] = original_value
 
 
 def test_main_functions(main_logger:logging.Logger) -> None:
@@ -193,17 +244,20 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
     main_logger.warning("Handlerconf Base", extra=handlerconf.Base)
     main_logger.warning("Handlerconf Opmon", extra=handlerconf.Opmon)
 
-    #* Interlude: Inject sample environment variables
-    os.environ["DUNEDAQ_ERS_WARNING"] = "erstrace,throttle,lstdout"
-    os.environ["DUNEDAQ_ERS_INFO"] = "erstrace,throttle,lstdout"
-    os.environ["DUNEDAQ_ERS_FATAL"] = "erstrace,lstdout"
-    os.environ["DUNEDAQ_ERS_ERROR"] = (
-        "erstrace,"
-        "throttle,"
-        "lstdout,"
-        "protobufstream(monkafka.cern.ch:30092)"
-    )
-        
+    ers_envs = {
+        "DUNEDAQ_ERS_WARNING" : "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_INFO" : "erstrace,throttle,lstdout",
+        "DUNEDAQ_ERS_FATAL" : "erstrace,lstdout",
+        "DUNEDAQ_ERS_ERROR" : (
+                "erstrace,"
+                "throttle,"
+                "lstdout,"
+                "protobufstream(monkafka.cern.ch:30092)"
+            )
+    }   
+    env_injector = EnvInjector(ers_envs)
+    env_injector.inject_ers_envs()
+    
     info_out = f"{os.getenv('DUNEDAQ_ERS_ERROR')=}"
     main_logger.info(info_out)
     critical_out = f"{os.getenv('DUNEDAQ_ERS_CRITICAL')=}"
@@ -225,6 +279,8 @@ def test_handlerconf(main_logger: logging.Logger) -> None:
         "protobufstream(monkafka.cern.ch:30092)", 
         extra=handlerconf.ERS
     )     
+
+    env_injector.restore_original_envs()
 
 
 def test_fallback_handlers(log_level: str) -> None:
@@ -280,6 +336,15 @@ def test_ers_handler_configuration(log_level: str) -> None:
     os.environ["DUNEDAQ_ERS_FATAL"] = "lstderr,rich"
     os.environ["DUNEDAQ_ERS_ERROR"] = "rich"
 
+    ers_envs = {
+        "DUNEDAQ_ERS_WARNING" : "rich",
+        "DUNEDAQ_ERS_INFO" : "lstdout",
+        "DUNEDAQ_ERS_FATAL" : "lstderr,rich",
+        "DUNEDAQ_ERS_ERROR" : "rich"
+    }   
+    env_injector = EnvInjector(ers_envs)
+    env_injector.inject_ers_envs()
+
     ers_logger: logging.Logger = get_daq_logger(
         logger_name="ers_logger",
         log_level=log_level,
@@ -294,8 +359,10 @@ def test_ers_handler_configuration(log_level: str) -> None:
     
     ers_hc = LogHandlerConf(init_ers=True)
     ers_logger.info("ERS Info lstdout ", extra=ers_hc.ERS)
-    ers_logger.warning("ERS error lstdout", extra=ers_hc.ERS)
+    ers_logger.warning("ERS error rich", extra=ers_hc.ERS)
     ers_logger.critical("ERS critical lstderr + rich", extra=ers_hc.ERS)
+
+    env_injector.restore_original_envs()
 
 
 class AllOptionsCommand(click.Command):

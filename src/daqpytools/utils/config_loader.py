@@ -69,54 +69,29 @@ class ConfigLoader:
         ``environment`` section of the internal ``ConfigParser``.
 
         If the section does not exist it will be created. The method stores
-        an empty string when the environment variable is not set so that
-        subsequent calls to ``safe_load_config('environment', env_key)`` will
-        raise a ``ConfigurationError`` for missing/empty values (consistent
-        with the rest of this loader).
+        the variable only when it is set and non-empty; if the variable is
+        not set (or is an empty string), the config is left unchanged and
+        the method returns ``None``. This differs from earlier behaviour that
+        used to write an empty string for unset variables.
 
-        Returns the environment value or ``None`` if the variable is not set.
+        Returns the environment value or ``None`` if the variable is not set
+        or is empty.
         """
         env_value = os.environ.get(env_key)
         section = "environment"
         if not self.config.has_section(section):
             self.config.add_section(section)
 
-        # Store an empty string when env is not set to preserve ConfigParser
-        # semantics used by `safe_load_config` (empty values are treated as
-        # errors by that method).
-        self.config.set(section, env_key, "" if env_value is None else env_value)
+        # Only store the value when the environment variable is set and
+        # non-empty. If the variable is unset or empty, leave the config
+        # unchanged and return None.
+        if env_value:
+            self.config.set(section, env_key, env_value)
 
         return env_value
 
 
     def safe_load_config(
-        self,
-        section: str,
-        option: str | None = None,
-        allow_fail: bool = False,
-    ) -> dict[str, str] | str | bool:
-        """Load configuration data or return ``False`` when allowed to fail.
-
-        Args:
-            section: Configuration section name.
-            option: Optional option name within ``section``.
-            allow_fail: If ``True``, return ``False`` instead of raising a
-                ``ConfigurationError`` when the section/option is missing or
-                empty.
-
-        Returns:
-            Either a full section mapping, a single option value, or ``False``
-            when failure is allowed.
-        """
-        try:
-            return self.load_config(section, option)
-        except ConfigurationError:
-            if allow_fail:
-                return False
-            raise
-
-
-    def load_config(
         self,
         section: str,
         option: str | None = None,

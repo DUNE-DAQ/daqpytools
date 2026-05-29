@@ -28,23 +28,20 @@ DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_bas
 #? use daq environment variables again?
 #? and then we can have a CLI entry point that just sets an env variable
 #? so that the daqqy stuff can just piont to it?
-config_loader.load_env("DUNEDAQ_LOGGING_THEME")
-theme_name = config_loader.safe_load_config(
-    "environment", "DUNEDAQ_LOGGING_THEME", allow_fail=True
-)
-theme_name = theme_name if theme_name else "default"
-THEME_FILE = DAQPYTOOLS_LOGGING_ROOT / f"themes/{theme_name}.ini"
-config_loader.read_conf(THEME_FILE)
+
+def load_and_return(env):
+    config_loader.load_env(env)
+    theme_name = config_loader.safe_load_config(
+        "environment", env
+    )
+    return theme_name
+
+
+config_loader.read_conf(DAQPYTOOLS_LOGGING_ROOT / f"themes/{load_and_return("DUNEDAQ_LOGGING_THEME")}.ini")
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
 
-
-config_loader.load_env("DUNEDAQ_TIMEZONE")
-timezone_name = config_loader.safe_load_config(
-    "environment", "DUNEDAQ_TIMEZONE", allow_fail=True
-)
-if not timezone_name:
-    timezone_name = config_loader.safe_load_config("logging", "timezone")
+timezone_name = load_and_return("DUNEDAQ_TIMEZONE")
 try:
     TIME_ZONE = timezone(timezone_name)
 except UnknownTimeZoneError as e:

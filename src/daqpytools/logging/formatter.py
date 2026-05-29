@@ -22,6 +22,14 @@ LOG_RECORD_PADDING = {
 LOG_FORMAT = config_loader.safe_load_config("logging", "record_format")
 DATE_TIME_FORMAT = config_loader.safe_load_config("logging", "date_time")
 DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_base")
+
+
+#! This bit needs to be sourced out again from somewhere!!!!!!
+#? use daq environment variables again?
+#? and then we can have a CLI entry point that just sets an env variable
+#? so that the daqqy stuff can just piont to it?
+THEME_FILE = DAQPYTOOLS_LOGGING_ROOT / "themes/default.ini"
+config_loader.read_conf(THEME_FILE)
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
 timezone_load = config_loader.load_env("DUNEDAQ_TIMEZONE")

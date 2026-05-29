@@ -34,8 +34,11 @@ class ConfigLoader:
         """
         self.config_file = config_file
         self.config: configparser.ConfigParser = configparser.ConfigParser()
-
-        if not self.config.read(self.config_file):
+        self.read_conf(self.config_file)
+        
+    
+    def read_conf(self, conf):
+        if not self.config.read(conf):
             err_msg = (
                 f"Configuration file '{self.config_file}' "
                 "not found or could not be read."

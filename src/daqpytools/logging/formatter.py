@@ -25,7 +25,9 @@ DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_bas
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
 timezone_load = config_loader.load_env("DUNEDAQ_TIMEZONE")
-timezone_name = config_loader.safe_load_config("environment", "DUNEDAQ_TIMEZONE", allow_fail = True)
+timezone_name = config_loader.safe_load_config(
+    "environment", "DUNEDAQ_TIMEZONE", allow_fail=True
+)
 if not timezone_name:
     timezone_name = config_loader.safe_load_config("logging", "timezone")
 

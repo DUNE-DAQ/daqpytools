@@ -1,5 +1,5 @@
-import os
 import configparser
+import os
 from pathlib import Path
 from typing import overload
 
@@ -61,7 +61,7 @@ class ConfigLoader:
 
 
     # define a thing that lets you parse environment variables
-    def load_env(self, env_key):
+    def load_env(self, env_key: str) -> str | None:
         """Read an environment variable and insert it into the
         ``environment`` section of the internal ``ConfigParser``.
 
@@ -73,10 +73,8 @@ class ConfigLoader:
 
         Returns the environment value or ``None`` if the variable is not set.
         """
-
         env_value = os.environ.get(env_key)
         section = "environment"
-        print(f"getting {env_value}, {env_key}")
         if not self.config.has_section(section):
             self.config.add_section(section)
 
@@ -86,21 +84,33 @@ class ConfigLoader:
         self.config.set(section, env_key, "" if env_value is None else env_value)
 
         return env_value
-    
+
 
     def safe_load_config(
         self,
         section: str,
         option: str | None = None,
-        allow_fail: bool = False
-    ):
+        allow_fail: bool = False,
+    ) -> dict[str, str] | str | bool:
+        """Load configuration data or return ``False`` when allowed to fail.
+
+        Args:
+            section: Configuration section name.
+            option: Optional option name within ``section``.
+            allow_fail: If ``True``, return ``False`` instead of raising a
+                ``ConfigurationError`` when the section/option is missing or
+                empty.
+
+        Returns:
+            Either a full section mapping, a single option value, or ``False``
+            when failure is allowed.
+        """
         try:
             return self.load_config(section, option)
-        except ConfigurationError as e:
+        except ConfigurationError:
             if allow_fail:
                 return False
-            else:
-                raise e 
+            raise
 
 
     def load_config(

@@ -1,4 +1,4 @@
-
+import os
 import configparser
 from pathlib import Path
 from typing import overload
@@ -59,6 +59,34 @@ class ConfigLoader:
     ) -> str:
         ...
 
+
+    # define a thing that lets you parse environment variables
+    def load_env(self, env_key):
+        """Read an environment variable and insert it into the
+        ``environment`` section of the internal ``ConfigParser``.
+
+        If the section does not exist it will be created. The method stores
+        an empty string when the environment variable is not set so that
+        subsequent calls to ``safe_load_config('environment', env_key)`` will
+        raise a ``ConfigurationError`` for missing/empty values (consistent
+        with the rest of this loader).
+
+        Returns the environment value or ``None`` if the variable is not set.
+        """
+
+        env_value = os.environ.get(env_key)
+        section = "environment"
+        print(f"getting {env_value}, {env_key}")
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+
+        # Store an empty string when env is not set to preserve ConfigParser
+        # semantics used by `safe_load_config` (empty values are treated as
+        # errors by that method).
+        self.config.set(section, env_key, "" if env_value is None else env_value)
+
+        return env_value
+    
 
     def safe_load_config(
         self,

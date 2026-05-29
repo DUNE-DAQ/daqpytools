@@ -24,7 +24,10 @@ DATE_TIME_FORMAT = config_loader.safe_load_config("logging", "date_time")
 DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_base")
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
-timezone_name = config_loader.safe_load_config("logging", "timezone")
+# timezone_name = config_loader.safe_load_config("logging", "timezone")
+timezone_load = config_loader.load_env("DUNEDAQ_TIMEZONE")
+timezone_name = config_loader.safe_load_config("environment", "DUNEDAQ_TIMEZONE")
+
 try:
     TIME_ZONE = timezone(timezone_name)
 except UnknownTimeZoneError as e:

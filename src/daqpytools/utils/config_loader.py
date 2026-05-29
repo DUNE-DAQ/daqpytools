@@ -92,6 +92,21 @@ class ConfigLoader:
         self,
         section: str,
         option: str | None = None,
+        allow_fail: bool = False
+    ):
+        try:
+            return self.load_config(section, option)
+        except ConfigurationError as e:
+            if allow_fail:
+                return False
+            else:
+                raise e 
+
+
+    def load_config(
+        self,
+        section: str,
+        option: str | None = None,
     ) -> dict[str, str] | str:
         """Safely load configuration content from a section or a single option.
 

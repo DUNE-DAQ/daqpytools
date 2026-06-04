@@ -23,4 +23,5 @@ This documentation is split into two sections depending on your role:
 | [Best practices](./how-to/best-practices.md) | Recommended patterns for structuring logging in your application |
 | [Troubleshooting](./reference/troubleshooting.md) | Common symptoms, causes, and fixes |
 | [API reference](../APIref/) | Auto-generated kwargs, types, and defaults for all public APIs (redirects to MKDocs website) |
+| [Environment configs](./environment-configs.md) | Extra information on how to configure your local copy of the logging. |
 

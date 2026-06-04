@@ -37,7 +37,12 @@ def load_and_return(env):
     return theme_name
 
 
-config_loader.read_conf(DAQPYTOOLS_LOGGING_ROOT / f"themes/{load_and_return("DUNEDAQ_LOGGING_THEME")}.ini")
+theme_path = Path(DAQPYTOOLS_LOGGING_ROOT / f"themes/{load_and_return("DUNEDAQ_LOGGING_THEME")}.ini")
+if not theme_path.is_file():
+    err_msg = f"{load_and_return("DUNEDAQ_LOGGING_THEME")} is not a valid theme file! Change your DUNEDAQ_LOGGING_THEME variable"
+    raise ValueError(err_msg)
+
+config_loader.read_conf(theme_path)
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
 

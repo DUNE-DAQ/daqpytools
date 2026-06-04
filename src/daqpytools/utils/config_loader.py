@@ -37,7 +37,8 @@ class ConfigLoader:
         self.read_conf(self.config_file)
         
     
-    def read_conf(self, conf):
+    def read_conf(self, conf: str) -> None: 
+        """Reads and loads a given config file."""
         if not self.config.read(conf):
             err_msg = (
                 f"Configuration file '{self.config_file}' "

@@ -24,22 +24,19 @@ DATE_TIME_FORMAT = config_loader.safe_load_config("logging", "date_time")
 DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_base")
 
 
-#! This bit needs to be sourced out again from somewhere!!!!!!
-#? use daq environment variables again?
-#? and then we can have a CLI entry point that just sets an env variable
-#? so that the daqqy stuff can just piont to it?
-
-def load_and_return(env):
+def load_and_return(env: str) -> str:
+    """Loads the env into the config, and then returns it safely."""
     config_loader.load_env(env)
-    theme_name = config_loader.safe_load_config(
+    return config_loader.safe_load_config(
         "environment", env
     )
-    return theme_name
 
 
-theme_path = Path(DAQPYTOOLS_LOGGING_ROOT / f"themes/{load_and_return("DUNEDAQ_LOGGING_THEME")}.ini")
+theme_path = Path(DAQPYTOOLS_LOGGING_ROOT / 
+                    f"themes/{load_and_return('DUNEDAQ_LOGGING_THEME')}.ini")
 if not theme_path.is_file():
-    err_msg = f"{load_and_return("DUNEDAQ_LOGGING_THEME")} is not a valid theme file! Change your DUNEDAQ_LOGGING_THEME variable"
+    err_msg = (f"{load_and_return('DUNEDAQ_LOGGING_THEME')} is not"
+    "a valid theme file! Change your DUNEDAQ_LOGGING_THEME variable")
     raise ValueError(err_msg)
 
 config_loader.read_conf(theme_path)
@@ -55,8 +52,6 @@ except UnknownTimeZoneError as e:
         "Please check the configuration file and ensure the time zone is valid."
     )
     raise LoggerConfigurationError(CONFIGURATION_FILE, err_msg) from e
-
-
 
 help_options_str = config_loader.safe_load_config("cli", "help_option_names")
 HELP_OPTION_NAMES = [opt.strip() for opt in help_options_str.split(",")]

@@ -22,9 +22,28 @@ LOG_RECORD_PADDING = {
 LOG_FORMAT = config_loader.safe_load_config("logging", "record_format")
 DATE_TIME_FORMAT = config_loader.safe_load_config("logging", "date_time")
 DATE_TIME_BASE_FORMAT = config_loader.safe_load_config("logging", "date_time_base")
+
+
+def load_and_return(env: str) -> str:
+    """Loads the env into the config, and then returns it safely."""
+    config_loader.load_env(env)
+    return config_loader.safe_load_config(
+        "environment", env
+    )
+
+
+theme_path = Path(DAQPYTOOLS_LOGGING_ROOT / 
+                    f"themes/{load_and_return('DUNEDAQ_LOGGING_THEME')}.ini")
+if not theme_path.is_file():
+    err_msg = (f"{load_and_return('DUNEDAQ_LOGGING_THEME')} is not"
+    "a valid theme file! Change your DUNEDAQ_LOGGING_THEME variable")
+    raise ValueError(err_msg)
+
+config_loader.read_conf(theme_path)
 CONSOLE_THEME = Theme(config_loader.safe_load_config("theme"))
 
-timezone_name = config_loader.safe_load_config("logging", "timezone")
+
+timezone_name = load_and_return("DUNEDAQ_TIMEZONE")
 try:
     TIME_ZONE = timezone(timezone_name)
 except UnknownTimeZoneError as e:

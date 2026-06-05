@@ -10,7 +10,7 @@ If you are new to this repo, read this first before editing docs.
 
 The docs are assembled from multiple sources at build time:
 
-- `docs/` contains user-facing content
+- `docs/` contains user-facing content. **Note that this is also used in the dunedaq readthedocs.**
 - `docs_dev/` contains developer-facing content
 - `docs_dev/utils/generate_logging_autodocs.py` generates API reference pages from Python registries
 - `docs_dev/utils/mirror_docs.py` mirrors everything into a virtual docs tree

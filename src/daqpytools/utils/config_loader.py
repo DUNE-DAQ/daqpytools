@@ -1,5 +1,5 @@
-
 import configparser
+import os
 from pathlib import Path
 from typing import overload
 
@@ -34,8 +34,12 @@ class ConfigLoader:
         """
         self.config_file = config_file
         self.config: configparser.ConfigParser = configparser.ConfigParser()
-
-        if not self.config.read(self.config_file):
+        self.read_conf(self.config_file)
+        
+    
+    def read_conf(self, conf: str) -> None: 
+        """Reads and loads a given config file."""
+        if not self.config.read(conf):
             err_msg = (
                 f"Configuration file '{self.config_file}' "
                 "not found or could not be read."
@@ -58,6 +62,34 @@ class ConfigLoader:
         option: str,
     ) -> str:
         ...
+
+
+    # define a thing that lets you parse environment variables
+    def load_env(self, env_key: str) -> str | None:
+        """Read an environment variable and insert it into the
+        ``environment`` section of the internal ``ConfigParser``.
+
+        If the section does not exist it will be created. The method stores
+        the variable only when it is set and non-empty; if the variable is
+        not set (or is an empty string), the config is left unchanged and
+        the method returns ``None``. This differs from earlier behaviour that
+        used to write an empty string for unset variables.
+
+        Returns the environment value or ``None`` if the variable is not set
+        or is empty.
+        """
+        env_value = os.environ.get(env_key)
+        section = "environment"
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+
+        # Only store the value when the environment variable is set and
+        # non-empty. If the variable is unset or empty, leave the config
+        # unchanged and return None.
+        if env_value:
+            self.config.set(section, env_key, env_value)
+
+        return env_value
 
 
     def safe_load_config(

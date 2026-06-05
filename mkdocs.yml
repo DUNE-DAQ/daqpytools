@@ -28,6 +28,8 @@ nav:
       - How docs work and how to update them: dev/how-to/update-documentation.md
     - Common patterns: dev/reference/patterns.md
   - API reference: APIref
+  - Environment configurations: user/environment-configs.md
+
 theme:
   name: material
   palette: 

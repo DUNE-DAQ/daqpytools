@@ -4,6 +4,8 @@
 
 The way this is configured is by setting environment variables. By default, these are _unset_ in the terminal, which daqpytools will read and resolve to a default value. These default values can be found in `logging/log_format.ini`.
 
+If a non-default time zone/theme is preferred, it is recommended to set the env vars `DUNEDAQ_TIMEZONE` and `DUNEDAQ_LOGGING_THEME` in your `~/.bashrc`.
+
 ## Timezones
 
 To change the timezone, simply do 

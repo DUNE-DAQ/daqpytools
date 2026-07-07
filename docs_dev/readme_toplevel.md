@@ -17,6 +17,7 @@ Furthermore, a separate API reference set that includes Auto-generated kwargs, t
 |---|---|
 | [Tutorial](./user/tutorial.md) | Get a working logger running from scratch |
 | [Concepts & explanation](./user/explanation.md) | Understand how Python logging and daqpytools work |
+| [Severity levels](./user/severitylevels.md) | Quick reference for `DEBUG`, `INFO`, `WARNING`, `ERROR`, and `CRITICAL` |
 | [How to use handlers and filters](./user/how-to/use-handlers.md) | Descriptions and examples for each handler and filter |
 | [How to route messages](./user/how-to/route-messages.md) | Direct records to specific handlers using HandlerType and LogHandlerConf |
 | [How to add handlers at runtime](./user/how-to/add-handlers-at-runtime.md) | Attach handlers after logger creation; pass kwargs |

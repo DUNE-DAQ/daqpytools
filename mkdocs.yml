@@ -10,6 +10,7 @@ nav:
   - User Documentation:
     - Tutorial: user/tutorial.md
     - Concepts & explanation: user/explanation.md
+    - Severity levels: user/severitylevels.md
     - How-to:
       - Use handlers and filters: user/how-to/use-handlers.md
       - Route messages: user/how-to/route-messages.md

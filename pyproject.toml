@@ -14,7 +14,7 @@ description = "Python utils to simplify DAQ development."
 name = "daqpytools"
 readme = "docs/README.md"
 requires-python = ">=3.10"
-version = "1.0.0"
+version = "1.1.0"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -29,9 +29,8 @@ dev = [
   "pytest",
   "pytest-cov",
   "pylint",
-  "graphviz"
+  "graphviz",
 ]
-test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 docs = [
   "mkdocs",
   "mkdocs-material",
@@ -41,13 +40,12 @@ docs = [
   "mkdocs-literate-nav",
   "mkdocs-section-index",
   "mkdocs-exclude",
-
 ]
+test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
 
 [project.scripts]
-daqpytools-logging-demonstrator = "daqpytools.apps.logging_demonstrator:main"
 daqpytools-generate-uml = "daqpytools.apps.generate_uml:main"
-
+daqpytools-logging-demonstrator = "daqpytools.apps.logging_demonstrator:main"
 
 # Stricter linting rules than the standard (daq-deliverables #196); this is fine
 

@@ -191,6 +191,7 @@ def split_dot_file(
     )
 
     written_dot_files: list[Path] = []
+    filename_counts: dict[str, int] = defaultdict(int)
 
     for cluster_nodes in sorted(all_clusters, key=lambda c: -len(c)):
         if len(cluster_nodes) < min_size:
@@ -199,6 +200,9 @@ def split_dot_file(
 
         name = cluster_name(cluster_nodes)
         safe_name = re.sub(r"[^\w\-.]", "_", name)
+        filename_counts[safe_name] += 1
+        if filename_counts[safe_name] > 1:
+            safe_name = f"{safe_name}_{filename_counts[safe_name]}"
         node_lines = [nodes[n] for n in cluster_nodes if n in nodes]
         edge_lines = [
             raw

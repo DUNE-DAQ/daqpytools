@@ -127,3 +127,24 @@ def load_style_config(path: Path | str | None = None) -> dict[str, str]:
         "nodesep": graph["nodesep"],
         "ranksep": graph["ranksep"],
     }
+
+
+def load_link_config(path: Path | str | None = None) -> dict[str, str]:
+    """Load GitHub linking configuration (org, fallback ref) from ini file."""
+    if path is None:
+        path = Path(__file__).parent / "uml_format.ini"
+
+    links = ConfigLoader(path).safe_load_config("uml_links")
+    return {
+        "github_org": links["github_org"],
+        "default_ref": links["default_ref"],
+    }
+
+
+def load_color_theme_config(path: Path | str | None = None) -> list[str]:
+    """Load the directory-coloring palette from ini file."""
+    if path is None:
+        path = Path(__file__).parent / "uml_format.ini"
+
+    colors = ConfigLoader(path).safe_load_config("uml_color_theme", "colors")
+    return [color.strip() for color in colors.split(",") if color.strip()]

@@ -28,6 +28,7 @@ import sys
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pylint.pyreverse.main import Run
 
@@ -76,24 +77,35 @@ def run_pyreverse(
     verbose: bool = False,
 ) -> list[Path]:
     """Run pyreverse and return the generated dot files."""
-    cmd_args = ["-o", "dot", "--output-directory", str(output_dir), *extra_args]
-    vprint(verbose, f"[style_pyreverse] Running: pyreverse {' '.join(cmd_args)}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".pyreverse-", dir=output_dir) as staging_dir_name:
+        staging_dir = Path(staging_dir_name)
+        cmd_args = ["-o", "dot", "--output-directory", str(staging_dir), *extra_args]
+        vprint(verbose, f"[style_pyreverse] Running: pyreverse {' '.join(cmd_args)}")
 
-    with _pushd(cwd):
-        result = Run(cmd_args).run()
+        with _pushd(cwd):
+            result = Run(cmd_args).run()
 
-    if result != 0:
-        sys.stderr.write(
-            f"[style_pyreverse] pyreverse failed with exit code {result}\n"
-        )
-        raise SystemExit(result)
-    dot_files = list(output_dir.glob("*.dot"))
-    if not dot_files:
-        sys.stderr.write(
-            f"[style_pyreverse] ERROR: pyreverse produced no .dot files in "
-            f"{output_dir}\n"
-        )
-        raise SystemExit(1)
+        if result != 0:
+            sys.stderr.write(
+                f"[style_pyreverse] pyreverse failed with exit code {result}\n"
+            )
+            raise SystemExit(result)
+
+        staged_dot_files = sorted(staging_dir.glob("*.dot"))
+        if not staged_dot_files:
+            sys.stderr.write(
+                f"[style_pyreverse] ERROR: pyreverse produced no .dot files in "
+                f"{staging_dir}\n"
+            )
+            raise SystemExit(1)
+
+        dot_files = []
+        for staged_dot_file in staged_dot_files:
+            dot_path = output_dir / staged_dot_file.name
+            staged_dot_file.replace(dot_path)
+            dot_files.append(dot_path)
+
     return dot_files
 
 

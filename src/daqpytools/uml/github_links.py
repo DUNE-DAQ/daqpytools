@@ -1,6 +1,7 @@
 """Resolve GitHub source links for UML nodes and inject them into dot files."""
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -19,9 +20,13 @@ _PATH_CANDIDATE_TEMPLATES = (
 
 def resolve_git_ref(cwd: Path, default_ref: str) -> str:
     """Return the current commit SHA of the repo at ``cwd``, or ``default_ref``."""
+    git_executable = shutil.which("git")
+    if git_executable is None:
+        return default_ref
+
     try:
-        result = subprocess.run(
-            ["git", "-C", str(cwd), "rev-parse", "HEAD"],
+        result = subprocess.run(  # noqa: S603
+            [git_executable, "-C", str(cwd), "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
             check=True,

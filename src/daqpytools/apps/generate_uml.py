@@ -110,7 +110,9 @@ def write_directory_color_legend(
         return None
 
     legend_dot = output_dir / "directory_color_legend.dot"
-    legend_dot.write_text(build_directory_color_legend_dot(directory_colors), encoding="utf-8")
+    legend_dot.write_text(
+        build_directory_color_legend_dot(directory_colors), encoding="utf-8"
+    )
     return legend_dot
 
 
@@ -319,7 +321,9 @@ def main(
             vprint(verbose, f"[generate_uml] Written linkable SVG: {img_path}")
 
         if legend_dot is not None:
-            img_path = render_dot(legend_dot, resolved_output_dir, fmt="svg", verbose=verbose)
+            img_path = render_dot(
+                legend_dot, resolved_output_dir, fmt="svg", verbose=verbose
+            )
             vprint(verbose, f"[generate_uml] Written color legend SVG: {img_path}")
 
     vprint(verbose, "[generate_uml] Complete")

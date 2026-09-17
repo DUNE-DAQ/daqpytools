@@ -306,6 +306,12 @@ def main(
 
     # Linkable output must be SVG; only render it if it wasn't already produced above.
     if generate_linkable and render_format != "svg":
+        for split_dot in split_dot_files:
+            img_path = render_dot(
+                split_dot, split_dot.parent, fmt="svg", verbose=verbose
+            )
+            vprint(verbose, f"[generate_uml] Written linkable SVG: {img_path}")
+
         for styled_dot in styled_dot_files:
             img_path = render_dot(
                 styled_dot, resolved_output_dir, fmt="svg", verbose=verbose

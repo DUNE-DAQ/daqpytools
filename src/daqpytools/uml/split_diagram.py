@@ -110,7 +110,8 @@ def module_group(node_id: str) -> str:
 def cluster_name(node_ids: set[str]) -> str:
     """Derive a filesystem-safe name for a cluster from its node ids."""
     if len(node_ids) == 1:
-        return module_group(next(iter(node_ids)))
+        # Empty names would collide with Graphviz's own cleanup-managed source file.
+        return module_group(next(iter(node_ids))) or "misc"
 
     # Find common prefix of all node module paths
     all_parts = [nid.split(".") for nid in node_ids]

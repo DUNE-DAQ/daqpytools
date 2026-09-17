@@ -21,10 +21,16 @@ from pathlib import Path
 import click
 
 from daqpytools.uml.dot_parsing import patch_dot
+from daqpytools.uml.github_links import inject_node_links, resolve_git_ref
 from daqpytools.uml.render import render_dot
 from daqpytools.uml.split_diagram import split_dot_file
 from daqpytools.uml.style_pyreverse import run_pyreverse
-from daqpytools.uml.utils import CONTEXT_SETTINGS, load_style_config, vprint
+from daqpytools.uml.utils import (
+    CONTEXT_SETTINGS,
+    load_link_config,
+    load_style_config,
+    vprint,
+)
 
 
 def validate_output_directory(
@@ -60,10 +66,18 @@ def resolve_output_directory(
     return cwd, resolved_output
 
 
-def style_dot_file(dot_path: Path, style: dict[str, str], concise: bool) -> Path:
+def style_dot_file(
+    dot_path: Path,
+    style: dict[str, str],
+    concise: bool,
+    link_context: tuple[Path, str, str, str, bool] | None = None,
+) -> Path:
     """Patch a raw dot file and write the styled version next to it."""
     original = dot_path.read_text(encoding="utf-8")
     patched = patch_dot(original, style=style, concise=concise)
+    if link_context is not None:
+        cwd, org, repo, ref, link_line_number = link_context
+        patched = inject_node_links(patched, cwd, org, repo, ref, link_line_number)
     patched_path = dot_path.with_name(f"{dot_path.stem}_styled.dot")
     patched_path.write_text(patched, encoding="utf-8")
     return patched_path
@@ -136,6 +150,16 @@ def style_dot_file(dot_path: Path, style: dict[str, str], concise: bool) -> Path
     default=None,
     help="Path to YAML style config file for the UML renderer.",
 )
+@click.option(
+    "--generate-linkable",
+    is_flag=True,
+    help="Add GitHub source links to nodes and render a linked SVG.",
+)
+@click.option(
+    "--link-line-number",
+    is_flag=True,
+    help="With --generate-linkable, link directly to a class's definition line.",
+)
 def main(
     targets: tuple[str, ...],
     directory: Path | None,
@@ -148,6 +172,8 @@ def main(
     classes: tuple[str, ...],
     verbose: bool,
     style_config: Path | None,
+    generate_linkable: bool,
+    link_line_number: bool,
 ) -> None:
     """Generate styled UML class diagrams from Python code."""
     pyreverse_args = build_pyreverse_args(targets, package, classes)
@@ -159,6 +185,14 @@ def main(
     style = load_style_config(style_config)
     render_format = None if output_format.lower() == "none" else output_format.lower()
 
+    link_context = None
+    if generate_linkable:
+        link_config = load_link_config()
+        repo = targets[0] if targets else package[0]
+        ref = resolve_git_ref(cwd, link_config["default_ref"])
+        link_context = (cwd, link_config["github_org"], repo, ref, link_line_number)
+        vprint(verbose, f"[generate_uml] Linking nodes to {link_config['github_org']}/{repo}@{ref}")
+
     vprint(verbose, f"[generate_uml] Running pyreverse in {cwd}")
     dot_files = run_pyreverse(
         pyreverse_args, resolved_output_dir, cwd=str(cwd), verbose=verbose
@@ -167,7 +201,11 @@ def main(
     styled_dot_files: list[Path] = []
     for dot_path in dot_files:
         vprint(verbose, f"[generate_uml] Styling {dot_path.name}")
-        styled_dot_files.append(style_dot_file(dot_path, style=style, concise=concise))
+        styled_dot_files.append(
+            style_dot_file(
+                dot_path, style=style, concise=concise, link_context=link_context
+            )
+        )
 
     split_dot_files: list[Path] = []
     if split:
@@ -201,6 +239,14 @@ def main(
             vprint(verbose, f"[generate_uml] Written: {img_path}")
     else:
         vprint(verbose, "[generate_uml] Skipping rendering (--format none)")
+
+    # Linkable output must be SVG; only render it if it wasn't already produced above.
+    if generate_linkable and render_format != "svg":
+        for styled_dot in styled_dot_files:
+            img_path = render_dot(
+                styled_dot, resolved_output_dir, fmt="svg", verbose=verbose
+            )
+            vprint(verbose, f"[generate_uml] Written linkable SVG: {img_path}")
 
     vprint(verbose, "[generate_uml] Complete")
     vprint(verbose, f"[generate_uml] Output directory: {resolved_output_dir.resolve()}")

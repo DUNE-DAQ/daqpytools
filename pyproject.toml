@@ -41,7 +41,7 @@ docs = [
   "mkdocs-section-index",
   "mkdocs-exclude",
 ]
-test = ["pytest", "pytest-mypy", "pytest-cov", "types-pytz"]
+test = ["pytest", "pylint", "pytest-mypy", "pytest-cov", "types-pytz"]
 
 [project.scripts]
 daqpytools-generate-uml = "daqpytools.apps.generate_uml:main"

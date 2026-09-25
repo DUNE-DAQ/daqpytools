@@ -9,6 +9,8 @@ dependencies = [
   "pytz",
   "rich",
   "sh",
+  "graphviz",
+  "pylint",
 ]
 description = "Python utils to simplify DAQ development."
 name = "daqpytools"

@@ -46,23 +46,38 @@ def patch_dot(dot_src: str, style: dict[str, str], concise: bool = False) -> str
     )
 
 
+def append_bracket_attrs(line: str, new_attrs: str) -> str:
+    """Append attrs into a line's outermost ``[...]`` attribute list.
+
+    Uses balanced-bracket matching rather than a naive first-match regex,
+    since HTML labels (e.g. ``set[HandlerType]``) can contain literal
+    bracket pairs before the real attribute list closes.
+    """
+    start = line.find("[")
+    if start == -1:
+        return re.sub(r";?\s*$", f" [{new_attrs}];", line.rstrip())
+
+    depth = 0
+    end = None
+    for i in range(start, len(line)):
+        if line[i] == "[":
+            depth += 1
+        elif line[i] == "]":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+
+    if end is None:
+        return re.sub(r";?\s*$", f" [{new_attrs}];", line.rstrip())
+
+    inner = line[start + 1 : end].strip().rstrip(",")
+    prefix = f"{inner}, " if inner else ""
+    return line[:start] + "[" + prefix + new_attrs + "]" + line[end + 1 :]
+
+
 def _append_edge_attrs(line: str, new_attrs: str) -> str:
-    if "[" in line:
-        return re.sub(
-            r"\[([^\]]*)\]",
-            lambda match: (
-                "["
-                + (
-                    match.group(1).strip().rstrip(",") + ", "
-                    if match.group(1).strip()
-                    else ""
-                )
-                + new_attrs
-                + "]"
-            ),
-            line,
-        )
-    return re.sub(r";?\s*$", f" [{new_attrs}];", line.rstrip())
+    return append_bracket_attrs(line, new_attrs)
 
 
 def fix_edges(dot_src: str, style: dict[str, str]) -> str:
